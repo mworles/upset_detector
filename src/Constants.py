@@ -7,3 +7,5 @@ COLUMNS_TO_RENAME = {'TeamID': 'team_id',
                      'WTeamID': 'Wteam',
                      'LTeamID': 'Lteam',
                      'WLoc': 'Wloc'}
+
+CURRENT_YEAR = 2019
