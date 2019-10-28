@@ -61,3 +61,29 @@ def add_season(df, season):
 def seed_to_numeric(seed):
     new_seed = int(re.sub(r'\D+', '', seed))
     return new_seed
+
+def set_gameid_index(df, id_cols):
+    """
+    Set dataframe index in YYYY_t1##_t2## format to provide each game with
+    a unique identifier.
+    YYYY: Season
+    t1##: Lower numerical team ID
+    t2##: Higher numerical team ID. 
+    Provides each game with a unique identifier.
+    """
+    id_lower = df[id_cols].min(axis=1).astype(str)
+    id_upper = df[id_cols].max(axis=1).astype(str)
+    season = df['season'].astype(str)
+    df['game_id'] = season + '_' + id_lower + '_' + id_upper
+    df = df.set_index('game_id')
+    return df
+
+def convert_team_id(df, id_cols, drop=True):
+    """Create 2 team identifier columns. 
+    t1_team_id is numerically lower team, t2_team_id is higher team.
+    """
+    df['t1_team_id'] = df[id_cols].min(axis=1)
+    df['t2_team_id'] = df[id_cols].max(axis=1)
+    if drop == True:
+        df = df.drop(columns=id_cols)
+    return df
