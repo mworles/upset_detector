@@ -32,8 +32,10 @@ mrg.columns = map(str.lower, mrg.columns)
 mrg['em'] = np.where(mrg['em'].isnull(), mrg['adjem'], mrg['em'])
 mrg['rankem'] = np.where(mrg['rankem'].isnull(), mrg['rankadjem'], mrg['rankem'])
 
-# remove columns not needed
-mrg = mrg.drop(['teamname', 'name_spelling', 'adjem', 'rankadjem'], axis=1)
+# select columns to keep as features
+keep = ['team_id', 'season', 'adjtempo', 'adjoe', 'rankadjoe',
+              'adjde', 'rankadjde', 'em', 'rankem']
+mrg = mrg[keep]
 
 # save kp feature data file
 write_file(mrg, '../../data/interim/', 'features_kp')
