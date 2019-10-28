@@ -20,7 +20,7 @@ ts = ts.drop('seed', axis=1)
 f_coach = pd.read_csv(dir + 'interim/features_coach.csv')
 f = pd.merge(ts, f_coach, how='inner', on=['team_id', 'season'])
 
-# import kp features, merge
+# import kp features, merge with other features
 f_kp = pd.read_csv(dir + 'interim/features_kp.csv')
 f = pd.merge(f, f_kp, how='inner', on=['team_id', 'season'])
 
