@@ -84,6 +84,9 @@ coaches.drop(['cvis', 'cwins', 'cgames', 'e8', 'f4', 'first_day', 'last_day',
 # had no pre-1985 data to compute 1985 features, so drop 1985
 coaches = coaches[coaches.season > 1985]
 
+# remove string name, not utilized as a feature
+coaches = coaches.drop(['cname'], axis=1)
+
 # save coach feature file
 dest = '../../data/interim/'
 file_name = 'features_coach'
