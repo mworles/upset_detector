@@ -2,6 +2,7 @@ import pandas as pd
 import os
 import re
 from fuzzywuzzy import process
+from Constants import COLUMNS_TO_RENAME
 
 def write_file(data, data_out, file_name, keep_index=False):
     """Set location and write new .csv file in one line."""
@@ -87,3 +88,36 @@ def convert_team_id(df, id_cols, drop=True):
     if drop == True:
         df = df.drop(columns=id_cols)
     return df
+
+
+
+def add_seeds(directory, df, team_ids, projected=False):
+    # import seeds data file
+    seeds = pd.read_csv(directory+ 'NCAATourneySeeds.csv')
+    # include projected seeds for future matchups
+    if projected:
+        proj = pd.read_csv('../data/interim/projected_seeds_ids.csv')
+        seeds = pd.concat([seeds, proj], sort=False)
+    
+    # cleaning columns for compatibility
+    seeds = seeds.rename(columns=COLUMNS_TO_RENAME)
+    seeds.columns = [x.lower() for x in seeds.columns]
+    
+    # convert seed column to numeric value
+    seeds['seed'] = seeds['seed'].apply(seed_to_numeric)
+    
+    # merge seed values for t1_team
+    merge_on1 = ['season', team_ids[0]]
+    df_seeds1 = pd.merge(df, seeds, left_on=merge_on1,
+                         right_on=['season', 'team_id'], how='inner')
+    df_seeds1 = df_seeds1.rename(columns={'seed': 't1_seed'})
+    df_seeds1 = df_seeds1.drop(columns=['team_id'])
+    
+    # merge seed values for t2_team
+    merge_on2 = ['season', team_ids[1]]
+    df_seeds2 = pd.merge(df_seeds1, seeds, left_on=merge_on2,
+                         right_on=['season', 'team_id'], how='inner')
+    df_seeds2 = df_seeds2.rename(columns={'seed': 't2_seed'})
+    df_seeds2 = df_seeds2.drop(columns=['team_id'])
+    
+    return df_seeds2
