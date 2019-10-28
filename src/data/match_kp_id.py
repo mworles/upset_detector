@@ -72,6 +72,12 @@ kp_ids = pd.concat([match, dfnm])
 
 kp_ids['team_id'] = kp_ids['team_id'].astype(int)
 
+# print warning if any school team_ids not identified
+if kp_ids.shape[0] != dfkp.shape[0]:
+    n_left = dfkp.shape[0] - kp_ids.shape[0]
+    print 'Warning: %d team ids not joined to kp teams.' % (n_left)
+
+
 # merge the kp data file with the kaggle identifiers
 mrg2 = pd.merge(df, kp_ids, on='team_kp', how='inner')
 cols_to_keep = ['TeamName', 'name_spelling', 'team_id']
