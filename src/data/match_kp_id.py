@@ -5,7 +5,7 @@ import pandas as pd
 import numpy as np
 import re
 from fuzzywuzzy import process
-from Cleaning import list_files, write_file, add_season_column
+from Cleaning import list_files, write_file
 from Constants import COLUMNS_TO_RENAME
 
 print "running %s" % (os.path.basename(__file__))
@@ -14,9 +14,12 @@ kpath = '../../data/external/kp/'
 dpath = '../../data/raw/'
 
 # create list of files
-files = list_files(kpath, suffix=".csv")
+files = [directory + x for x in list_files(directory, suffix=".csv")]
 
-data_list = [add_season_column(x, kpath) for x in files]
+# list of dataframes, add season column
+data_list = [pd.read_csv(x) for x in files]
+
+# combine into single data frame
 df = pd.concat(data_list, sort=True)
 
 # modify kp team names to match kaggle format and improve matching
