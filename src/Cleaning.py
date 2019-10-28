@@ -46,13 +46,16 @@ def list_files(directory, suffix=".csv"):
     files = os.listdir(directory)
     return [filename for filename in files if filename.endswith(suffix)]
 
-def add_season_column(x, directory):
-    df = pd.read_csv(directory + x, index_col=None, header=0)
+def get_season(file):
+    year = re.findall('\d+', file)
+    season = int('20' + ''.join(year))
+    return season
+
+def add_season(df, season):
     if any([c in df.columns for c in ['Season', 'season']]):
         df = df.rename(columns={'Season': 'season'})
     else:
-        year = re.findall('\d+', x)
-        df['season'] = int('20' + ''.join(year))
+        df['season'] = season
     return df
 
 def seed_to_numeric(seed):
