@@ -58,7 +58,7 @@ def match_school_id(df):
     # print warning if any school team_ids not identified
     if n_schools != all.shape[0]:
         n_left = n_schools - all.shape[0]
-        print 'Warning: %d team ids not joined.' % (n_left)
+        print 'Warning: %d team ids not joined to school names.' % (n_left)
     
     return all
 
