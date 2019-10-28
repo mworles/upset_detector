@@ -3,7 +3,7 @@ sys.path.append("../")
 import os
 import pandas as pd
 import numpy as np
-from Cleaning import seed_to_numeric, write_file
+from Cleaning import write_file
 from Constants import DATA_COLUMN_KEY
 
 print 'running %s' % (os.path.basename(__file__))
