@@ -19,5 +19,21 @@ dfs = [pd.read_csv(x) for x in files]
 # add season column
 data_list = [add_season(x, y) for x, y  in zip(dfs, seasons)]
 
-# combine into single data frame
-df = pd.concat(data_list, sort=True)
+df = pd.concat(data_list, sort=False)
+
+# link team id numbers
+kpid = pd.read_csv('../../data/interim/kp_ids.csv')
+mrg = pd.merge(df, kpid, on='TeamName', how='inner')
+
+# remove columns not needed
+mrg.columns = map(str.lower, mrg.columns)
+
+# fill missing rows due to changes in column name
+mrg['em'] = np.where(mrg['em'].isnull(), mrg['adjem'], mrg['em'])
+mrg['rankem'] = np.where(mrg['rankem'].isnull(), mrg['rankadjem'], mrg['rankem'])
+
+# remove columns not needed
+mrg = mrg.drop(['teamname', 'name_spelling', 'adjem', 'rankadjem'], axis=1)
+
+# save kp feature data file
+write_file(mrg, '../../data/interim/', 'features_kp')
