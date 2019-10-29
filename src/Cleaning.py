@@ -80,8 +80,8 @@ def set_gameid_index(df, id_cols):
     return df
 
 def convert_team_id(df, id_cols, drop=True):
-    """Create 2 team identifier columns. 
-    t1_team_id is numerically lower team, t2_team_id is higher team.
+    """Create columns with team numerical identifier where t1_team_id is
+    numerically lower team, t2_team_id is higher team.
     """
     df['t1_team_id'] = df[id_cols].min(axis=1)
     df['t2_team_id'] = df[id_cols].max(axis=1)
@@ -90,10 +90,9 @@ def convert_team_id(df, id_cols, drop=True):
     return df
 
 
-
 def add_seeds(directory, df, team_ids, projected=False):
     # import seeds data file
-    seeds = pd.read_csv(directory+ 'NCAATourneySeeds.csv')
+    seeds = pd.read_csv(directory + 'NCAATourneySeeds.csv')
     # include projected seeds for future matchups
     if projected:
         proj = pd.read_csv('../data/interim/projected_seeds_ids.csv')
