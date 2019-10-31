@@ -1,6 +1,5 @@
 import pandas as pd
 import numpy as np
-from sklearn.model_selection import KFold
 
 def fold_indices(df, column, value):
     train = df[df[column] < value].index.values
