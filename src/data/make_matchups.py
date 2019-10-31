@@ -63,4 +63,8 @@ df2['t2_dist'] = df2.apply(lambda x: compute_travel_distance(x, 't2_team_id'), a
 df2['t1_dist_delt'] = df2['t1_dist'] - df2['t2_dist']
 df2['t2_dist_delt'] = df2['t2_dist'] - df2['t1_dist']
 """
+
+# remove some columns not used as features
+df2 = df2.drop(['t1_team_id', 't2_team_id'], axis=1)
+
 write_file(df2, '../../data/processed/', 'features', keep_index=True)
