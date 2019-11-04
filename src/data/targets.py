@@ -78,6 +78,6 @@ df = pd.merge(df, upset, how='left', left_index=True, right_index=True)
 
 # keep target columns
 df = df.loc[:, ['t1_win', 't1_marg', 'upset']]
-print df.head(20)
+
 # save file
 write_file(df, dir + '/processed/', 'targets', keep_index=True)
