@@ -120,3 +120,13 @@ def add_seeds(directory, df, team_ids, projected=False):
     df_seeds2 = df_seeds2.drop(columns=['team_id'])
     
     return df_seeds2
+
+def upset_features(df):
+    dfr = df.copy()
+    toswitch = dfr['t1_seed'] < dfr['t2_seed']
+    t1_cols = [x for x in dfr.columns if x[0:3] == 't1_']
+    t2_cols = [x for x in dfr.columns if x[0:3] == 't2_']
+    for t1_col, t2_col in zip(t1_cols, t2_cols):
+        dfr.loc[toswitch, t1_col] = df.loc[toswitch, t2_col]
+        dfr.loc[toswitch, t2_col] = df.loc[toswitch, t1_col]
+    return dfr
