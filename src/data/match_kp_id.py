@@ -10,7 +10,7 @@ from Constants import COLUMNS_TO_RENAME
 
 print "running %s" % (os.path.basename(__file__))
 
-kpath = '../../data/external/kp/'
+directory = '../../data/external/kp/'
 dpath = '../../data/raw/'
 
 # create list of files
