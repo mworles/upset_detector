@@ -64,7 +64,7 @@ def match_school_id(df):
 
 print "running %s" % (os.path.basename(__file__))
 
-directory = 'data/external/school_stats/'
+directory = '../../data/external/school_stats/'
 schools = clean_schools(directory)
 df = match_school_id(schools)
 df = df.rename(columns={'School': 'ss_team'})
