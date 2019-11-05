@@ -8,4 +8,7 @@ COLUMNS_TO_RENAME = {'TeamID': 'team_id',
                      'LTeamID': 'Lteam',
                      'WLoc': 'Wloc'}
 
+DATA_COLUMN_KEY = {'winner_column': 'WTeamID',
+                   'loser_column': 'LTeamID'}
+
 CURRENT_YEAR = 2019
