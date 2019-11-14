@@ -37,11 +37,14 @@ def clean_school_name(x):
     x = re.sub(r' ', '-', x)
     return x
 
-def fuzzy_match(x, y):
+def fuzzy_match(x, y, cutoff=90):
     """Indentify the closest match between a given string and a list of
     strings."""
     best_match, score = process.extractOne(x, y)
-    return best_match
+    if score >= cutoff:
+        return best_match
+    else:
+        return None
 
 def list_files(directory, suffix=".csv"):
     files = os.listdir(directory)
