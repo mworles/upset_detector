@@ -58,27 +58,9 @@ md =  {k: v for (k, v) in matches}
 
 df['team_id'] = df['team_clean'].apply(lambda x: get_id(x, md)[1])
 
-print df.sort_values('team_id').tail(10)
-
-
-"""
-df['team_id'] = 
-
-
-for t in df['team_clean'].values[0:50]:
-    if t in nsd.keys():
-        tid = nsd[t]
-    else:
-        tid = np.nan
-    print tid
-
-
-schools = clean_schools(directory)
-df = match_school_id(schools)
-df = df.rename(columns={'School': 'ss_team'})
+df = df[['team', 'team_id']]
 
 data_out = '../../data/interim/'
 
 # save school stats data file
-write_file(df, data_out, 'id_school')
-"""
+write_file(df, data_out, 'pt_id')
