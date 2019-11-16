@@ -18,6 +18,9 @@ space_grid[0] = {"model": "logistic",
                  "hyperparameters": {"C": {"min": 0.00001,
                                            "max": 1,
                                            "func": "loguniform"
-                                           }
+                                           },
+                                     "penalty": {"options": ['l1', 'l2'],
+                                                "func": "choice"
+                                                }
                                      }
                  }
