@@ -49,11 +49,14 @@ df = df.dropna(how='any', subset=['team_id_h', 'team_id_r'])
 
 df = convert_team_id(df, ['team_id_h', 'team_id_r'], drop=False)
 
-df['spread_t1'] = df.apply(t1_spread, axis=1)
+df['t1_spread'] = df.apply(t1_spread, axis=1)
 
 df['game_id'] = df.apply(game_id, axis=1)
 
-df = df[['game_id', 't1_team_id', 't2_team_id', 'spread_t1']]
+df = df[['game_id', 't1_team_id', 't2_team_id', 't1_spread']]
+
+df = df.set_index('game_id')
+df = df.sort_index()
 
 data_out = '../../data/interim/'
 
