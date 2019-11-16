@@ -69,6 +69,17 @@ def scale_folds(df, target, folds, scaler):
     folds_scaled = map(tf, folds)
     return folds_scaled
 
+def fold_preds(fold, model, type='probs'):
+    
+    model.fit(fold['x_train'], fold['y_train'])
+    
+    preds =  model.predict_proba(fold['x_test'])[:, 1]
+    
+    if type == 'labels':
+        preds = np.where(preds > 0.50, 1, 0)
+
+    return preds
+    
 def fold_score(fold, model, score_func):
     
     model.fit(fold['x_train'], fold['y_train'])
@@ -104,11 +115,20 @@ def hyper_search(grid_id, folds, n_trials, score_type):
     def objective_min(params):
         
         model.set_params(**params)
-        scores = map(lambda x: fold_score(x, model, score_func), folds)
-        mean_score = np.mean(scores)
+        #scores = map(lambda x: fold_score(x, model, score_func), folds)
+        #mean_score = np.mean(scores)
+        
+        preds_list = map(lambda x: fold_preds(x, model, type='labels'), folds)
+        preds = np.concatenate(preds_list).ravel().tolist()
+        
+        labels_list = [x['y_test'] for x in folds]
+        labels = [i for sub in labels_list for i in sub]
+                
+        cv_score = score_func(labels, preds)
+        
         print "Trial: %r" % (len(trials.trials))
         
-        return {'loss': 1 - mean_score,
+        return {'loss': 1 - cv_score,
                 'status': STATUS_OK,
                 'params': params,
                 'grid_id': grid_id,
@@ -178,11 +198,15 @@ def trials_data(trials, search_space):
                     for x in param_values]
     param_values = [space_eval(search_space, x) for x in param_values]
     losses = [x['result']['loss'] for x in trials.trials]
+    score_type = trials.trials[0]['result']['scorer']
     
     trials_data = param_values
     [x.update({'loss': y}) for x, y in zip(trials_data, losses)]
+    [x.update({'loss': y}) for x, y in zip(trials_data, losses)]
     
     df = pd.DataFrame(param_values)
+    df['score_type'] = score_type
+    
     return df
 
 def split_scale(df, target, split_on, split_values, drop=True):
