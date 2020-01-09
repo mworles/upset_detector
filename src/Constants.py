@@ -12,3 +12,5 @@ DATA_COLUMN_KEY = {'winner_column': 'WTeamID',
                    'loser_column': 'LTeamID'}
 
 CURRENT_YEAR = 2019
+
+SPLIT_YEARS = [2013, 2014, 2015, 2016, 2017]
