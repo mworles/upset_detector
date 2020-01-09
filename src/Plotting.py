@@ -45,17 +45,18 @@ def plot_scores(df, param, log_scale = True, show = False):
     else:
         plt.close('all')
 
-
-trials =  get_search(0)
-search_space = convert_grid(0, space_grid)
-df = trials_data(trials, search_space)
-print df.head()
-"""
-param = 'C'
-df = df[df['penalty'] == 'l2']
-
-if space_grid[0]['hyperparameters'][param]['func'] == 'loguniform':
-    log_scale = True
-
-plot_scores(df, param, log_scale = log_scale, show = True)
-"""
+def plot_roc_curve(y, y_prob, label_name):
+    fig = plt.figure(figsize=(8, 6))
+    fpr, tpr, thresh = roc_curve(y, y_prob)
+    plt.plot(fpr, tpr, lw=3, label=s['model'])
+    plt.ylim([0.0, 1.0])
+    plt.xlim([0.0, 1.0])
+    title = "".join([label_name, " Classifier ROC Curve"])
+    plt.title(title, fontsize=20)
+    plt.xlabel('False Positive Rate', fontsize=18)
+    plt.ylabel('True Positive Rate', fontsize=18)
+    plt.yticks(fontsize=16)
+    plt.xticks(fontsize=16)
+    plt.tight_layout()
+    plt.legend(frameon=True, fontsize=14, loc=0, facecolor='white')
+    plt.savefig(plot_path + r'\results_3.jpg')
