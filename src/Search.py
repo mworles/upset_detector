@@ -13,7 +13,7 @@ split_values = SPLIT_YEARS
 split_on = 'season'
 score_type = 'f1'
 target = targets['upset']
-grid_id = 0
+grid_id = 1
 n_trials = 100
 
 # remove examples missing the target
@@ -25,7 +25,8 @@ df = upset_features(df)
 folds_scaled = utils.split_scale(df, target, split_on, split_values)
 
 # return trials object from hyperparameter search
-trials =  utils.hyper_search(grid_id, folds_scaled, n_trials, score_type)
+trials =  utils.hyper_search(grid_id, folds_scaled, n_trials, score_type,
+                             imbal=True)
 
 # store the search object
 utils.dump_search(grid_id, trials)
