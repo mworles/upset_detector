@@ -206,3 +206,12 @@ def get_upsets(idx):
     upset = df.apply(label_row, axis=1)
     
     return pd.DataFrame({'upset': upset}, index=df.index)
+
+def ids_from_index(df):
+    """Get team id numbers from the game id index."""
+    df.index = df.index.rename('game_id')
+    df = df.reset_index()
+    df['t1_team_id'] = df['game_id'].apply(lambda x: int(x[5:9]))
+    df['t2_team_id'] = df['game_id'].apply(lambda x: int(x[10:]))
+    df = df.set_index('game_id')
+    return df
