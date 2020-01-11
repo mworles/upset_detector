@@ -1,6 +1,8 @@
 import pandas as pd
+import numpy as np
 import os
 import re
+import datetime
 from fuzzywuzzy import process
 from Constants import COLUMNS_TO_RENAME
 
@@ -61,12 +63,21 @@ def add_season(df, season):
     else:
         df['season'] = season
     return df
+    
+def game_date(row):
+    dn = row['DayNum']
+    dz = datetime.datetime.strptime(row['DayZero'], '%m/%d/%Y')
+    date = dz + datetime.timedelta(days=dn)
+    date_id = date.strftime("%Y/%m/%d")
+    date_id = date_id.replace('/', '_')
+    return date_id
+
 
 def seed_to_numeric(seed):
     new_seed = int(re.sub(r'\D+', '', seed))
     return new_seed
 
-def set_gameid_index(df):
+def set_gameid_index(df, full_date=False):
     """
     Set dataframe index in DATE_t1##_t2## format as a unique identifier for each
     game. Dataframe must have columns of t1_team_id and t2_team_id.
@@ -76,7 +87,11 @@ def set_gameid_index(df):
     """
     id_lower = df['t1_team_id'].astype(str)
     id_upper = df['t2_team_id'].astype(str)
-    date = df['date_id']
+    if full_date == True:
+        date = df['date_id']
+    else:
+        date = df['season'].apply(str)
+    
     df['game_id'] = date + '_' + id_lower + '_' + id_upper
     df = df.set_index('game_id')
     return df
@@ -123,9 +138,14 @@ def add_seeds(directory, df, team_ids, projected=False):
     
     return df_seeds2
 
+def upset_switch(df):
+    """Return boolean array of rows to switch."""
+    toswitch = df['t1_seed'] < df['t2_seed']
+    return toswitch
+
 def upset_features(df):
+    toswitch = upset_switch(df)
     dfr = df.copy()
-    toswitch = dfr['t1_seed'] < dfr['t2_seed']
     t1_cols = [x for x in dfr.columns if x[0:3] == 't1_']
     t2_cols = [x for x in dfr.columns if x[0:3] == 't2_']
     for t1_col, t2_col in zip(t1_cols, t2_cols):
@@ -183,20 +203,21 @@ def team_location(row, team):
     return team_loc
 
 def get_upsets(idx):
-    df = pd.read_csv('../../data/raw/NCAATourneyCompactResults.csv')
+    df = pd.read_csv('..//data/raw/NCAATourneyCompactResults.csv')
     df.columns = map(lambda x: x.lower(), df.columns)
 
     # assigns t1_seed to winning teams, t2_seed to losing teams
-    df = add_seeds('../../data/raw/', df, ['wteamid', 'lteamid'])
-
-    df = set_gameid_index(df, ['wteamid', 'lteamid'])
-    df = df[df.index.isin(idx)]
+    df = add_seeds('../data/raw/', df, ['wteamid', 'lteamid'])
     
+    df = convert_team_id(df, ['wteamid', 'lteamid'], drop=False)
+    df = set_gameid_index(df, full_date=False)
+    df = df[df.index.isin(idx)]
+
     def label_row(row):
         # absolute seed difference 3 or less, no upset assigned
         if abs(row.t1_seed - row.t2_seed) <= 3:
             return np.nan
-        # seed difference 3 or greater, assign 1 for upset
+        # t1_seed (winner) is 3 or greater, then assign 1 for upset
         elif (row.t1_seed - row.t2_seed) > 3:
             return 1
         # assign 0 for no upset
@@ -204,9 +225,9 @@ def get_upsets(idx):
             return 0
     
     upset = df.apply(label_row, axis=1)
-    
     return pd.DataFrame({'upset': upset}, index=df.index)
 
+    
 def ids_from_index(df):
     """Get team id numbers from the game id index."""
     df.index = df.index.rename('game_id')
@@ -215,3 +236,24 @@ def ids_from_index(df):
     df['t2_team_id'] = df['game_id'].apply(lambda x: int(x[10:]))
     df = df.set_index('game_id')
     return df
+
+def add_team_name(df, dir='../data/'):
+    """Add team names to dataset containing team id numbers."""
+    path = "".join([dir, 'scrub/teams.csv'])
+    nm = pd.read_csv(path)
+    ido = nm[['team_id', 'team_name']].copy()
+    mrg = pd.merge(df, ido, left_on='t1_team_id', right_on='team_id',
+                   how='inner')
+    mrg = mrg.drop(columns=['team_id'])
+    mrg = mrg.rename(columns={'team_name': 'team_1'})
+    mrg = pd.merge(mrg, ido, left_on='t2_team_id', right_on='team_id',
+                   how='inner')
+    mrg = mrg.drop(columns=['team_id'])
+    mrg = mrg.rename(columns={'team_name': 'team_2'})
+    return mrg
+
+def switch_ids(df, toswitch):
+    dfr = df.copy()
+    dfr.loc[toswitch, 't1_team_id'] = df.loc[toswitch, 't2_team_id']
+    dfr.loc[toswitch, 't2_team_id'] = df.loc[toswitch, 't1_team_id']
+    return dfr
