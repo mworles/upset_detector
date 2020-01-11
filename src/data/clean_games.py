@@ -6,16 +6,8 @@ sys.path.append('../')
 from Constants import COLUMNS_TO_RENAME
 from Cleaning import combine_files, convert_team_id, set_gameid_index
 from Cleaning import team_id_scores, team_location, write_file
+from Clean import game_date
 import datetime
-
-
-def game_date(row):
-    dn = row['DayNum']
-    dz = datetime.datetime.strptime(row['DayZero'], '%m/%d/%Y')
-    date = dz + datetime.timedelta(days=dn)
-    date_id = date.strftime("%Y/%m/%d")
-    date_id = date_id.replace('/', '_')
-    return date_id
 
 # read in data file of past game results
 dir = '../../data/raw/'
