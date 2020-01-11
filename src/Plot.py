@@ -52,6 +52,7 @@ def plot_roc_curve(y, y_prob, grid_id, path='../plots/'):
     fig = plt.figure(figsize=(8, 6))
     fpr, tpr, thresh = roc_curve(y, y_prob)
     plt.plot(fpr, tpr, lw=3) #, label=s['model'])
+    plt.plot(thresh, tpr, lw=3) #, label=s['model'])
     plt.ylim([0.0, 1.0])
     plt.xlim([0.0, 1.0])
     title = "ROC Curve" #.join([label_name, " Classifier ROC Curve"])
