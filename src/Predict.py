@@ -1,9 +1,7 @@
 import pandas as pd
-import numpy as np
-from models import utils, grids
+from models import utils
 import Clean
-from Constants import SPLIT_YEARS, TEST_YEAR
-import Plotting
+from Constants import TEST_YEAR
 
 # define data directory, import features and targets
 dir = '../data/processed/'
@@ -23,6 +21,9 @@ df = df[df.index.isin(has_target)]
 # remove examples beyond test year
 df = df[df['season'] <= TEST_YEAR]
 
+# array of rows to switch for upset seed order
+toswitch = Clean.upset_switch(df)
+
 # re-arrange data for predicting upsets
 df = Clean.upset_features(df)
 
@@ -37,10 +38,28 @@ model = utils.model_set(grid_result)
 # get model predictions
 probs_list = utils.fold_preds(folds_scaled[0], model, type='probs', imbal=True)
 
-# test example index array
+# list of indices to isolate test set examples
 i_test = utils.fold_split(df, 'season', TEST_YEAR)['i_test']
 
-# isolate test examples
+# isolate examples to team identifiers
 test = df[df.index.isin(i_test)]
 test = Clean.ids_from_index(test)
-test = test['t1_team_id', 't2_team_id']
+test = test[['t1_team_id', 't2_team_id']]
+
+test = Clean.switch_ids(test, toswitch)
+
+# add team names to data
+test = Clean.add_team_name(test, dir='../data/')
+
+test['t1_prob'] = probs_list
+test['uprob'] = (test['t1_prob'] * 100).astype(int)
+
+test['uprob'] = test['uprob'].astype(str).apply(lambda x: x + ' %')
+
+test = test.drop(['t1_team_id', 't2_team_id', 't1_prob'], axis=1)
+cols_rename = {'team_1': 'Underdog',
+               'team_2': 'Favorite',
+               'uprob': 'Upset probability'}
+test = test.rename(columns=cols_rename)
+
+test.to_html('../post/' + 'upsets_2018.html', index=False)
