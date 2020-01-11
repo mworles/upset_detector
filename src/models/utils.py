@@ -4,7 +4,10 @@ import json
 import pickle
 from sklearn.preprocessing import StandardScaler
 from hyperopt import fmin, tpe, Trials, space_eval, hp, STATUS_OK
-from models.grids import model_grid, space_grid, scorer_grid
+from models.grids import model_grid, space_grid, scorer_grid, scorer_pred
+from sklearn.linear_model import LogisticRegression
+from imblearn.over_sampling import RandomOverSampler
+from Constants import RANDOM_SEED
 
 def fold_split(df, split_on, split_value):
     """Split data into one training and validation set. 
@@ -42,7 +45,7 @@ def fit_scaler(df, split_on, split_values, drop=True):
     fold_min = min(split_values)
     scale_data = df[df[split_on] < fold_min]
     if drop:
-        scale_data = df.drop(split_on, axis=1)
+        scale_data = scale_data.drop(split_on, axis=1)
     sc = StandardScaler()
     scaler = sc.fit(scale_data.astype(float))
     return scaler
@@ -68,10 +71,26 @@ def scale_folds(df, target, folds, scaler):
     tf = lambda x: scale_fold(df, target, x, scaler)
     folds_scaled = map(tf, folds)
     return folds_scaled
-
-def fold_preds(fold, model, type='probs'):
     
-    model.fit(fold['x_train'], fold['y_train'])
+def split_scale(df, target, split_on, split_values, drop=True):
+    folds = custom_folds(df, split_on, split_values)
+    scaler = fit_scaler(df, split_on, split_values, drop=drop)
+    if drop == True:
+        df = df.drop(split_on, axis=1)
+    folds_scaled = scale_folds(df, target, folds, scaler)
+    return folds_scaled
+
+def fold_preds(fold, model, type='probs', imbal=False):
+    
+    x = fold['x_train']
+    y = fold['y_train']
+        
+    # use resampled data if data is imbalanced
+    if imbal == True:
+        sampler = RandomOverSampler(random_state=RANDOM_SEED)
+        x, y = sampler.fit_resample(x, y)
+    
+    model.fit(x, y)
     
     preds =  model.predict_proba(fold['x_test'])[:, 1]
     
@@ -108,17 +127,17 @@ def convert_grid(id, space_grid):
 
     return search_space
 
-def hyper_search(grid_id, folds, n_trials, score_type):
+def hyper_search(grid_id, folds, n_trials, score_type, imbal=False):
     
     score_func = scorer_grid[score_type]
+    pred_type = scorer_pred[score_type]
     
     def objective_min(params):
         
         model.set_params(**params)
-        #scores = map(lambda x: fold_score(x, model, score_func), folds)
-        #mean_score = np.mean(scores)
         
-        preds_list = map(lambda x: fold_preds(x, model, type='labels'), folds)
+        preds_list = map(lambda x: fold_preds(x, model, type=pred_type,
+                                              imbal=imbal), folds)
         preds = np.concatenate(preds_list).ravel().tolist()
         
         labels_list = [x['y_test'] for x in folds]
@@ -129,6 +148,7 @@ def hyper_search(grid_id, folds, n_trials, score_type):
         print "Trial: %r" % (len(trials.trials))
         
         return {'loss': 1 - cv_score,
+                'score': cv_score,
                 'status': STATUS_OK,
                 'params': params,
                 'grid_id': grid_id,
@@ -154,7 +174,6 @@ def dump_search(grid_id, trials):
     p_file = "".join([dir_search, "search_", str(grid_id), ".p"])
     pickle.dump(trials, open(p_file, "wb"))
 
-
 def write_results(grid_id, trials):
     
     # get result dict of trial with minimum loss
@@ -164,7 +183,7 @@ def write_results(grid_id, trials):
     # to include model identifier
     top['model'] = space_grid[0]['model']
     
-    # file to store scores and metadata
+    # file to store scores and model metadata
     dir_results = "../data/results/"
     s_file = "".join([dir_results, "scores.json"])
     
@@ -209,10 +228,27 @@ def trials_data(trials, search_space):
     
     return df
 
-def split_scale(df, target, split_on, split_values, drop=True):
-    folds = custom_folds(df, split_on, split_values)
-    scaler = fit_scaler(df, split_on, split_values, drop=drop)
-    if drop == True:
-        df = df.drop(split_on, axis=1)
-    folds_scaled = scale_folds(df, target, folds, scaler)
-    return folds_scaled
+def get_grid_result(grid_id):
+    # file to store scores and model metadata
+    dir_results = "../data/results/"
+    s_file = "".join([dir_results, "scores.json"])
+
+    # open results logging json file if it exists
+    with open(s_file) as f:
+        scores = json.load(f)
+        
+    return scores[str(grid_id)]
+    
+def model_set(grid_result):
+    model_name = grid_result['model']
+    model_params = grid_result['params']
+    if model_name == 'logistic':
+        params = {'C': 1.0, 'penalty': 'l2'}
+        for p in model_params:
+            params[p] = model_params[p]
+        
+        model = LogisticRegression(random_state=RANDOM_SEED,
+                                   solver='liblinear',
+                                   penalty=params['penalty'],
+                                   C=params['C'])
+    return model
