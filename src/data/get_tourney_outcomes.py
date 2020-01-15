@@ -1,36 +1,43 @@
-import sys
-sys.path.append("../")
-import os
+"""Get yearly team tourney outcomes.
+
+This script uses data on prior year tournament results to create a dataset of
+the number of tournament games and wins for each team for each year. This data
+is saved for use by other scripts to compute various team features. 
+
+This script requires `pandas`. It imports the custom Clean module.
+
+"""
+
 import pandas as pd
-import numpy as np
-from Cleaning import write_file
-from Constants import DATA_COLUMN_KEY
+import Clean
 
-print 'running %s' % (os.path.basename(__file__))
+# read in prior tournament results data
+data_in = '../data/scrub/'
+tgames = pd.read_csv(data_in + 'ncaa_results.csv')
 
-# read in data files
-data_in = '../../data/raw/'
-tgames = pd.read_csv(data_in + 'NCAATourneyCompactResults.csv')
-
-winner_column = DATA_COLUMN_KEY['winner_column']
-loser_column = DATA_COLUMN_KEY['loser_column']
-
-wteams = tgames[['Season', 'WTeamID']]
-wteams = wteams.rename(columns={winner_column: 'team_id'})
+# data is one row per game
+# separate winners and losers create a team-specific win indicator to count
+wteams = tgames[['season', 'wteam']]
+wteams = wteams.rename(columns={'wteam': 'team_id'})
 wteams['win'] = 1
 
-lteams = tgames[['Season', 'LTeamID']]
-lteams = lteams.rename(columns={loser_column: 'team_id'})
+lteams = tgames[['season', 'lteam']]
+lteams = lteams.rename(columns={'lteam': 'team_id'})
 lteams['win'] = 0
 
+# combine data to create one row per team per game
 tteams = pd.concat([wteams, lteams], ignore_index=True)
-tteams.columns = map(str.lower, tteams.columns)
 
+# columns to group by
 gcols = ['season', 'team_id']
 
+# count and sum number of rows per "group"
 tteams = tteams.groupby(gcols)['win'].aggregate(['count', 'sum']).reset_index()
+
+# count is the number of games, sum is the number of wins
 tteams = tteams.rename(columns={'count': 'games', 'sum': 'wins'})
 
-dest = '../../data/interim/'
+# save data
+data_out = '../data/interim/'
 file_name = 'tourney_outcomes'
-write_file(tteams, dest, file_name)
+Clean.write_file(tteams, data_out, file_name)
