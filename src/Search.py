@@ -1,6 +1,6 @@
 import pandas as pd
 from models import utils
-import Clean
+from data import Clean
 from Constants import SPLIT_YEARS
 
 # define data directory, import features and targets

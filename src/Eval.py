@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 from models import utils, grids
-import Clean
+from data import Clean
 from Constants import SPLIT_YEARS
 import Plot
 
