@@ -4,7 +4,6 @@ import os
 import re
 import datetime
 from fuzzywuzzy import process
-from Constants import COLUMNS_TO_RENAME
 
 def write_file(data, data_out, file_name, keep_index=False):
     """Set location and write new .csv file in one line."""
@@ -30,7 +29,7 @@ def combine_files(directory, index_col=False, tag = None):
     
     return df
 
-def clean_school_name(x):
+def school_name(x):
     """Format school name for joining with other data."""
     x = str.lower(x)
     x = re.sub('[().&*\']', '', x)
@@ -39,14 +38,17 @@ def clean_school_name(x):
     x = re.sub(r' ', '-', x)
     return x
 
-def fuzzy_match(x, y, cutoff=90):
+def fuzzy_match(x, y, cutoff=85):
     """Indentify the closest match between a given string and a list of
     strings."""
     best_match, score = process.extractOne(x, y)
     if score >= cutoff:
         return best_match
     else:
+        print 'team not matched'
+        print x, best_match, score
         return None
+        
 
 def list_files(directory, suffix=".csv"):
     files = os.listdir(directory)
