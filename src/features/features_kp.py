@@ -38,4 +38,4 @@ keep = ['team_id', 'season', 'adjtempo', 'adjoe', 'rankadjoe',
 mrg = mrg[keep]
 
 # save kp feature data file
-write_file(mrg, '../../data/interim/', 'features_kp')
+write_file(mrg, '../../data/interim/', 'rating')

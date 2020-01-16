@@ -4,7 +4,7 @@ import data.Clean
 
 
 
-def get_coach():
+def get_coach(dir):
     shift = lambda x: x.shift(1)
         
     def create_shift(df, col, new_col, func):
@@ -14,8 +14,8 @@ def get_coach():
         return df
     
     # read in data files
-    to = pd.read_csv('../data/interim/tourney_outcomes.csv')
-    c = pd.read_csv('../data/scrub/coaches.csv')
+    to = pd.read_csv(dir + 'interim/tourney_outcomes.csv')
+    c = pd.read_csv(dir + 'scrub/coaches.csv')
 
     # merge coach file with team tourney outcomes file
     df = pd.merge(c, to, how='outer', on=['season', 'team_id'])
@@ -81,9 +81,4 @@ def get_coach():
     # no tourney data prior to season 1985, remove rows
     df = df[df['season'] > 1985]
     
-    return df
-
-
-def write_coach(dir):
-    df = get_coach()
-    data.Clean.write_file(df, dir + 'features/', 'features_coach')
+    data.Clean.write_file(df, dir + 'features/', 'coach')
