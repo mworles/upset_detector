@@ -1,81 +1,89 @@
 import pandas as pd
 import numpy as np
+import data.Clean
+
+
 
 def get_coach():
+    shift = lambda x: x.shift(1)
+        
+    def create_shift(df, col, new_col, func):
+        df[new_col] = df.groupby('coach_name')[col].apply(func)
+        df[new_col] = df.groupby('coach_name')[new_col].apply(shift)
+        df[new_col] = df[new_col].fillna(0)
+        return df
+    
     # read in data files
     to = pd.read_csv('../data/interim/tourney_outcomes.csv')
-    coach = pd.read_csv('../data/scrub/coaches.csv')
+    c = pd.read_csv('../data/scrub/coaches.csv')
 
     # merge coach file with team tourney outcomes file
-    coaches = pd.merge(coach, to, how='outer',
-                       on=['season', 'team_id'])
+    df = pd.merge(c, to, how='outer', on=['season', 'team_id'])
 
-    # deal with coaches who didn't coach in tourney bc didn't finish season
-    # get the last day number that coach was on the team, add to coach dataframe
-    def my_agg(x):
-        names = {'team_last': x['last_day'].max()}
-        return pd.Series(names, index=['team_last'])
+    # add last day for each team to account for removed coaches
+    df['team_last'] = df.groupby(['team_id', 'season'])['last_day'].transform(max)
+    
+    # if coach wasn't still with team for tourney, recode wins and games
+    df['wins'] = np.where(df.last_day != df.team_last, np.nan, df['wins'])
+    df['games'] = np.where(df.last_day != df.team_last, np.nan, df['games'])
+    
+    # if missing the true value is 0
+    df['games'] = df['games'].fillna(0)
+    df['wins'] = df['wins'].fillna(0)
 
-    teamlast = coaches.groupby(['season', 'team_id']).apply(my_agg)
-    teamlast = teamlast.reset_index()
+    # first sort before creating shifted variables
+    df = df.sort_values(['coach_name', 'season'])
+    
+    # 0/1 indicator of whether coach coached in tourney, for creating features
+    df['cvis'] = np.where(df['games'] > 0, 1, 0)
 
-    coaches = pd.merge(coaches, teamlast, how='outer', on=['season', 'team_id'])
+    # functions for applying on grouped data
+    cumsum = lambda x: x.cumsum()
+    cummax = lambda x: x.cummax()
+    
+    # indicator of whether coach was in prior year's tourney
+    df['clast'] = df.groupby('coach_name')['cvis'].apply(shift)
+    # if missing, row is coach's first year and value should be 0
+    df['clast'] = np.where(df['clast'].isnull(), 0, df['clast'])
 
-    # if coach wasn't still with team for tourney, set wins to missing, games to 0
-    coaches.ix[coaches.last_day != coaches.team_last, 'wins'] = np.NaN
-    coaches.ix[coaches.last_day != coaches.team_last, 'games'] = np.NaN
-    coaches['games'].fillna(0, inplace=True)
-    coaches = coaches.sort_values(['coach_name', 'season'])
+    # count of coach's prior tourneys
+    df = create_shift(df, 'cvis', 'cvisits', cumsum)
+    # max round coach has previously reached
+    df = create_shift(df, 'games', 'cfar', cummax)
+    # indicator if coach has won tourney game or not
+    df['cwon'] = np.where(df['cfar'] > 1, 1, 0)
+    
+    # 0/1 indicator for row if made elite 8 (round 4)
+    d_round = dict.fromkeys([0, 1, 2, 3], 0)
+    d_round.update(d_round.fromkeys([4, 5, 6], 1))
+    df['round_4'] = df['games'].map(d_round)
+    
+    # 0/1 indicator for row if made final 4 (round 5)
+    d_round[4] = 0
+    df['round_5'] = df['games'].map(d_round)
+    
+    # number of elite 8 trips
+    df = create_shift(df, 'round_4', 'c_r4sum', cumsum)
+    # number of final 4 trips
+    df = create_shift(df, 'round_5', 'c_r5sum', cumsum)
+    
+    # indicator of many trips without deep tourney success
+    df['snkbit'] = np.where((df['cvisits'] > 5) & (df['cfar'] < 4), 1, 0)
+    
+    # one row per team season, 
+    df = df[df.last_day == df.team_last]
+    
+    # keep only coach features and unique keys
+    cols_drop = ['cvis', 'wins', 'games', 'round_4', 'round_5', 'first_day',
+                 'last_day','team_last', 'coach_name']
+    df = df.drop(cols_drop, axis=1)
+    
+    # no tourney data prior to season 1985, remove rows
+    df = df[df['season'] > 1985]
+    
+    return df
 
-    # compute coach tourney experience/success features
-    coaches = coaches.rename(columns={'wins': 'cwins',
-                                      'games': 'cgames',
-                                      'coach_name': 'cname'}
-                            )
-    # create cvis, 0/1 indicator of whether coach coached in tourney
-    coaches['cvis'] = np.where(coaches['cgames'] > 0, 1, 0)
 
-    # create cvisits, cumulative count of coach's prior tourneys
-    coaches['cvisits'] = coaches.groupby('cname')['cvis'].apply(lambda x: x.cumsum())
-    coaches['cvisits'] = coaches.groupby('cname')['cvisits'].apply(lambda x: x.shift(1))
-    coaches['cvisits'].fillna(0, inplace=True)
-
-    # create clast, indicator of whether coached was in prior year's tourney
-    coaches['clast'] = coaches.groupby('cname')['cvis'].apply(lambda y: y.shift(1))
-    coaches['clast'] = np.where(coaches['clast'].isnull(), 0, coaches['clast'])
-
-    # create cfar, the max number of rounds coach has reached
-    coaches['cfar'] = coaches.groupby('cname')['cgames'].apply(lambda x: x.cummax())
-    coaches['cfar'] = coaches.groupby('cname')['cfar'].apply(lambda y: y.shift(1))
-    coaches['cfar'] = np.where(coaches['cfar'].isnull(), 0, coaches['cfar'])
-    coaches['cwon'] = np.where(coaches['cfar'] > 1, 1, 0)
-
-    # create ce8times, number of coach's prior trips to "elite 8"(round 4)
-    e8dict = dict.fromkeys([0, 1, 2, 3], 0)
-    e8dict.update(dict.fromkeys([4, 5, 6], 1))
-    coaches["e8"] = coaches.cgames.map(e8dict)
-    coaches['ce8times'] = coaches.groupby('cname')['e8'].apply(lambda x: x.cumsum())
-
-    # create cf4times, number of coach's prior trips to "final 4"(round 5)
-    f4dict = dict.fromkeys([0, 1, 2, 3, 4], 0)
-    f4dict.update(dict.fromkeys([5, 6], 1))
-    coaches["f4"] = coaches.cgames.map(f4dict)
-    coaches['cf4times'] = coaches.groupby('cname')['f4'].apply(lambda x: x.cumsum())
-
-    # compute snkbit, indicator of "snakebit" criteria
-    # coach has at least 6 trips to tournament and not reached elite 8
-    coaches['snkbit'] = 0
-    coaches.loc[(coaches.cvisits >5) & (coaches.cfar < 4),'snkbit'] = 1
-
-    # keep one row per team season, keeping the coach who was coach on last day
-    coaches = coaches[coaches.last_day == coaches.team_last]
-    coaches.drop(['cvis', 'cwins', 'cgames', 'e8', 'f4', 'first_day', 'last_day',
-                 'team_last'], inplace=True, axis=1)
-
-    # had no pre-1985 data to compute 1985 features, so drop 1985
-    coaches = coaches[coaches.season > 1985]
-
-    # remove string name, not utilized as a feature
-    coaches = coaches.drop(['cname'], axis=1)
-
-    return coaches
+def write_coach(dir):
+    df = get_coach()
+    data.Clean.write_file(df, dir + 'features/', 'features_coach')
