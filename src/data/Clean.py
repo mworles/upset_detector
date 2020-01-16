@@ -75,9 +75,9 @@ def game_date(row):
     return date_id
 
 
-def seed_to_numeric(seed):
-    new_seed = int(re.sub(r'\D+', '', seed))
-    return new_seed
+def get_integer(x):
+    x_num = int(re.sub(r'\D+', '', x))
+    return x_num
 
 def set_gameid_index(df, full_date=False):
     """
