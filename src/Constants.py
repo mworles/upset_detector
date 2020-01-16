@@ -36,6 +36,10 @@ RAW_MAP['TeamCoaches'] = {'new_name': 'coaches',
                                       }
                           }
 
+RAW_MAP['NCAATourneySeeds'] = {'new_name': 'seeds',
+                               'columns': {'TeamID': 'team_id'}
+                               }
+
 RANDOM_SEED = 40195
 
 DATA = '../data/'
