@@ -101,11 +101,15 @@ def match_kp(dir, write=False):
         Clean.write_file(df, data_out, 'id_kp')
     return df
 
-def combine_id(dir, data_list):
+def create_key(dir):
     id = pd.read_csv(dir + '/scrub/teams.csv')
     id = id[['team_id', 'team_name']]
-    for df in data_list:
+    ss = match_schools(dir)
+    kp = match_kp(dir)
+    
+    for df in [ss, kp]:
         id = pd.merge(id, df, on='team_id', how='left')
+
     data_out = dir + 'interim/'
     # save  data file
     Clean.write_file(id, data_out, 'id_key')
