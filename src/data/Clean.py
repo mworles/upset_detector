@@ -10,8 +10,8 @@ def write_file(data, data_out, file_name, keep_index=False):
     file = "".join([data_out, file_name, '.csv'])
     data.to_csv(file, index=keep_index)
 
-def combine_files(directory, index_col=False, tag = None):
-    """Combine data from all files in a directory."""
+def list_of_files(directory, tag = None):
+    """Create list of all files in a directory."""
     
     # collect names of all files in directory
     file_names = os.listdir(directory)
@@ -20,8 +20,15 @@ def combine_files(directory, index_col=False, tag = None):
     if tag is not None:
         file_names = [x for x in file_names if tag in x]
     
-    # list of full file names for concatenation
+    # list of full file names
     files = [directory + x for x in file_names]
+    
+    return files
+
+def combine_files(directory, index_col=False, tag = None):
+    """Combine data from all files in a directory."""
+    # list of full file names for concatenation
+    files = list_of_files(directory, tag = tag)
     
     # combine all dataframes
     data_list = [pd.read_csv(x, index_col=index_col) for x in files]
@@ -48,11 +55,6 @@ def fuzzy_match(x, y, cutoff=85):
         print 'team not matched'
         print x, best_match, score
         return None
-        
-
-def list_files(directory, suffix=".csv"):
-    files = os.listdir(directory)
-    return [filename for filename in files if filename.endswith(suffix)]
 
 def get_season(file):
     year = re.findall('\d+', file)
@@ -67,8 +69,8 @@ def add_season(df, season):
     return df
     
 def game_date(row):
-    dn = row['DayNum']
-    dz = datetime.datetime.strptime(row['DayZero'], '%m/%d/%Y')
+    dn = row['daynum']
+    dz = datetime.datetime.strptime(row['dayzero'], '%m/%d/%Y')
     date = dz + datetime.timedelta(days=dn)
     date_id = date.strftime("%Y/%m/%d")
     date_id = date_id.replace('/', '_')
@@ -79,7 +81,7 @@ def get_integer(x):
     x_num = int(re.sub(r'\D+', '', x))
     return x_num
 
-def set_gameid_index(df, full_date=False):
+def set_gameid_index(df, full_date=False, drop_date=True):
     """
     Set dataframe index in DATE_t1##_t2## format as a unique identifier for each
     game. Dataframe must have columns of t1_team_id and t2_team_id.
@@ -89,25 +91,47 @@ def set_gameid_index(df, full_date=False):
     """
     id_lower = df['t1_team_id'].astype(str)
     id_upper = df['t2_team_id'].astype(str)
+    
     if full_date == True:
         date = df['date_id']
+        if drop_date == True:
+            df = df.drop(['date_id'], axis=1)
     else:
         date = df['season'].apply(str)
     
     df['game_id'] = date + '_' + id_lower + '_' + id_upper
     df = df.set_index('game_id')
+    
     return df
 
 def convert_team_id(df, id_cols, drop=True):
-    """Create columns with team numerical identifier where t1_team_id is
-    numerically lower team, t2_team_id is higher team.
-    """
+    """Create team identifier where t1 is numerically lower, t2 is higher."""
     df['t1_team_id'] = df[id_cols].min(axis=1)
     df['t2_team_id'] = df[id_cols].max(axis=1)
     if drop == True:
         df = df.drop(columns=id_cols)
     return df
 
+def team_scores(df):
+    
+    def get_score(row, team_id, score_dict):
+        """Function to apply over rows and obtain score for given team."""
+        row_gameid = row.name
+        row_team = row[team_id]
+        team_score = score_dict[row_gameid][row_team]
+        return team_score
+    
+    # create dict with key as game identifier, values as team scores
+    score_dict = {}
+    for i, r in df.iterrows():
+        score_dict[i] = {r['wteam']: r['wscore'], r['lteam']: r['lscore']}
+    
+    # apply get_score function to get scores for t1_team and t2_team each row
+    df['t1_score'] = df.apply(lambda x: get_score(x, 't1_team_id', score_dict),
+                              axis=1)
+    df['t2_score'] = df.apply(lambda x: get_score(x, 't2_team_id', score_dict),
+                              axis=1)
+    return df
 
 def add_seeds(directory, df, team_ids, projected=False):
     # import seeds data file
@@ -154,30 +178,6 @@ def upset_features(df):
         dfr.loc[toswitch, t1_col] = df.loc[toswitch, t2_col]
         dfr.loc[toswitch, t2_col] = df.loc[toswitch, t1_col]
     return dfr
-
-def get_score(row, team_id, score_dict):
-    row_gameid = row.name
-    row_team = row[team_id]
-    team_score = score_dict[row_gameid][row_team]
-    return team_score
-
-def team_id_scores(df):
-    # create dict with key as game identifier, values as team scores
-    score_dict = {}
-    for i, r in df.iterrows():
-        score_dict[i] = {r['wteam']: r['wscore'], r['lteam']: r['lscore']}
-
-    df['t1_score'] = df.apply(lambda x: get_score(x, 't1_team_id', score_dict),
-                              axis=1)
-    df['t2_score'] = df.apply(lambda x: get_score(x, 't2_team_id', score_dict),
-                              axis=1)
-    return df
-    
-def get_t1_win(df, id_cols):
-    df = get_scores(df, id_cols)
-    df['t1_win'] = np.where(df['t1_score'] > df['t2_score'], 1, 0)
-    df = df.drop(columns=['t1_score', 't2_score'])
-    return df
 
 def team_location(row, team):
     team_col = team + '_team_id'
@@ -259,3 +259,9 @@ def switch_ids(df, toswitch):
     dfr.loc[toswitch, 't1_team_id'] = df.loc[toswitch, 't2_team_id']
     dfr.loc[toswitch, 't2_team_id'] = df.loc[toswitch, 't1_team_id']
     return dfr
+
+def merge_from_list(df_list, merge_on, how='inner'):
+    df = df_list[0]
+    for x in df_list[1:]:
+        df = pd.merge(df, x, on=merge_on, how=how)
+    return df
