@@ -13,6 +13,7 @@ import numpy as np
 import Clean
 
 def tourney_outcomes(dir):
+    """Function to count team games and wins for each tournament year.""" 
     # read in prior tournament results
     data_in = dir + 'scrub/'
     tgames = pd.read_csv(data_in + 'ncaa_results.csv')
