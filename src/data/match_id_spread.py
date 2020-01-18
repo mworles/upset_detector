@@ -6,8 +6,8 @@ sys.path.append("../")
 from Cleaning import write_file, combine_files, clean_school_name, fuzzy_match
 from Constants import COLUMNS_TO_RENAME
 
-directory = '../../data/external/pt/'
-df = combine_files(directory)
+datdirectory = '../../data/external/pt/'
+df = combine_files(datdirectory)
 
 # list of all unique team names
 teams = list(set(list(df['home']) + list(df['road'])))

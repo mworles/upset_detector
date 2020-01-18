@@ -21,8 +21,8 @@ def get_id(team, id_dict, fuzzy=False):
     return result
 
 
-dir = "../../data/external/odds/"
-df = pd.read_csv(dir + 'odds.csv')
+datdir = "../../data/external/odds/"
+df = pd.read_csv(datdir + 'odds.csv')
 
 # list of all unique team names
 teams = list(set(list(df['team1']) + list(df['team2'])))

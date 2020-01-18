@@ -170,8 +170,8 @@ def hyper_search(grid_id, folds, n_trials, score_type, imbal=False):
 
 
 def dump_search(grid_id, trials):
-    dir_search = "../data/results/searches/"
-    p_file = "".join([dir_search, "search_", str(grid_id), ".p"])
+    datdir_search = "../data/results/searches/"
+    p_file = "".join([datdir_search, "search_", str(grid_id), ".p"])
     pickle.dump(trials, open(p_file, "wb"))
 
 def write_results(grid_id, trials):
@@ -184,8 +184,8 @@ def write_results(grid_id, trials):
     top['model'] = space_grid[0]['model']
     
     # file to store scores and model metadata
-    dir_results = "../data/results/"
-    s_file = "".join([dir_results, "scores.json"])
+    datdir_results = "../data/results/"
+    s_file = "".join([datdir_results, "scores.json"])
     
     # open results logging json file if it exists
     try:
@@ -205,8 +205,8 @@ def write_results(grid_id, trials):
     return scores
 
 def get_search(grid_id):
-    dir_search = "../data/results/searches/"
-    p_file = "".join([dir_search, "search_", str(grid_id), ".p"])
+    datdir_search = "../data/results/searches/"
+    p_file = "".join([datdir_search, "search_", str(grid_id), ".p"])
     with open(p_file, 'rb') as f:
         trials = pickle.load(f)
     return trials
@@ -230,8 +230,8 @@ def trials_data(trials, search_space):
 
 def get_grid_result(grid_id):
     # file to store scores and model metadata
-    dir_results = "../data/results/"
-    s_file = "".join([dir_results, "scores.json"])
+    datdir_results = "../data/results/"
+    s_file = "".join([datdir_results, "scores.json"])
 
     # open results logging json file if it exists
     with open(s_file) as f:

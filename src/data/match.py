@@ -14,10 +14,10 @@ module to use data cleaning functions.
 import pandas as pd
 import Clean
 
-def clean_schools(dir):
+def clean_schools(datdir):
     
     # compiles all files into one dataset
-    df = Clean.combine_files(dir)
+    df = Clean.combine_files(datdir)
 
     # rows missing value for 'G' column are invalid
     df = df.dropna(subset=['G'])
@@ -30,8 +30,8 @@ def clean_schools(dir):
     
     return df
     
-def clean_kp(dir):
-    df = Clean.combine_files(dir)
+def clean_kp(datdir):
+    df = Clean.combine_files(datdir)
 
     # isolate data to unique names
     df = df[['TeamName']].drop_duplicates()
@@ -42,12 +42,12 @@ def clean_kp(dir):
     
     return df
 
-def match_id(df, dir):
+def match_id(df, datdir):
     
     # number of schools for later comparison
     n_schools = df.shape[0]
     
-    file_id = dir + '/scrub/team_spellings.csv'
+    file_id = datdir + '/scrub/team_spellings.csv'
     ns = pd.read_csv(file_id)
     
     # join school name to id number in team identifer file 
@@ -83,33 +83,33 @@ def match_id(df, dir):
     
     return all
 
-def match_schools(dir, write=False):
-    data_in = dir + 'external/school_stats/'
+def match_schools(datdir, write=False):
+    data_in = datdir + 'external/school_stats/'
     schools = clean_schools(data_in)
-    df = match_id(schools, dir)
+    df = match_id(schools, datdir)
     if write==True:
-        data_out = dir + 'interim/'
+        data_out = datdir + 'interim/'
         Clean.write_file(df, data_out, 'id_ss')
     return df
 
-def match_kp(dir, write=False):
-    data_in = dir + 'external/kp/'
+def match_kp(datdir, write=False):
+    data_in = datdir + 'external/kp/'
     schools = clean_kp(data_in)
-    df = match_id(schools, dir)
+    df = match_id(schools, datdir)
     if write==True:
-        data_out = dir + 'interim/'
+        data_out = datdir + 'interim/'
         Clean.write_file(df, data_out, 'id_kp')
     return df
 
-def create_key(dir):
-    id = pd.read_csv(dir + '/scrub/teams.csv')
+def create_key(datdir):
+    id = pd.read_csv(datdir + '/scrub/teams.csv')
     id = id[['team_id', 'team_name']]
-    ss = match_schools(dir)
-    kp = match_kp(dir)
+    ss = match_schools(datdir)
+    kp = match_kp(datdir)
     
     for df in [ss, kp]:
         id = pd.merge(id, df, on='team_id', how='left')
 
-    data_out = dir + 'interim/'
+    data_out = datdir + 'interim/'
     # save  data file
     Clean.write_file(id, data_out, 'id_key')

@@ -2,18 +2,18 @@ import pandas as pd
 import numpy as np
 import data.Clean
 
-def team_seeds(dir):
-    data_in = dir + '/scrub/seeds.csv'
+def team_seeds(datdir):
+    data_in = datdir + '/scrub/seeds.csv'
     df = pd.read_csv(data_in)
     df['seed'] = df['seed'].apply(data.Clean.get_integer)
-    data_out = dir + '/features/'
+    data_out = datdir + '/features/'
     data.Clean.write_file(df, data_out, 'team_seeds', keep_index=False)
 
-def team_ratings(dir):
-    directory = dir + '/external/kp/'
+def team_ratings(datdir):
+    datdirectory = datdir + '/external/kp/'
 
     # create list of file names
-    files = data.Clean.list_of_files(directory)
+    files = data.Clean.list_of_files(datdirectory)
 
     # use files to get lists of season numbers and dataframes
     seasons = [data.Clean.get_season(x) for x in files]
@@ -25,7 +25,7 @@ def team_ratings(dir):
     df = pd.concat(data_list, sort=False)
     
     # link team id numbers
-    id_file = dir + '/interim/id_key.csv'
+    id_file = datdir + '/interim/id_key.csv'
     id = pd.read_csv(id_file)
     id = id[['team_id', 'team_kp']]
     mrg = pd.merge(df, id, left_on='TeamName', right_on='team_kp', how='inner')
@@ -44,10 +44,10 @@ def team_ratings(dir):
     mrg = mrg[keep]
 
     # save team ratings file
-    data_out = dir + 'features/'
+    data_out = datdir + 'features/'
     data.Clean.write_file(mrg, data_out, 'team_ratings')
 
-def coach_features(dir):
+def coach_features(datdir):
     shift = lambda x: x.shift(1)
         
     def create_shift(df, col, new_col, func):
@@ -57,8 +57,8 @@ def coach_features(dir):
         return df
     
     # read in data files
-    to = pd.read_csv(dir + 'interim/tourney_outcomes.csv')
-    c = pd.read_csv(dir + 'scrub/coaches.csv')
+    to = pd.read_csv(datdir + 'interim/tourney_outcomes.csv')
+    c = pd.read_csv(datdir + 'scrub/coaches.csv')
 
     # merge coach file with team tourney outcomes file
     df = pd.merge(c, to, how='outer', on=['season', 'team_id'])
@@ -124,24 +124,24 @@ def coach_features(dir):
     # no tourney data prior to season 1985, remove rows
     df = df[df['season'] > 1985]
     
-    data.Clean.write_file(df, dir + 'features/', 'coach')
+    data.Clean.write_file(df, datdir + 'features/', 'coach')
 
-def filter_teams(dir, df):
-    data_in = dir + '/scrub/seeds.csv'
+def filter_teams(datdir, df):
+    data_in = datdir + '/scrub/seeds.csv'
     left = pd.read_csv(data_in)
     merge_on = ['team_id', 'season']
     left = left[merge_on]
     df = pd.merge(left, df, on=merge_on, how='left')
     return df
 
-def merge_features(dir):
-    subdir = dir + '/features/'
-    files = data.Clean.list_of_files(subdir, tag = None)
+def merge_features(datdir):
+    subdatdir = datdir + '/features/'
+    files = data.Clean.list_of_files(subdatdir, tag = None)
     read_csv = lambda x: pd.read_csv(x)
     df_list = [read_csv(x) for x in files]
     merge_on = ['team_id', 'season']
     df = data.Clean.merge_from_list(df_list, merge_on, how='outer')
     # filter to tourney teams
-    df = filter_teams(dir, df)
-    data_out = dir + '/features/'
+    df = filter_teams(datdir, df)
+    data_out = datdir + '/features/'
     data.Clean.write_file(df, data_out, 'team_features', keep_index=False)

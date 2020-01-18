@@ -33,8 +33,8 @@ def game_id(row):
     return gid
 
 
-directory = '../../data/external/pt/'
-df = combine_files(directory)
+datdirectory = '../../data/external/pt/'
+df = combine_files(datdirectory)
 
 df = df[df['date'].notnull()]
 df['date_id'] = df['date'].apply(change_date)

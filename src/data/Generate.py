@@ -12,10 +12,10 @@ import pandas as pd
 import numpy as np
 import Clean
 
-def tourney_outcomes(dir):
+def tourney_outcomes(datdir):
     """Function to count team games and wins for each tournament year.""" 
     # read in prior tournament results
-    data_in = dir + 'scrub/'
+    data_in = datdir + 'scrub/'
     tgames = pd.read_csv(data_in + 'ncaa_results.csv')
 
     # data is one row per game
@@ -43,12 +43,12 @@ def tourney_outcomes(dir):
     df = df.rename(columns={'count': 'games', 'sum': 'wins'})
     
     # write file
-    Clean.write_file(df, dir + 'interim/', 'tourney_outcomes')
+    Clean.write_file(df, datdir + 'interim/', 'tourney_outcomes')
 
-def set_games(dir):
+def set_games(datdir):
     """Create data containing features for both teams in matchup."""
-    r = pd.read_csv(dir + 'scrub/ncaa_results.csv')
-    s = sk = pd.read_csv(dir + 'scrub/seasons.csv')
+    r = pd.read_csv(datdir + 'scrub/ncaa_results.csv')
+    s = sk = pd.read_csv(datdir + 'scrub/seasons.csv')
     df = pd.merge(r, s, on='season', how='inner')
     
     # add string date column to games
@@ -64,9 +64,9 @@ def set_games(dir):
     
     return df
     
-def add_features(dir, df):
+def add_features(datdir, df):
     # import features data
-    file_feat = dir + 'features/team_features.csv'
+    file_feat = datdir + 'features/team_features.csv'
     feat = pd.read_csv(file_feat)
     
     # cols to exclude when renaming features
@@ -100,17 +100,17 @@ def add_features(dir, df):
     #df2 = Clean.set_gameid_index(df2)
     return df2
 
-def make_matchups(dir):
-    matchups = set_games(dir)
-    df = add_features(dir, matchups)
+def make_matchups(datdir):
+    matchups = set_games(datdir)
+    df = add_features(datdir, matchups)
     
     # set unique game index
     df = Clean.set_gameid_index(df)
         
     # save data
-    Clean.write_file(df, dir + 'processed/', 'matchups', keep_index=True)
+    Clean.write_file(df, datdir + 'processed/', 'matchups', keep_index=True)
 
-def get_upsets(dir, df):
+def get_upsets(datdir, df):
     
     def label_upset(row):
         
@@ -131,7 +131,7 @@ def get_upsets(dir, df):
         return upset
 
     # seeds data
-    s = pd.read_csv(dir + '/processed/matchups.csv', index_col=0)
+    s = pd.read_csv(datdir + '/processed/matchups.csv', index_col=0)
     s = s[['t1_seed', 't2_seed']]
     # absolute seed difference
     s['t1_seed_dif'] = s['t1_seed'] - s['t2_seed']
@@ -143,7 +143,7 @@ def get_upsets(dir, df):
     
     return mrg
 
-def score_targets(dir, df):
+def score_targets(datdir, df):
     # binary indicator of 1 if t1_team won
     df['t1_win'] = np.where(df['t1_score'] > df['t2_score'], 1, 0)
 
@@ -151,15 +151,15 @@ def score_targets(dir, df):
     df['t1_marg'] = df['t1_score'] - df['t2_score']
     
     # upset labels
-    df = get_upsets(dir, df)
+    df = get_upsets(datdir, df)
     
     # keep target columns
     df = df.loc[:, ['t1_win', 't1_marg', 'upset']]
     
     return df
     
-def make_targets(dir):
-    file = dir + '/scrub/ncaa_results.csv'
+def make_targets(datdir):
+    file = datdir + '/scrub/ncaa_results.csv'
     df = pd.read_csv(file)
     
     # created ordered, outcome_neutral team identifier
@@ -168,6 +168,6 @@ def make_targets(dir):
     df = Clean.set_gameid_index(df)
     # add column indicating score for each team
     scores = Clean.team_scores(df)
-    df = score_targets(dir, scores)
+    df = score_targets(datdir, scores)
     
-    Clean.write_file(df, dir + '/processed/', 'targets', keep_index=True)
+    Clean.write_file(df, datdir + '/processed/', 'targets', keep_index=True)

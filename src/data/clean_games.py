@@ -10,11 +10,11 @@ from Clean import game_date
 import datetime
 
 # read in data file of past game results
-dir = '../../data/raw/'
+datdir = '../../data/raw/'
 
-df = combine_files(dir, tag='CompactResults')
+df = combine_files(datdir, tag='CompactResults')
 
-sk = pd.read_csv(dir + 'Seasons.csv')
+sk = pd.read_csv(datdir + 'Seasons.csv')
 sk = sk[['Season', 'DayZero']]
 
 df = pd.merge(df, sk, on='Season', how='inner')

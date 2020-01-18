@@ -26,8 +26,8 @@ def parse_row(x):
         return "NA"
 
 def file_name(year):
-    dir = '../../data/external/odds/'
-    year_file = "".join([dir, "odds", "_", str(year), ".json"])
+    datdir = '../../data/external/odds/'
+    year_file = "".join([datdir, "odds", "_", str(year), ".json"])
     return year_file
 
 def store_data(data, year, page):

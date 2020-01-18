@@ -3,10 +3,10 @@ from models import utils
 from data import Clean
 from Constants import TEST_YEAR
 
-# define data directory, import features and targets
-dir = '../data/processed/'
-df = pd.read_csv(dir + 'features.csv', index_col=0)
-targets = pd.read_csv(dir + 'targets.csv', index_col=0)
+# define data datdirectory, import features and targets
+datdir = '../data/processed/'
+df = pd.read_csv(datdir + 'features.csv', index_col=0)
+targets = pd.read_csv(datdir + 'targets.csv', index_col=0)
 
 # input variable values
 split_values = [TEST_YEAR]
@@ -49,7 +49,7 @@ test = test[['t1_team_id', 't2_team_id']]
 test = Clean.switch_ids(test, toswitch)
 
 # add team names to data
-test = Clean.add_team_name(test, dir='../data/')
+test = Clean.add_team_name(test, datdir='../data/')
 
 test['t1_prob'] = probs_list
 test['uprob'] = (test['t1_prob'] * 100).astype(int)

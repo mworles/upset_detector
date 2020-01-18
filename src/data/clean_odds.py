@@ -26,8 +26,8 @@ def game_id(row):
     gid = "_".join([dt, t1, t2])
     return gid
 
-dir = "../../data/external/odds/"
-df = pd.read_csv(dir + 'odds.csv')
+datdir = "../../data/external/odds/"
+df = pd.read_csv(datdir + 'odds.csv')
 
 month_key = {v: k for k,v in enumerate(calendar.month_abbr)}
 

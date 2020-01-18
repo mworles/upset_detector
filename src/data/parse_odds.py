@@ -5,8 +5,8 @@ sys.path.append("../")
 from Cleaning import write_file
 
 def file_name(year):
-    dir = '../../data/external/odds/'
-    year_file = "".join([dir, "odds", "_", str(year), ".json"])
+    datdir = '../../data/external/odds/'
+    year_file = "".join([datdir, "odds", "_", str(year), ".json"])
     return year_file
 
 def year_games(year):

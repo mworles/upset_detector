@@ -3,10 +3,10 @@ from models import utils
 from data import Clean
 from Constants import SPLIT_YEARS
 
-# define data directory, import features and targets
-dir = '../data/processed/'
-df = pd.read_csv(dir + 'features.csv', index_col=0)
-targets = pd.read_csv(dir + 'targets.csv', index_col=0)
+# define data datdirectory, import features and targets
+datdir = '../data/processed/'
+df = pd.read_csv(datdir + 'features.csv', index_col=0)
+targets = pd.read_csv(datdir + 'targets.csv', index_col=0)
 
 # input variable values
 split_values = SPLIT_YEARS

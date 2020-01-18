@@ -3,8 +3,8 @@ import numpy as np
 import Clean
 from Constants import COLUMNS_TO_RENAME
 
-dir = '../data/'
-df = pd.read_csv(dir + 'raw/NCAATourneyCompactResults.csv')
+datdir = '../data/'
+df = pd.read_csv(datdir + 'raw/NCAATourneyCompactResults.csv')
 df = df.rename(columns=COLUMNS_TO_RENAME)
 df.columns = df.columns.str.lower()
 
@@ -28,4 +28,4 @@ df = pd.merge(df, upset, how='left', left_index=True, right_index=True)
 df = df.loc[:, ['t1_win', 't1_marg', 'upset']]
 
 # save file
-Clean.write_file(df, dir + '/processed/', 'targets', keep_index=True)
+Clean.write_file(df, datdir + '/processed/', 'targets', keep_index=True)

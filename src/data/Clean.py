@@ -10,25 +10,25 @@ def write_file(data, data_out, file_name, keep_index=False):
     file = "".join([data_out, file_name, '.csv'])
     data.to_csv(file, index=keep_index)
 
-def list_of_files(directory, tag = None):
-    """Create list of all files in a directory."""
+def list_of_files(datdirectory, tag = None):
+    """Create list of all files in a datdirectory."""
     
-    # collect names of all files in directory
-    file_names = os.listdir(directory)
+    # collect names of all files in datdirectory
+    file_names = os.listdatdir(datdirectory)
     
     # if tag given, select file names that include tag
     if tag is not None:
         file_names = [x for x in file_names if tag in x]
     
     # list of full file names
-    files = [directory + x for x in file_names]
+    files = [datdirectory + x for x in file_names]
     
     return files
 
-def combine_files(directory, index_col=False, tag = None):
-    """Combine data from all files in a directory."""
+def combine_files(datdirectory, index_col=False, tag = None):
+    """Combine data from all files in a datdirectory."""
     # list of full file names for concatenation
-    files = list_of_files(directory, tag = tag)
+    files = list_of_files(datdirectory, tag = tag)
     
     # combine all dataframes
     data_list = [pd.read_csv(x, index_col=index_col) for x in files]
@@ -133,9 +133,9 @@ def team_scores(df):
                               axis=1)
     return df
 
-def add_seeds(directory, df, team_ids, projected=False):
+def add_seeds(datdirectory, df, team_ids, projected=False):
     # import seeds data file
-    seeds = pd.read_csv(directory + 'NCAATourneySeeds.csv')
+    seeds = pd.read_csv(datdirectory + 'NCAATourneySeeds.csv')
     # include projected seeds for future matchups
     if projected:
         proj = pd.read_csv('../data/interim/projected_seeds_ids.csv')
@@ -239,9 +239,9 @@ def ids_from_index(df):
     df = df.set_index('game_id')
     return df
 
-def add_team_name(df, dir='../data/'):
+def add_team_name(df, datdir='../data/'):
     """Add team names to dataset containing team id numbers."""
-    path = "".join([dir, 'scrub/teams.csv'])
+    path = "".join([datdir, 'scrub/teams.csv'])
     nm = pd.read_csv(path)
     ido = nm[['team_id', 'team_name']].copy()
     mrg = pd.merge(df, ido, left_on='t1_team_id', right_on='team_id',
