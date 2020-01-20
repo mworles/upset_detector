@@ -1,14 +1,15 @@
 """Data Builder
 
-This script executes the full pipeline to build the data used in machine 
+This script executes the full pipeline to build data used in machine 
 learning models to create predictions for college basketball games. Each step in 
 the pipeline is controlled by a module. This is for comprehension and to allow 
-flexibility in pipeline control, as each step can easily be removed, modified, or added.
+flexibility in pipeline control, so each step can easily be removed, modified, 
+or added.
 
 The script uses custom imports created for the project:
 Constants: module containing project-wide variables
-data: package containing modules used to clean and generate interim data
-features: package with modules used to create features
+data: package used to clean and modify data
+features: package used to create features
 """
 
 import Constants
