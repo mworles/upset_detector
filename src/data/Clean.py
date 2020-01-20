@@ -22,7 +22,7 @@ def list_of_files(datdirectory, tag = None, tag_drop = None):
     
     # if tag_drop given, remove files with tag
     if tag_drop is not None:
-        files_name = [x for x in file_names if tag_drop not in x]
+        file_names = [x for x in file_names if tag_drop not in x]
     
     # list of full file names
     files = [datdirectory + x for x in file_names]
@@ -268,4 +268,11 @@ def merge_from_list(df_list, merge_on, how='inner'):
     df = df_list[0]
     for x in df_list[1:]:
         df = pd.merge(df, x, on=merge_on, how=how)
+    return df
+
+
+def round_floats(df, prec=2):
+    for c in df.columns:
+        if df[c].dtype == 'float':
+            df[c] = df[c].round(decimals=prec)
     return df
