@@ -10,15 +10,19 @@ def write_file(data, data_out, file_name, keep_index=False):
     file = "".join([data_out, file_name, '.csv'])
     data.to_csv(file, index=keep_index)
 
-def list_of_files(datdirectory, tag = None):
+def list_of_files(datdirectory, tag = None, tag_drop = None):
     """Create list of all files in a datdirectory."""
     
     # collect names of all files in datdirectory
-    file_names = os.listdatdir(datdirectory)
+    file_names = os.listdir(datdirectory)
     
     # if tag given, select file names that include tag
     if tag is not None:
         file_names = [x for x in file_names if tag in x]
+    
+    # if tag_drop given, remove files with tag
+    if tag_drop is not None:
+        files_name = [x for x in file_names if tag_drop not in x]
     
     # list of full file names
     files = [datdirectory + x for x in file_names]
