@@ -136,7 +136,8 @@ def filter_teams(datdir, df):
 
 def merge_features(datdir):
     subdatdir = datdir + '/features/'
-    files = data.Clean.list_of_files(subdatdir, tag = None)
+    files = data.Clean.list_of_files(subdatdir, tag_drop = 'team_features')
+    files = [x for x in files if 'team_features' not in x]
     read_csv = lambda x: pd.read_csv(x)
     df_list = [read_csv(x) for x in files]
     merge_on = ['team_id', 'season']
