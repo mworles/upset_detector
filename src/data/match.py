@@ -113,3 +113,11 @@ def create_key(datdir):
     data_out = datdir + 'interim/'
     # save  data file
     Clean.write_file(id, data_out, 'id_key')
+
+def id_from_name(datdir, df, key_col, name_col):
+    id_file = datdir + '/interim/id_key.csv'
+    id = pd.read_csv(id_file)
+    id = id[['team_id', key_col]]
+    mrg = pd.merge(df, id, left_on=name_col, right_on=key_col, how='inner')
+    mrg = mrg.drop([key_col, name_col], axis=1)
+    return mrg
