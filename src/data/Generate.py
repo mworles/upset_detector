@@ -1,10 +1,12 @@
-"""Get yearly team tourney outcomes.
+"""Interim data generation.
 
-This script uses data on prior year tournament results to create a dataset of
-the number of tournament games and wins for each team for each year. This data
-is saved for use by other scripts to compute various team features. 
+This module contains functions used to generate interim data. Each function
+will:
+1) use raw data to create an intermediate dataset used to compute features
+2) add additional data to an object (usually a dataframe)
+3) modify data structure for inputting to other operations
 
-This script requires `pandas`. It imports the custom Clean module.
+This script requires `pandas` and `numpy`. It imports the custom Clean module.
 
 """
 
@@ -13,7 +15,8 @@ import numpy as np
 import Clean
 
 def tourney_outcomes(datdir):
-    """Function to count team games and wins for each tournament year.""" 
+    """Uses game results to create team performance indicators for each 
+    tournament year.""" 
     # read in prior tournament results
     data_in = datdir + 'scrub/'
     tgames = pd.read_csv(data_in + 'ncaa_results.csv')
@@ -42,11 +45,14 @@ def tourney_outcomes(datdir):
     # count is the number of games, sum is the number of wins
     df = df.rename(columns={'count': 'games', 'sum': 'wins'})
     
+    # add 1 to season so indicators represent past performance
+    df['season'] = df['season'] + 1
+    
     # write file
     Clean.write_file(df, datdir + 'interim/', 'tourney_outcomes')
 
 def set_games(datdir):
-    """Create data containing features for both teams in matchup."""
+    """Establish neutral team ids and date for each game."""
     r = pd.read_csv(datdir + 'scrub/ncaa_results.csv')
     s = sk = pd.read_csv(datdir + 'scrub/seasons.csv')
     df = pd.merge(r, s, on='season', how='inner')
@@ -64,45 +70,59 @@ def set_games(datdir):
     
     return df
     
-def add_features(datdir, df):
+def matchup_features(datdir, df):
+    """Add features for both teams in a matchup.
+    
+    Arguments
+    ----------
+    datdir: string
+        Project data directory. 
+    df: pandas dataframe
+        Requires columns 'season', 't1_team_id', 't2_team_id'.
+    """
+    def add_team_features(df_game, df_features, team_id):
+        """Nested function to add features for one team."""
+        merge_on=['season', 'team_id']
+        df = pd.merge(df_game, df_features, left_on=['season', team_id],
+                      right_on=merge_on, how='inner')
+        df = df.drop('team_id', axis=1)
+        return df
+        
     # import features data
     file_feat = datdir + 'features/team_features.csv'
     feat = pd.read_csv(file_feat)
     
     # cols to exclude when renaming features
     exc = ['team_id', 'season']
-    # feature columns to rename
+    # get list of feature columns to rename
     tcols = [x for x in list(feat.columns) if x not in exc]
     
+    # empty dicts for creating map to rename columns
     t1dict = {}
     t2dict = {}
     
+    # create separate maps for t1 and t2 teams
     for t in tcols:
         t1dict[t] = 't1_' + t
         t2dict[t] = 't2_' + t
-    
     
     # create data for both teams with t1 and t2 prefix
     t1 = feat.copy().rename(columns=t1dict)
     t2 = feat.copy().rename(columns=t2dict)
     
-
-    # merge for team 1
-    merge_on=['season', 'team_id']
-    df1 = pd.merge(df, t1, left_on=['season', 't1_team_id'], right_on=merge_on,
-                   how='inner')
-    df1 = df1.drop('team_id', axis=1)
+    # add features for both teams in matchup
+    df = add_team_features(df, t1, 't1_team_id')
+    df = add_team_features(df, t2, 't2_team_id')
     
-    df2 = pd.merge(df1, t2, left_on=['season', 't2_team_id'], right_on=merge_on,
-                   how='inner')
-    df2 = df2.drop('team_id', axis=1)
-    
-    #df2 = Clean.set_gameid_index(df2)
-    return df2
+    return df
 
 def make_matchups(datdir):
+    """Convenience function to set up games, add features, and save file."""
+    # identifies outcome-neutral team identifers and game date
     matchups = set_games(datdir)
-    df = add_features(datdir, matchups)
+    
+    # add features to both teams in matchup
+    df = matchup_features(datdir, matchups)
     
     # set unique game index
     df = Clean.set_gameid_index(df)
@@ -111,46 +131,82 @@ def make_matchups(datdir):
     Clean.write_file(df, datdir + 'processed/', 'matchups', keep_index=True)
 
 def get_upsets(datdir, df):
+    """Apply upset label to games.
+    
+    Arguments
+    ----------
+    datdir: string
+        Project data directory. 
+    df: pandas dataframe
+        Requires unique game id index and 't1_marg' column for team 1
+        score margin.
+    """
     
     def label_upset(row):
-        
+        """Nested function to apply to rows and identify upsets."""
+        # absolute seed difference is at least 4
         if row['seed_abs'] >= 4:
+            # if team 1 seed is higher
             if row['t1_seed_dif'] > 0:
+                # if team 1 won game 
                 if row['t1_marg'] > 0:
+                    # is an upset
                     upset = 1
                 else:
+                    # team 1 lost and not an upset
                     upset = 0
+            # else team 1 seed is lower
             else:
+                # if team 1 won game
                 if row['t1_marg'] > 0:
+                    # not an upset
                     upset = 0
                 else:
+                    # team 1 lost game and is an upset
                     upset = 1
+        # seed difference is less than 4 and upset label not applied
         else:
             upset = np.nan
         
+        # return row
         return upset
 
-    # seeds data
+    # to identify upsets need team seeds
     s = pd.read_csv(datdir + '/processed/matchups.csv', index_col=0)
     s = s[['t1_seed', 't2_seed']]
-    # absolute seed difference
+    
+    # create temp columns needed to use label_upset function
     s['t1_seed_dif'] = s['t1_seed'] - s['t2_seed']
     s['seed_abs'] = s['t1_seed_dif'].apply(abs)
+    
     # merge with scores
     mrg = pd.merge(df, s, left_index=True, right_index=True)
     
+    # apply upset label using nested function above
     mrg['upset'] = mrg.apply(label_upset, axis=1)
+    
+    # remove the added columns
+    mrg = mrg.drop(['t1_seed', 't2_seed', 't1_seed_dif', 'seed_abs'], axis=1)
     
     return mrg
 
 def score_targets(datdir, df):
+    """Get targets from team scores.
+    
+    Arguments
+    ----------
+    datdir: string
+        Project data directory. 
+    df: pandas dataframe
+        Requires unique game id index and columns 't1_score' and 't2_score'.
+    """
     # binary indicator of 1 if t1_team won
     df['t1_win'] = np.where(df['t1_score'] > df['t2_score'], 1, 0)
 
-    # score margin 
+    # score margin as t1_team score minus t2_team score
     df['t1_marg'] = df['t1_score'] - df['t2_score']
     
-    # upset labels
+    # add upset labels
     df = get_upsets(datdir, df)
     
     # keep target columns
@@ -159,15 +215,24 @@ def score_targets(datdir, df):
     return df
     
 def make_targets(datdir):
+    """Create dataset of targets for prediction.
+    
+    Arguments
+    ----------
+    datdir: string
+        Project data directory.
+    """
+    # read in data file with game results
     file = datdir + '/scrub/ncaa_results.csv'
     df = pd.read_csv(file)
     
-    # created ordered, outcome_neutral team identifier
+    # created outcome-neutral team identifier
     df = Clean.convert_team_id(df, ['wteam', 'lteam'], drop=False)
     # create unique game identifier and set as index
     df = Clean.set_gameid_index(df)
     # add column indicating score for each team
     scores = Clean.team_scores(df)
+    # create targets data
     df = score_targets(datdir, scores)
-    
+    # save data file
     Clean.write_file(df, datdir + '/processed/', 'targets', keep_index=True)
