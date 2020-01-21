@@ -27,7 +27,21 @@ def team_seeds(datdir):
 
 def team_ratings(datdir):
     """Create data containing team ratings."""
+
+    def clean_season(df, season):
+        """Use to clean inconsistency in use of season. Some files contain 
+        season, others Season, and others neither."""
+        # if either 'Season' or 'season' in columns
+        if any([c in df.columns for c in ['Season', 'season']]):
+            # rename upper to lower
+            df = df.rename(columns={'Season': 'season'})
+        else:
+            # if neither included, add column using value in season
+            df['season'] = season
+        # return data
+        return df
     
+    # location of files containing ratings for each season
     ratings_dir = datdir + '/external/kp/'
     
     # create list of file names from directory
@@ -35,11 +49,11 @@ def team_ratings(datdir):
 
     # use files to get lists of season numbers and dataframes
     # data has no season column so must be collected from file name and added
-    seasons = [data.Clean.get_season(x) for x in files]
+    seasons = [data.Clean.year4_from_string(x) for x in files]
     dfs = [pd.read_csv(x) for x in files]
 
-    # add season column
-    data_list = [data.Clean.add_season(x, y) for x, y  in zip(dfs, seasons)]
+    # used nested function to create consistent season column
+    data_list = [clean_season(x, y) for x, y in zip(dfs, seasons)]
 
     # create combined data with all seasons
     df = pd.concat(data_list, sort=False)
