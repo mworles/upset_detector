@@ -3,7 +3,7 @@
 This module contains functions used to generate interim data. Each function
 will:
 1) use raw data to create an intermediate dataset used to compute features
-2) add additional data to an object (usually a dataframe)
+2) add additional data to an object, such as a dataframe.
 3) modify data structure for inputting to other operations
 
 This script requires `pandas` and `numpy`. It imports the custom Clean module.
@@ -13,6 +13,43 @@ This script requires `pandas` and `numpy`. It imports the custom Clean module.
 import pandas as pd
 import numpy as np
 import Clean
+
+def set_gameid_index(df, full_date=False, drop_date=True):
+    """
+    Returns dataframe with new index in date_team1_team2 format. 
+    Ensures a unique identifier for each game to use as primary key. 
+
+    Arguments
+    ----------
+    df: pandas dataframe
+        Data to set the index on. Must have 't1_team_id', 't2_team_id', and 
+        either 'date_id' or 'season' as columns, depending on whether the full
+        date is used to create the index. 
+    full_date: boolean
+        If true, use the full date (year_mon_day) in index. If false, year only.
+    drop_date: boolean
+        If true, remove the date column before returning. If false, remove it. 
+    
+    """
+    # identify date series as either full date or season
+    if full_date == True:
+        date = df['date_id']
+        # remove date col if indicated
+        if drop_date == True:
+            df = df.drop(['date_id'], axis=1)
+    else:
+        date = df['season'].apply(str)
+    
+    # need team numeric identifiers as string type
+    id_lower = df['t1_team_id'].astype(str)
+    id_upper = df['t2_team_id'].astype(str)    
+    
+    # game_id is date combined with both team series
+    df['game_id'] = date + '_' + id_lower + '_' + id_upper
+    df = df.set_index('game_id')
+    
+    # return data with new index
+    return df
 
 def tourney_outcomes(datdir):
     """Uses game results to create team performance indicators for each 
@@ -125,10 +162,93 @@ def make_matchups(datdir):
     df = matchup_features(datdir, matchups)
     
     # set unique game index
-    df = Clean.set_gameid_index(df)
+    df = set_gameid_index(df)
         
     # save data
     Clean.write_file(df, datdir + 'processed/', 'matchups', keep_index=True)
+
+def convert_team_id(df, id_cols, drop=True):
+    """Return data with neutral team identifiers 't1_team_id' and 't2_team_id' 
+    where 't1_team_id' is the numerically-lower id.
+    In the raw data, the identifers are separated into game winners and losers.
+    This function creates outcome-neutral idenfiers to prevent leakage.
+    
+    Arguments
+    ----------
+    df: pandas dataframe
+        A dataframe containing two team identifer columns.
+    id_cols: list
+        The list of length 2 with the names of the team identifer columns.
+    drop: boolean
+        If true, remove the original team identifer columns before returning 
+        data.
+    
+    """
+    # use min and max to create new identifiers
+    df['t1_team_id'] = df[id_cols].min(axis=1)
+    df['t2_team_id'] = df[id_cols].max(axis=1)
+    # drop original identifers if desired
+    if drop == True:
+        df = df.drop(columns=id_cols)
+    
+    return df
+
+def team_scores(df):
+    """Return data with neutral team scores 't1_score' and 't2_score' 
+    where 't1_score' is the score for the team with numerically-lower id.
+    In the raw data, game scores are separated into game winners and losers.
+    This function creates outcome-neutral scores to prevent leakage.
+    
+    Arguments
+    ----------
+    df: pandas dataframe
+        A dataframe containing game results. Requires 'wteam' for winning team
+        id, 'wscore' for winning team score, 'lteam' for losing team id, and 
+        'lscore' for losing team score, 't1_team_id' for one team and 
+        't2_team_id' for otehr team. 
+
+    """
+        
+    def get_score(row, team_id, score_dict):
+        """Function to apply over dataframe rows and obtain team score.
+        
+        Arguments
+        ----------
+        row: row of pandas dataframe
+            Each row to apply function, called when function is applied.
+        team_id: string
+            The column of 
+        score_dict: dictionary
+            Contains keys with unique game identifier. Key paired with dict 
+            with two key:value pairs (one for each team in game) with key as 
+            team id and value as the score for that team.   
+        """
+        # extract game identifier
+        row_gameid = row.name
+        # extract team identifier
+        row_team = row[team_id]
+        # use both identifiers to extract team score
+        team_score = score_dict[row_gameid][row_team]
+        # return score
+        return team_score
+    
+    
+    # create dict containing data for all games
+    score_dict = {}
+    for i, r in df.iterrows():
+        # creates unique key for each game
+        # value is a dict with team_id:score for both teams in game
+        score_dict[i] = {r['wteam']: r['wscore'],
+                         r['lteam']: r['lscore']}
+
+    # apply get_score function to get scores for both teams
+    t1_score = lambda x: get_score(x, 't1_team_id', score_dict), axis=1)
+    df['t1_score'] = df.apply(t1_score)
+    t2_score = lambda x: get_score(x, 't2_team_id', score_dict), axis=1)
+    df['t2_score'] = df.apply(t2_score)
+    
+    return df
+
 
 def get_upsets(datdir, df):
     """Apply upset label to games.
@@ -229,7 +349,7 @@ def make_targets(datdir):
     # created outcome-neutral team identifier
     df = Clean.convert_team_id(df, ['wteam', 'lteam'], drop=False)
     # create unique game identifier and set as index
-    df = Clean.set_gameid_index(df)
+    df = set_gameid_index(df)
     # add column indicating score for each team
     scores = Clean.team_scores(df)
     # create targets data
