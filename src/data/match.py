@@ -1,6 +1,6 @@
 """Match team name to ID number.
 
-This script contains functions used to match the names of schools from mixed
+This module contains functions used to match the names of schools from mixed
 data sources to a single numeric identifier from a master ID file. 
 
 The raw data names contain exact and non-exact matches to names in the master 
