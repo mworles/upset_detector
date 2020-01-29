@@ -29,7 +29,7 @@ def team_ratings(datdir):
     """Create data containing team ratings."""
 
     def clean_season(df, season):
-        """Use to clean inconsistency in use of season. Some files contain 
+        """Cleans inconsistent use of season. Some files contain 
         season, others Season, and others neither."""
         # if either 'Season' or 'season' in columns
         if any([c in df.columns for c in ['Season', 'season']]):
