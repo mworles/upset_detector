@@ -1,12 +1,11 @@
 """Data cleaning.
 
 This module contains functions used to clean data. Functions in this module
-may be used in multiple other scripts/modules for general purpose data 
-cleaning such as file manipulation, extracting numeric data, recoding values, 
-or reformatting strings. 
+are used in other scripts/modules for general purpose data 
+cleaning such as file manipulation, extracting, recoding, or reformatting. 
 
-This script requires `pandas`, `numpy`, and `fuzzywuzzy`. It uses base 
-modules `os`, `re`, and `datetime`. 
+This script requires `pandas`, `numpy`, and `fuzzywuzzy` packages. 
+It uses base Python packages `os`, `re`, and `datetime`. 
 
 """
 import pandas as pd
@@ -15,6 +14,7 @@ import os
 import re
 import datetime
 from fuzzywuzzy import process
+
 
 def write_file(df, data_out, file_name, keep_index=False):
     """Specify location and save .csv data file in one line.
@@ -34,6 +34,7 @@ def write_file(df, data_out, file_name, keep_index=False):
     file = "".join([data_out, file_name, '.csv'])
     # save file
     df.to_csv(file, index=keep_index)
+
 
 def list_of_files(directory, tag = None, tag_drop = None):
     """Returns list of all files in a directory. Names of files in returned list 
@@ -66,6 +67,7 @@ def list_of_files(directory, tag = None, tag_drop = None):
     
     return files
 
+
 def combine_files(directory, index_col=False, tag = None):
     """Combine data from all files in a directory.
     
@@ -89,6 +91,7 @@ def combine_files(directory, index_col=False, tag = None):
     # return data
     return df
 
+
 def school_name(x):
     """Format school names from external sources for joining with team id."""
     # remove capitals
@@ -96,11 +99,13 @@ def school_name(x):
     # remove symbols and whitespace
     x = re.sub('[().&*\']', '', x)
     x = x.rstrip()
-    # replace spaces with hyphens, which is format used in team id file
+    # replace spaces with hyphens
+    # this is the format used in team id file
     x = re.sub(r'  ', '-', x)
     x = re.sub(r' ', '-', x)
     # return the formatted string
     return x
+
 
 def fuzzy_match(x, options, cutoff=85):
     """Indentify the closest match between a given string and a list of
@@ -129,6 +134,7 @@ def fuzzy_match(x, options, cutoff=85):
         print x, best_match, match_score
         return None
 
+
 def year4_from_string(s):
     """Returns numeric 4-digit year from string containing 2-digit year."""
     # extract digits from string
@@ -142,8 +148,9 @@ def year4_from_string(s):
     year4 = int(''.join([pre, year2]))
     return year4
     
+
 def game_date(row):
-    """Apply along rows to return the date of each game. Row must contain 
+    """Apply along rows to return the string date of each game. Row must contain 
     'daynum' integer for day of game and 'dayzero' string indicating the 'zero 
     day' for that year."""
     # identify integer day of game
@@ -158,13 +165,15 @@ def game_date(row):
     # return string
     return date_id
 
+
 def get_integer(x):
     """Returns the integer value from a string."""
     x_num = int(re.sub(r'\D+', '', x))
     return x_num
 
+
 def upset_features(df):
-    """Returns dataframe with features re-aligned for upset prediction, where
+    """Returns the dataframe with features re-aligned for upset prediction, where
     't1_' columns represent features for underdog teams and 't2_' columns 
     represent features for favored teams. 
     
@@ -194,45 +203,208 @@ def upset_features(df):
     return dfr
 
 
-def ids_from_index(df):
-    """Get team id numbers from the game id index."""
+def ids_from_index(df, full_date = False):
+    """Returns the input dataframe with team id columns added. Team id numbers 
+    are extracted from the dataframe index. Useful when team identifers have 
+    been removed from data (i.e., for model training) but need to be 
+    re-inserted for some reason, such as merging with other team data. 
+    
+    Arguments
+    ----------
+    df: pandas dataframe
+        Requires an index of unique game identifers that contain team id for 
+        both teams in the game.
+    """
+    # ensure index has name
     df.index = df.index.rename('game_id')
+    # set index as column
     df = df.reset_index()
-    df['t1_team_id'] = df['game_id'].apply(lambda x: int(x[5:9]))
-    df['t2_team_id'] = df['game_id'].apply(lambda x: int(x[10:]))
+    
+    # assume game date contains year only
+    if full_date == False:
+        df['t1_team_id'] = df['game_id'].apply(lambda x: int(x[5:9]))
+        df['t2_team_id'] = df['game_id'].apply(lambda x: int(x[10:]))
+    # if full date, need 
+    else:
+        df['t1_team_id'] = df['game_id'].apply(lambda x: int(x[11:15]))
+        df['t2_team_id'] = df['game_id'].apply(lambda x: int(x[16:]))
+    
+    # return game identifer to index
     df = df.set_index('game_id')
+    
     return df
 
+
 def add_team_name(df, datdir='../data/'):
-    """Add team names to dataset containing team id numbers."""
+    """Returns the input dataframe with team names added. Team names are read 
+    in from a file and merged with the input data using team identifers.
+    
+    Arguments
+    ----------
+    df: pandas dataframe
+        Requires team identifer columns 't1_team_id' and 't2_team_id'. 
+    datadir: string
+        Relative path to data directory.
+    """    
+    # specificy path to team name data and read in dataframe
     path = "".join([datdir, 'scrub/teams.csv'])
     nm = pd.read_csv(path)
-    ido = nm[['team_id', 'team_name']].copy()
-    mrg = pd.merge(df, ido, left_on='t1_team_id', right_on='team_id',
+    
+    # merge and create name column for team 1
+    mrg = pd.merge(df, nm, left_on='t1_team_id', right_on='team_id',
                    how='inner')
     mrg = mrg.drop(columns=['team_id'])
     mrg = mrg.rename(columns={'team_name': 'team_1'})
-    mrg = pd.merge(mrg, ido, left_on='t2_team_id', right_on='team_id',
+    
+    # merge and create name column for team 2
+    mrg = pd.merge(mrg, nm, left_on='t2_team_id', right_on='team_id',
                    how='inner')
     mrg = mrg.drop(columns=['team_id'])
     mrg = mrg.rename(columns={'team_name': 'team_2'})
+    
+    
     return mrg
 
+
 def switch_ids(df, toswitch):
+    """Returns the input dataframe with team identifers switched in specified
+    rows as indicated by input boolean array. Useful when the intent is to 
+    organize data for presentation, such as when aligning all underdogs.
+    
+    Arguments
+    ----------
+    df: pandas dataframe
+        Requires team identifer columns 't1_team_id' and 't2_team_id'. 
+    toswitch: array
+        Contains boolean values where True indicates rows to switch.
+    """
+    # copy of data for replacing values    
     dfr = df.copy()
+    # switch both team identifers
     dfr.loc[toswitch, 't1_team_id'] = df.loc[toswitch, 't2_team_id']
     dfr.loc[toswitch, 't2_team_id'] = df.loc[toswitch, 't1_team_id']
+    
     return dfr
 
+
 def merge_from_list(df_list, merge_on, how='inner'):
+    """Returns dataframe produced after merging all dataframes in input list. 
+    Columns to use for merge provided as arguments, with 'inner' merge used 
+    as default method. 
+    
+    Arguments
+    ----------
+    df_list: list
+        Includes all dataframes desired to merge. 
+    merge_on: list
+        List of column names to use to merge rows.
+    how: string
+        The type of merge to perform. Default type is 'inner'. Other options
+        include 'left', 'right', 'outer'
+    """
+    # use first df in list for left-most merge
     df = df_list[0]
+    # repeat merge for remaining dfs in list
     for x in df_list[1:]:
         df = pd.merge(df, x, on=merge_on, how=how)
+    
     return df
 
 
 def round_floats(df, prec=2):
+    """Returns dataframe with all float values rounded to specified precision. 
+    
+    Arguments
+    ----------
+    df: pandas dataframe
+        Contains float numeric desired to be rounded. 
+    prec: integer
+        The desired decimal point precision for rounding. Default is 2. 
+    """
     for c in df.columns:
+        # only round columns of float data type
         if df[c].dtype == 'float':
             df[c] = df[c].round(decimals=prec)
     return df
+
+
+def scrub_file(name, file_map):
+    """Returns dataframe identified by file name with column names formatted and
+    renamed according to file map. For files located in 'raw' subdirectory.
+
+    Arguments
+    ----------
+    name: string
+        Contains string identifer used for file name and as key in RAW_MAP in
+        the Constants file. 
+    file_map: dictionary
+        Must contain key to match file name. Value is a dict that may contain 
+        'columns' key indicating columns to rename.
+    """
+    # create relative path to file and read data as dataframe
+    file = '../data/raw/' + name + '.csv'
+    df = pd.read_csv(file)
+    
+    # if file map has columns to rename, rename them
+    if 'columns' in file_map[name].keys():
+        df = df.rename(columns=file_map[name]['columns'])
+    
+    # column names all lower case for consistency across project
+    df.columns = df.columns.str.lower()
+    
+    return df
+
+def scrub_write(name, file_map):
+    """Write scrubbed data to file.
+
+    Arguments
+    ----------
+    name: string
+        String used as file name and key in file_map. 
+    file_map: dictionary
+        Must contain key to match file name. Value is a dict that must contain
+        'new_name' key paired with value as string of new file name. Dict may 
+        contain 'columns' key indicating columns to rename.
+    """
+    
+    def scrub_file(name, file_map):
+        """Returns dataframe identified by file name with column names formatted and
+        renamed according to file map. For files located in 'raw' subdirectory.
+        """
+        # create relative path to file and read data as dataframe
+        file = '../data/raw/' + name + '.csv'
+        df = pd.read_csv(file)
+        
+        # if file map has columns to rename, rename them
+        if 'columns' in file_map[name].keys():
+            df = df.rename(columns=file_map[name]['columns'])
+        
+        # column names all lower case for consistency across project
+        df.columns = df.columns.str.lower()
+        
+        return df
+
+    # obtain data with columns reformatted
+    df = scrub_file(name, file_map)
+    # identify relative path to write file
+    data_out = '../data/scrub/'
+    # for naming new file
+    name_new = file_map[name]['new_name']
+    # write file
+    write_file(df, data_out, name_new, keep_index=False)
+
+def scrub_files(file_map):
+    """Scrubs and writes all files identified in Constants file map.
+
+    Arguments
+    ----------
+    file_map: dictionary
+        Must contain key to match file names. Value is a dict that must contain
+        'new_name' key paired with value as string of new file name. Dict may 
+        contain 'columns' key indicating columns to rename.
+    """
+    # collect list of all files to process
+    files = file_map.keys()
+    # scrub and write each file
+    for f in files:
+        scrub_write(f, file_map)
