@@ -1,3 +1,14 @@
+"""Modeling utility tools.
+
+This module contains functions used for modeling data. Functions are here to
+isolate and package code used to create cross-validation splits, scale data, 
+create cross-validation predictions, and perform hyperparameter searches. 
+
+This script requires `pandas`, `numpy`, and `fuzzywuzzy` packages. 
+It uses base Python packages `os`, `re`, and `datetime`. 
+
+"""
+
 import pandas as pd
 import numpy as np
 import json
@@ -10,22 +21,31 @@ from imblearn.over_sampling import RandomOverSampler
 from Constants import RANDOM_SEED
 
 def fold_split(df, split_on, split_value):
-    """Split data into one training and validation set. 
+    """Returns a dictionary containing indices to identify training set and
+    test set examples from the input dataframe. To perform sequential 
+    cross-validation, the training and test set are identified using specified
+    criteria in the data instead of randomly.
     
-    Training set is all examples where split_on is less than split_value. 
-    Validation set is all examples where split_on is equal to split_value.
-    
-    Args:
-        df: a dataframe that includes split_on as a column
-        split_on: column to use to split
-        split_value: value used to split
+    Arguments
+    ----------
+    df: pandas dataframe 
+        Contains a column with values to use to split the data into training
+        and test set.
+    split_on: string
+        The column to use to split.
+    split_value: numeric
+        The value that identifies example to use as test set.
     """
-    # identify index values for training set and test set
+    # index values for training set 
+    # for training, want examples that occur before split_value
     train = df[df[split_on] < split_value].index.values
+    # test set is examples equal to split_value
     test = df[df[split_on] == split_value].index.values
     
-    # return dict 
-    dict_split = {'fold': split_value, 'i_train': train, 'i_test': test}
+    # return dict
+    dict_split = {'fold': split_value, # 'fold': split_value as identifier
+                  'i_train': train, # i_train for list of train examples
+                  'i_test': test} # i_test for list of test examples
     return dict_split
 
 def custom_folds(df, split_on, split_values):
