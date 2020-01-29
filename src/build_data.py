@@ -2,25 +2,24 @@
 
 This script executes the full pipeline to build data used in machine 
 learning models to create predictions for college basketball games. Each step in 
-the pipeline is controlled by a module. This is for comprehension and to allow 
-flexibility in pipeline control, so each step can easily be removed, modified, 
-or added.
+the pipeline is controlled by a module. This structure allows individual steps 
+in the pipeline to be removed, modified, or added in a flexible manner. 
 
 The script uses custom imports created for the project:
 Constants: module containing project-wide variables
 data: package used to clean and modify data
 features: package used to create features
 """
-
+# import custom modules/packages
 import Constants
 import data
 import features
 
-# location of data
+# location of data directory from constants module
 datdir = Constants.DATA
 
 # pre-process raw data
-data.Scrub.scrub_files(Constants.RAW_MAP)
+data.Clean.scrub_files(Constants.RAW_MAP)
 
 # create files matching school names to numeric identifiers
 data.Match.create_key(datdir)
