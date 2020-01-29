@@ -88,6 +88,32 @@ def tourney_outcomes(datdir):
     # write file
     Clean.write_file(df, datdir + 'interim/', 'tourney_outcomes')
 
+def convert_team_id(df, id_cols, drop=True):
+    """Return data with neutral team identifiers 't1_team_id' and 't2_team_id' 
+    where 't1_team_id' is the numerically-lower id.
+    In the raw data, the identifers are separated into game winners and losers.
+    This function creates outcome-neutral idenfiers to prevent leakage.
+    
+    Arguments
+    ----------
+    df: pandas dataframe
+        A dataframe containing two team identifer columns.
+    id_cols: list
+        The list of length 2 with the names of the team identifer columns.
+    drop: boolean
+        If true, remove the original team identifer columns before returning 
+        data.
+    
+    """
+    # use min and max to create new identifiers
+    df['t1_team_id'] = df[id_cols].min(axis=1)
+    df['t2_team_id'] = df[id_cols].max(axis=1)
+    # drop original identifers if desired
+    if drop == True:
+        df = df.drop(columns=id_cols)
+    
+    return df
+
 def set_games(datdir):
     """Establish neutral team ids and date for each game."""
     r = pd.read_csv(datdir + 'scrub/ncaa_results.csv')
@@ -99,7 +125,7 @@ def set_games(datdir):
     
     # create outcome-neutral team identifiers
     team_cols = ['wteam', 'lteam']
-    df = Clean.convert_team_id(df, team_cols, drop=True)
+    df = convert_team_id(df, team_cols, drop=True)
     
     # keep only necessary info to add features
     keep = ['season', 't1_team_id', 't2_team_id', 'date_id']
@@ -167,31 +193,6 @@ def make_matchups(datdir):
     # save data
     Clean.write_file(df, datdir + 'processed/', 'matchups', keep_index=True)
 
-def convert_team_id(df, id_cols, drop=True):
-    """Return data with neutral team identifiers 't1_team_id' and 't2_team_id' 
-    where 't1_team_id' is the numerically-lower id.
-    In the raw data, the identifers are separated into game winners and losers.
-    This function creates outcome-neutral idenfiers to prevent leakage.
-    
-    Arguments
-    ----------
-    df: pandas dataframe
-        A dataframe containing two team identifer columns.
-    id_cols: list
-        The list of length 2 with the names of the team identifer columns.
-    drop: boolean
-        If true, remove the original team identifer columns before returning 
-        data.
-    
-    """
-    # use min and max to create new identifiers
-    df['t1_team_id'] = df[id_cols].min(axis=1)
-    df['t2_team_id'] = df[id_cols].max(axis=1)
-    # drop original identifers if desired
-    if drop == True:
-        df = df.drop(columns=id_cols)
-    
-    return df
 
 def team_scores(df):
     """Return data with neutral team scores 't1_score' and 't2_score' 
@@ -242,10 +243,10 @@ def team_scores(df):
                          r['lteam']: r['lscore']}
 
     # apply get_score function to get scores for both teams
-    t1_score = lambda x: get_score(x, 't1_team_id', score_dict), axis=1)
-    df['t1_score'] = df.apply(t1_score)
-    t2_score = lambda x: get_score(x, 't2_team_id', score_dict), axis=1)
-    df['t2_score'] = df.apply(t2_score)
+    t1_score = lambda x: get_score(x, 't1_team_id', score_dict)
+    df['t1_score'] = df.apply(t1_score, axis=1)
+    t2_score = lambda x: get_score(x, 't2_team_id', score_dict)
+    df['t2_score'] = df.apply(t2_score, axis=1)
     
     return df
 
@@ -347,11 +348,11 @@ def make_targets(datdir):
     df = pd.read_csv(file)
     
     # created outcome-neutral team identifier
-    df = Clean.convert_team_id(df, ['wteam', 'lteam'], drop=False)
+    df = convert_team_id(df, ['wteam', 'lteam'], drop=False)
     # create unique game identifier and set as index
     df = set_gameid_index(df)
     # add column indicating score for each team
-    scores = Clean.team_scores(df)
+    scores = team_scores(df)
     # create targets data
     df = score_targets(datdir, scores)
     # save data file
