@@ -48,8 +48,6 @@ def list_of_files(directory, tag = None, tag_drop = None):
         Optional, use to restrict list to files containing the tag.
     tag_drop: string
         Optional, use to exclude files containing the tag.
-    keep_index: boolean
-        Whether to keep or drop the dataframe index. 
     """    
     # collect names of all files in directory
     file_names = os.listdir(directory)
@@ -66,6 +64,25 @@ def list_of_files(directory, tag = None, tag_drop = None):
     files = [directory + x for x in file_names]
     
     return files
+
+def list_of_filenames(directory):
+    """Returns list of all file names in a directory with file type removed.
+    
+    Arguments
+    ----------
+    directory: string
+        Relative path of directory containing the files.
+    """    
+    # collect names of all files in directory
+    files = os.listdir(directory)
+    
+    # lambda function to obtain file name without file type
+    file_stub = lambda x: x.split('.')[0]
+    
+    # iterate function over full file names
+    file_names = [file_stub(x) for x in files]
+    
+    return file_names
 
 
 def combine_files(directory, index_col=False, tag = None):
