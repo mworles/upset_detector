@@ -126,17 +126,7 @@ class DBAssist():
                                    'PWD='+code+';'
                                    'charset=utf8mb4;')
         self.cursor = self.conn.cursor()
-    
-    def extract_data(self, file):
-        """Extract and return all rows from data file as list of lists."""
-        
-        with open(file) as csvfile:
-            reader = csv.reader(csvfile)
-            rows = [x for x in reader]
-        
-        len_data = len(rows)
-        
-        return rows
+
 
     def check_table(self, table):
         qp = """SELECT COUNT(*)
