@@ -5,7 +5,7 @@ import Transfer
 
 def get_ratings(url):
     """
-    Imports raw data from kenpom website.
+    Reads team ratings data from kenpom website.
     """
     f = requests.get(url)
     soup = BeautifulSoup(f.text, features='lxml')
@@ -55,15 +55,22 @@ def get_ratings(url):
     rows.insert(0, names)
 
     return rows
-
+"""
 url = 'http://kenpom.com/index.php'
 rows = get_ratings(url)
 
 dbt = Transfer.DBTable('ratings', rows)
-
-
-
-#dba = Transfer.DBAssist()
-#dba.connect('../../aws.config')
+dbt.setup_table()
+"""
+dba = Transfer.DBAssist()
+dba.connect('../../aws.config')
+#dba.create_table(dbt)
 #dba.create_table('ratings', rows)
-#dba.insert_rows('ratings', rows[:10])
+#dba.insert_rows(dbt)
+
+q = "SELECT COUNT(*) FROM ratings"
+result = dba.run_query(q)
+for r in result:
+    print r
+
+dba.close()
