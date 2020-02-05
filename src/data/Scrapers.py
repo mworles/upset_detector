@@ -1,9 +1,8 @@
 from bs4 import BeautifulSoup
 import requests
 import datetime
-import Transfer
 
-def get_ratings(url):
+def team_ratings(url = 'http://kenpom.com/index.php'):
     """
     Reads team ratings data from kenpom website.
     """
@@ -47,7 +46,7 @@ def get_ratings(url):
     rows = [[x for x in row if x is not None] for row in rows]
     rows = [[clean_text(x) for x in row] for row in rows]
     
-    date = str(datetime.datetime.now().date())
+    date = str(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
     [r.insert(0, date) for r in rows]
     
     names.insert(0, 'date')
@@ -55,22 +54,3 @@ def get_ratings(url):
     rows.insert(0, names)
 
     return rows
-"""
-url = 'http://kenpom.com/index.php'
-rows = get_ratings(url)
-
-dbt = Transfer.DBTable('ratings', rows)
-dbt.setup_table()
-"""
-dba = Transfer.DBAssist()
-dba.connect('../../aws.config')
-#dba.create_table(dbt)
-#dba.create_table('ratings', rows)
-#dba.insert_rows(dbt)
-
-q = "SELECT COUNT(*) FROM ratings"
-result = dba.run_query(q)
-for r in result:
-    print r
-
-dba.close()
