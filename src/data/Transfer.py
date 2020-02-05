@@ -20,130 +20,9 @@ def file_rows(name, directory):
     rows = extract_data(file)
     return rows
 
-def no_digits(x):
-    """Returns false if item contains only digits, otherwise true."""
-    no_digits = True
-    try:
-        y = float(x)
-        no_digits = False
-    except:
-        pass
-    return no_digits
-
-def column_type(col):
-    """Given a vector of data, returns type of column for MYSQL create table."""
-    col_texts = [no_digits(x) for x in col]
-    if any(col_texts):
-        col_type = """ TEXT """
-    else:
-        col_type = """ DECIMAL(10, 5) """
-    return col_type
-
 def clean_name(name):
     name_clean = name.replace('-', '_')
     return name_clean
-
-def query_column(col):
-    """Given a vector of data with header, returns portion of query
-    with column name and data type for MSQL create table."""
-    col_name = clean_name(col[0])    
-    col_type = column_type(col[1:])
-    column_details = "".join([col_name, col_type])
-    return column_details
-
-def query_columns(column_list):
-    column_details = [query_column(x) for x in column_list]
-    qcs = ", ".join(column_details)
-    return qcs
-
-    
-def query_create_table(name, rows):
-    """Returns full MYSQL query needed to create table from flat .csv file."""
-    
-    # transpose rows to list of columns, to extract column type
-    column_list = map(list, zip(*rows))
-    
-    # get portion of query for columns
-    qc = query_columns(column_list)
-    
-    # combine statements to create full query
-    q = " ".join(["""CREATE TABLE""", name, """(""", qc, """);"""])
-    
-    return q
-
-
-def format_value(x):
-    """Format string value for MYSQL insert statement."""
-    if no_digits(x):
-        x = x.replace("'", r"\'")
-        x = x.replace(".", "")
-        xf = r"""'%s'""" % (x)
-    else:
-        xf = """%s""" % (x)
-    return xf
-
-def format_rows(rows):
-    """Return list of rows formatted for MYSQL insert."""
-    # convert list of rows to list of columns
-    # to iterate conversion over full column vector
-    column_list = map(list, zip(*rows))
-    
-    def convert_col(col):
-        col_new = map(lambda x: format_value(x), col)
-        return col_new
-    
-    cl_new = [convert_col(x) for x in column_list]
-    
-    rows_f = map(list, zip(*cl_new))
-    
-    return rows_f
-
-
-def row_as_query(row):
-    """Return row list as string containing portion of MYSQL insert query."""
-    row_s = ", ".join(row)
-    q_values = "".join(["(", row_s, ")"])
-    return q_values
-
-def query_insert_rows(table_name, rows):
-    """Return full MYSQL insert query for all rows to insert."""
-    # list of separate row values for mysql insert
-    row_queries = map(lambda x: row_as_query(x), rows)
-    # combine lists to form one block
-    rows_combined = ",\n".join(row_queries)
-    # form full query with table name
-    pref = " ".join(["INSERT INTO ", table_name, "VALUES"])
-    query_insert = " ".join([pref, rows_combined, ";"])
-    
-    return query_insert
-
-def check_table(table_name, cursor):
-    qp = """SELECT COUNT(*) FROM information_schema.tables WHERE table_name = """ 
-    qtn = """'%s'""" % (table_name)
-    q_full = "".join([qp, qtn])
-    cursor.execute(q_full)
-    
-    result = False
-    
-    if cursor.fetchone()[0] == 1:
-        result = True
-    
-    return result
-
-def create_and_insert(table_name, directory, cursor):
-    # extract data as list of rows
-    print 'extracting table: %s' % (table_name)
-    rows = file_rows(table_name, directory)
-    # first row is column headers
-    print '%s rows extracted' % (len(rows) - 1)
-    
-    if check_table(table_name, cursor) == False:
-        q_create = query_create_table(table_name, rows)
-        cursor.execute(q_create)
-    
-    rows_data = format_rows(rows[1:])
-    result = insert_rows(table_name, rows_data, cursor)
-    
 
 def transfer_directory(directory, cursor):
     
@@ -153,31 +32,78 @@ def transfer_directory(directory, cursor):
     
     return l_tables
 
-def get_col_info(col):
+def get_column_type(col):
     try:
         col_f = [str(float(x)) for x in col]
         dec_splits = [x.split('.') for x in col_f]
         imax = max([len(x[0]) for x in dec_splits])
         dmax = max([len(x[1]) for x in dec_splits])
-        col_type = " DECIMAL (%s, %s) " % (imax, dmax)
+        # for DECIMAL (M,D) mysql requires M >= D
+        if imax < dmax:
+            imax = dmax
+        col_type = """ DECIMAL (%s, %s) """ % (imax, dmax)
     except:
         col_type = """ VARCHAR (64) """
 
     return col_type
 
-class DBTable():
+def format_value(x, col_type):
+    """Format string value for MYSQL insert statement."""
+    if "VARCHAR" in col_type:
+        x = x.replace("'", r"\'")
+        x = x.replace(".", "")
+        xf = r"""'%s'""" % (x)
+    elif "DECIMAL" in col_type:
+        xf = """%s""" % (x)
+    return xf
+
+class DBColumn():
     
+    def __init__(self, data):
+        self.name = clean_name(data[0])
+        self.values = data[1:]
+        self.type = get_column_type(self.values)
+        self.query = "".join([self.name, self.type])
+    
+    def convert_values(self):
+        values_conv = map(lambda x: format_value(x, self.type), self.values)
+        return values_conv
+
+class DBTable():
+
     def __init__(self, name, data):
         self.name = name
         self.column_names = data[0]
-        self.rows = data[1:]
-        #self.columns = map(list, zip(*self.rows))
-        self.data_dict = {t[0]: {'values': t[1:]} for t in map(list, zip(*data))}
-
+        self.column_list = map(list, zip(*data))
     
-    def get_col_type(self):
-        for name in self.column_names():
-            dd[name]['col_type'] = get_col_info(dd[name]['values'])
+    def setup_columns(self):
+        self.columns = [DBColumn(x) for x in self.column_list]
+        
+    def get_query_create(self):
+        q_columns = ", \n".join([c.query for c in self.columns])
+        q_create = """ """.join(["CREATE TABLE", self.name, "(", q_columns, ");"])
+        self.query_create = q_create
+
+    def get_query_rows(self):
+        values_conv = [c.convert_values() for c in self.columns]
+        for c in values_conv:
+            print c[0:5]
+        rows_conv = map(list, zip(*values_conv))
+        rows_joined = [", ".join(r) for r in rows_conv]
+        rows_queries = ["".join(["(", r, ")"]) for r in rows_joined]
+        rows_combined = ",\n".join(rows_queries)
+        return rows_combined
+        
+    def get_query_insert(self):
+        query_rows = self.get_query_rows()
+        pref = " ".join(["INSERT INTO ", self.name, "VALUES"])
+        self.query_insert = " ".join([pref, query_rows, ";"])
+        
+    def setup_table(self):
+        self.setup_columns()
+        self.get_query_create()
+        self.get_query_insert()
+
 
 class DBAssist():
     def __init__(self):
@@ -188,11 +114,12 @@ class DBAssist():
         self.config_file = config_file
         parser = ConfigParser.ConfigParser()
         parser.readfp(open('../../aws.config'))
+        driver = parser.get('Local', 'driver')
         server = parser.get('RDS', 'server')
         database = parser.get('RDS', 'database')
         uid = parser.get('RDS', 'uid')
         code = parser.get('RDS', 'code')
-        self.conn = pyodbc.connect('DRIVER=MySQL ODBC 8.0 ANSI Driver;'
+        self.conn = pyodbc.connect('DRIVER='+driver+';'
                                    'SERVER='+server+';'
                                    'DATABASE='+database+';'
                                    'UID='+uid+';'
@@ -211,18 +138,37 @@ class DBAssist():
         
         return rows
 
-    def create_table(self, table_name, rows):
-        table_exists = check_table(table_name, self.cursor)
+    def check_table(self, table):
+        qp = """SELECT COUNT(*)
+                FROM information_schema.tables 
+                WHERE table_name = """ 
+        tn = """'%s'""" % (table.name)
+        q_full = "".join([qp, tn])
+        self.cursor.execute(q_full)
+        
+        if self.cursor.fetchone()[0] == 1:
+            result = True
+        else:
+            result = False
+        
+        return result
+
+    def create_table(self, table):
+        table_exists = self.check_table(table)
         if table_exists == False:
-            query_create = query_create_table(table_name, rows)
-            self.cursor.execute(query_create)
+            self.cursor.execute(table.query_create)
             self.conn.commit()
 
-    def insert_rows(self, table_name, rows):
+    def insert_rows(self, table):
         """Given table name with list of rows, insert all rows."""
         # obtain full insert query for all rows
-        rows_data = format_rows(rows[1:])
-        query_insert = query_insert_rows(table_name, rows_data)
-        print query_insert
-        self.cursor.execute(query_insert)
+        self.cursor.execute(table.query_insert)
         self.conn.commit()
+
+    def run_query(self, query):
+        self.cursor.execute(query)
+        result = self.cursor.fetchall()
+        return result
+
+    def close(self):
+        self.conn.close()
