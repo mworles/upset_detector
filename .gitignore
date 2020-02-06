@@ -2,3 +2,4 @@
 *.pyc
 /plots/
 aws.config
+/venv
