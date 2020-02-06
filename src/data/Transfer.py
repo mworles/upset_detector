@@ -55,9 +55,7 @@ class DBColumn():
             imax = max([len(x[0]) for x in dec_splits])
             dmax = max([len(x[1]) for x in dec_splits])
             # for DECIMAL (M,D) mysql requires M >= D
-            if imax < dmax:
-                imax = dmax
-            col_type = """ DECIMAL (%s, %s) """ % (imax, dmax)
+            col_type = """ DECIMAL (%s, %s) """ % (imax + dmax, dmax)
         except:
             col_type = """ VARCHAR (64) """
     
@@ -131,11 +129,11 @@ class DBAssist():
                                    'PWD='+code+';'
                                    'charset=utf8mb4;')
         """
-        self.conn = pymysql.connect(host='172.31.8.143',
+        self.conn = pymysql.connect(host='127.0.0.1',
                                     port=3306,
                                     user='root',
                                     passwd=pwd,
-                                    db='mysql')
+                                    db='bball')
         self.cursor = self.conn.cursor()
 
 
@@ -155,10 +153,10 @@ class DBAssist():
         return result
 
     def create_table(self, table):
-        table_exists = self.check_table(table)
-        if table_exists == False:
-            self.cursor.execute(table.query_create)
-            self.conn.commit()
+        #table_exists = self.check_table(table)
+        #if table_exists == False:
+        self.cursor.execute(table.query_create)
+        self.conn.commit()
 
     def insert_rows(self, table):
         """Given table name with list of rows, insert all rows."""
