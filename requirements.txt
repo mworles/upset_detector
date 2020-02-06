@@ -1,0 +1,17 @@
+backports.functools-lru-cache==1.6.1
+beautifulsoup4==4.8.2
+certifi==2019.11.28
+chardet==3.0.4
+fuzzywuzzy==0.17.0
+idna==2.8
+lxml==4.5.0
+numpy==1.16.6
+pandas==0.24.2
+pyodbc==4.0.28
+python-dateutil==2.8.1
+python-Levenshtein==0.12.0
+pytz==2019.3
+requests==2.22.0
+six==1.14.0
+soupsieve==1.9.5
+urllib3==1.25.8
