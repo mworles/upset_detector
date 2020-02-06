@@ -3,6 +3,7 @@ import pyodbc
 import csv
 import Clean
 import time
+import pymysql
 
 def rows_from_file(file):
     """Extract and return all rows from data file as list of lists."""
@@ -121,12 +122,20 @@ class DBAssist():
         database = parser.get('RDS', 'database')
         uid = parser.get('RDS', 'uid')
         code = parser.get('RDS', 'code')
+        pwd = parser.get('Local', 'pwd')
+        """
         self.conn = pyodbc.connect('DRIVER='+driver+';'
                                    'SERVER='+server+';'
                                    'DATABASE='+database+';'
                                    'UID='+uid+';'
                                    'PWD='+code+';'
                                    'charset=utf8mb4;')
+        """
+        self.conn = pymysql.connect(host='172.31.8.143',
+                                    port=3306,
+                                    user='root',
+                                    passwd=pwd,
+                                    db='mysql')
         self.cursor = self.conn.cursor()
 
 

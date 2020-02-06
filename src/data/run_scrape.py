@@ -15,6 +15,6 @@ dbt.setup_table()
 dba = Transfer.DBAssist()
 dba.connect('../../aws.config')
 dba.create_table(dbt)
-#dba.insert_rows(dbt)
+dba.insert_rows(dbt)
 
 dba.close()
