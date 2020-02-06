@@ -4,8 +4,7 @@ import csv
 import Clean
 import time
 
-
-def extract_data(file):
+def rows_from_file(file):
     """Extract and return all rows from data file as list of lists."""
     
     with open(file) as csvfile:
@@ -14,15 +13,11 @@ def extract_data(file):
     
     return rows
 
-def file_rows(name, directory):
+def extract_data(name, directory):
     """Given file name, return data as list of lists."""
     file = "".join([directory, name, ".csv"])
-    rows = extract_data(file)
+    rows = rows_from_file(file)
     return rows
-
-def clean_name(name):
-    name_clean = name.replace('-', '_')
-    return name_clean
 
 def transfer_directory(directory, cursor):
     
@@ -32,43 +27,52 @@ def transfer_directory(directory, cursor):
     
     return l_tables
 
-def get_column_type(col):
-    try:
-        col_f = [str(float(x)) for x in col]
-        dec_splits = [x.split('.') for x in col_f]
-        imax = max([len(x[0]) for x in dec_splits])
-        dmax = max([len(x[1]) for x in dec_splits])
-        # for DECIMAL (M,D) mysql requires M >= D
-        if imax < dmax:
-            imax = dmax
-        col_type = """ DECIMAL (%s, %s) """ % (imax, dmax)
-    except:
-        col_type = """ VARCHAR (64) """
-
-    return col_type
-
-def format_value(x, col_type):
-    """Format string value for MYSQL insert statement."""
-    if "VARCHAR" in col_type:
-        x = x.replace("'", r"\'")
-        x = x.replace(".", "")
-        xf = r"""'%s'""" % (x)
-    elif "DECIMAL" in col_type:
-        xf = """%s""" % (x)
-    return xf
 
 class DBColumn():
     
     def __init__(self, data):
-        self.name = clean_name(data[0])
-        self.values = data[1:]
-        self.type = get_column_type(self.values)
+        self.data = data
+        self.name = self.clean_column_name(self.data[0])
+        self.values = self.data[1:]
+        self.type = self.get_column_type(self.values)
         self.query = "".join([self.name, self.type])
-    
+
     def convert_values(self):
-        values_conv = map(lambda x: format_value(x, self.type), self.values)
+        values_conv = map(lambda x: self.format_value(x, self.type), self.values)
         return values_conv
 
+    @staticmethod
+    def clean_column_name(name):
+        name_clean = name.replace('-', '_')
+        return name_clean
+    
+    @staticmethod
+    def get_column_type(col):
+        try:
+            col_f = [str(float(x)) for x in col]
+            dec_splits = [x.split('.') for x in col_f]
+            imax = max([len(x[0]) for x in dec_splits])
+            dmax = max([len(x[1]) for x in dec_splits])
+            # for DECIMAL (M,D) mysql requires M >= D
+            if imax < dmax:
+                imax = dmax
+            col_type = """ DECIMAL (%s, %s) """ % (imax, dmax)
+        except:
+            col_type = """ VARCHAR (64) """
+    
+        return col_type
+
+    @staticmethod
+    def format_value(x, col_type):
+        """Format string value for MYSQL insert statement."""
+        if "VARCHAR" in col_type:
+            x = x.replace("'", r"\'")
+            x = x.replace(".", "")
+            xf = r"""'%s'""" % (x)
+        elif "DECIMAL" in col_type:
+            xf = """%s""" % (x)
+        return xf
+        
 class DBTable():
 
     def __init__(self, name, data):
@@ -86,8 +90,6 @@ class DBTable():
 
     def get_query_rows(self):
         values_conv = [c.convert_values() for c in self.columns]
-        for c in values_conv:
-            print c[0:5]
         rows_conv = map(list, zip(*values_conv))
         rows_joined = [", ".join(r) for r in rows_conv]
         rows_queries = ["".join(["(", r, ")"]) for r in rows_joined]
