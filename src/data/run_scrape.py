@@ -8,8 +8,9 @@ import Scrapers
 
 url = 'http://kenpom.com/index.php'
 rows = Scrapers.team_ratings(url)
-
-
+for r in rows[0:5]:
+    print r
+"""
 dbt = Transfer.DBTable('ratings', rows)
 dbt.setup_table()
 
@@ -19,3 +20,4 @@ dba.create_table(dbt)
 dba.insert_rows(dbt)
 
 dba.close()
+"""
