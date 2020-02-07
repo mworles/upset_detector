@@ -59,7 +59,7 @@ def team_ratings(url = 'http://kenpom.com/index.php'):
     return rows
 
 
-def get_odds_rows(url):
+def get_table_rows(url):
     print "Scraping {}...".format(url)
     r = requests.get(url)
     soup = BeautifulSoup(r.content, 'html.parser')
@@ -68,13 +68,13 @@ def get_odds_rows(url):
     game_rows = [x for x in table_rows if len(x.findAll('td')) > 1]
     return game_rows
 
-def clean_string(x):
+def encode_odds_cell(x):
     x = unicodedata.normalize("NFKD", x)
     x = x.encode('ascii', 'ignore').strip()
     x = x.replace('+', '')
     return x
 
-def parse_row(row):
+def parse_odds_row(row):
     td = row.find('td')
     date_time = td.find('span').getText()
     date = date_time.split(' ')[0]
@@ -82,7 +82,7 @@ def parse_row(row):
     teams = [a.getText() for a in td.findAll('a')]
     tdo = row.findAll('td')[2]
     tdbr = tdo.findAll('br')
-    ml = [clean_string(x.next_sibling) for x in tdbr]
+    ml = [encode_odds_cell(x.next_sibling) for x in tdbr]
     row_data = [date, time] + teams + ml
     return row_data
 
@@ -92,5 +92,56 @@ def scrape_odds(url):
     date = str(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
     [r.insert(0, date) for r in data]
     columns = ['timestamp', 'game_date', 'game_time', 'team_1', 'team_2', 'odds1', 'odds2']
+    data.insert(0, columns)
+    return data
+
+
+def encode_spread_cell(x):
+    x = x.encode('utf-8')
+    return x
+    
+def get_line(line_spread):
+    line = [x for x in line_spread if 'u' in x][0]
+    line = line.split('u')[0]
+    return line
+
+def get_spread(line_spread):
+    spread = [x for x in line_spread if 'u' not in x][0]
+    spread_i = line_spread.index(spread)
+    spread = spread.split('-')[1]
+    return spread, spread_i
+
+def spread_decimal(spread):
+    decimal_uni = "".join(spread.encode('string_escape').split('\\')[1:])
+    unicode_dict = {'xc2xbdxc2xa0': '5', 'xc2xa0': '0'}
+    decimal = unicode_dict[decimal_uni]
+    return decimal
+
+def parse_spread_row(row):
+    td = row.find('td')
+    date_time = td.find('span').getText()
+    date = date_time.split(' ')[0]
+    time = " ".join(date_time.split(' ')[2:])
+    teams = [a.getText() for a in td.findAll('a')]
+    tdo = row.findAll('td')[2]
+    tdbr = tdo.findAll('br')
+    line_spread = [encode_spread_cell(x.next_sibling) for x in tdbr]
+    line = get_line(line_spread).decode('ascii', 'ignore')
+    spread_uni, spread_i = get_spread(line_spread)
+    decimal = spread_decimal(spread_uni)
+    spread = spread_uni.decode('ascii', 'ignore')
+    spread = "".join([spread, '.', decimal])
+    favorite = teams[spread_i]
+    row_data = [date, time] + teams
+    row_data.extend([line, spread, favorite])
+    return row_data
+
+def scrape_spreads(url):
+    game_rows = get_table_rows(url)
+    data = [parse_spread_row(x) for x in game_rows]
+    date = str(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+    [r.insert(0, date) for r in data]
+    columns = ['timestamp', 'game_date', 'game_time', 'team_1', 'team_2',
+               'line', 'spread', 'favorite']
     data.insert(0, columns)
     return data
