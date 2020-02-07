@@ -4,6 +4,7 @@ import csv
 import Clean
 import time
 import pymysql
+import os
 
 def rows_from_file(file):
     """Extract and return all rows from data file as list of lists."""
@@ -84,7 +85,7 @@ class DBTable():
         
     def get_query_create(self):
         q_columns = ", \n".join([c.query for c in self.columns])
-        q_create = """ """.join(["CREATE TABLE", self.name, "(", q_columns, ");"])
+        q_create = """ """.join(["CREATE TABLE IF NOT EXISTS", self.name, "(", q_columns, ");"])
         self.query_create = q_create
 
     def get_query_rows(self):
@@ -111,16 +112,17 @@ class DBAssist():
         self.conn = None
         self.cursor = None
 
-    def connect(self, config_file):
-        self.config_file = config_file
+    def connect(self):
         parser = ConfigParser.ConfigParser()
-        parser.readfp(open('../../aws.config'))
+        config_path = os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../aws.config')
+        parser.readfp(open(config_path))
         driver = parser.get('Local', 'driver')
         server = parser.get('RDS', 'server')
         database = parser.get('RDS', 'database')
         uid = parser.get('RDS', 'uid')
         code = parser.get('RDS', 'code')
         pwd = parser.get('Local', 'pwd')
+        db = parser.get('Local', 'db')
         """
         self.conn = pyodbc.connect('DRIVER='+driver+';'
                                    'SERVER='+server+';'
@@ -133,7 +135,7 @@ class DBAssist():
                                     port=3306,
                                     user='root',
                                     passwd=pwd,
-                                    db='bball')
+                                    db=db)
         self.cursor = self.conn.cursor()
 
 
