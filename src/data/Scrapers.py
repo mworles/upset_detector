@@ -86,8 +86,8 @@ def parse_odds_row(row):
     return row_data
 
 def scrape_odds(url):
-    game_rows = get_odds_rows(url)
-    data = [parse_row(row) for row in game_rows]
+    game_rows = get_table_rows(url)
+    data = [parse_odds_row(row) for row in game_rows]
     date = str(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
     [r.insert(0, date) for r in data]
     columns = ['timestamp', 'game_date', 'game_time', 'team_1', 'team_2', 'odds1', 'odds2']
