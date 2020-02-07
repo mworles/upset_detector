@@ -114,9 +114,9 @@ class DBAssist():
 
     def connect(self):
         parser = ConfigParser.ConfigParser()
-        config_path = os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../aws.config')
+        config_path = os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../.config')
         parser.readfp(open(config_path))
-        driver = parser.get('Local', 'driver')
+        driver = parser.get('RDS', 'driver')
         server = parser.get('RDS', 'server')
         database = parser.get('RDS', 'database')
         uid = parser.get('RDS', 'uid')
@@ -173,3 +173,13 @@ class DBAssist():
 
     def close(self):
         self.conn.close()
+
+def scrape_insert(scraper, url, name):
+    rows = scraper(url)
+    dbt = DBTable(name, rows)
+    dbt.setup_table()
+    dba = DBAssist()
+    dba.connect()
+    dba.create_table(dbt)
+    dba.insert_rows(dbt)
+    dba.close()
