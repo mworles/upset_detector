@@ -60,7 +60,6 @@ def team_ratings(url = 'http://kenpom.com/index.php'):
 
 
 def get_table_rows(url):
-    print "Scraping {}...".format(url)
     r = requests.get(url)
     soup = BeautifulSoup(r.content, 'html.parser')
     table = soup.find('table', {'class': 'frodds-data-tbl'})
