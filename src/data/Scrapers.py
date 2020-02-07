@@ -1,6 +1,9 @@
 from bs4 import BeautifulSoup
 import requests
 import datetime
+import requests
+import unicodedata
+
 
 def team_ratings(url = 'http://kenpom.com/index.php'):
     """
@@ -54,3 +57,40 @@ def team_ratings(url = 'http://kenpom.com/index.php'):
     rows.insert(0, names)
 
     return rows
+
+
+def get_odds_rows(url):
+    print "Scraping {}...".format(url)
+    r = requests.get(url)
+    soup = BeautifulSoup(r.content, 'html.parser')
+    table = soup.find('table', {'class': 'frodds-data-tbl'})
+    table_rows = table.findAll('tr')
+    game_rows = [x for x in table_rows if len(x.findAll('td')) > 1]
+    return game_rows
+
+def clean_string(x):
+    x = unicodedata.normalize("NFKD", x)
+    x = x.encode('ascii', 'ignore').strip()
+    x = x.replace('+', '')
+    return x
+
+def parse_row(row):
+    td = row.find('td')
+    date_time = td.find('span').getText()
+    date = date_time.split(' ')[0]
+    time = " ".join(date_time.split(' ')[2:])
+    teams = [a.getText() for a in td.findAll('a')]
+    tdo = row.findAll('td')[2]
+    tdbr = tdo.findAll('br')
+    ml = [clean_string(x.next_sibling) for x in tdbr]
+    row_data = [date, time] + teams + ml
+    return row_data
+
+def scrape_odds(url):
+    game_rows = get_odds_rows(url)
+    data = [parse_row(row) for row in game_rows]
+    date = str(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+    [r.insert(0, date) for r in data]
+    columns = ['timestamp', 'game_date', 'game_time', 'team_1', 'team_2', 'odds1', 'odds2']
+    data.insert(0, columns)
+    return data
