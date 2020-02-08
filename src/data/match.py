@@ -71,6 +71,28 @@ def clean_kp(datdir):
     
     return df
 
+def clean_odds_portal(datdir):
+    """Returns a dataframe produced by combining data from files in the input 
+    directory and cleaning school names. Used to pre-process school names for 
+    matching with numeric team identifiers. 
+
+    Arguments
+    ----------
+    datdir: string
+        The relative path to subdirectory containing data files.
+    """
+    df = pd.read_csv(datdir + 'external/odds/odds.csv')
+    
+    # isolate data to unique names
+    t1 = df[['team1']].rename(columns={'team1': 'team_oddsport'})
+    t2 = df[['team2']].rename(columns={'team2': 'team_oddsport'})
+    
+    tu = pd.concat([t1, t2]).drop_duplicates()
+    
+    tu['team_clean'] = map(lambda x: Clean.school_name(x), tu['team_oddsport'])
+    
+    return tu
+    
 def match_id(df, id):
     """Returns a dataframe produced by matching team names in df to team names 
     in id. 
@@ -142,12 +164,16 @@ def create_key(datdir):
     kp = clean_kp(datdir + 'external/kp/')
     kp_id = match_id(kp, id)    
 
+    # clean and match past odds teams
+    op = clean_odds_portal(datdir)
+    op_id = match_id(op, id)
+
     # read in master id file
     key = pd.read_csv(datdir + '/scrub/teams.csv')
     key = key[['team_id', 'team_name']]
     
     # create universal key
-    for df in [schools_id, kp_id]:
+    for df in [schools_id, kp_id, op_id]:
         key = pd.merge(key, df, on='team_id', how='left')
 
     # set location to write file and save file
