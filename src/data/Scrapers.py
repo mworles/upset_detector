@@ -3,6 +3,10 @@ import requests
 import datetime
 import requests
 import unicodedata
+import time
+import json
+import re
+#from selenium import webdriver
 
 
 def team_ratings(url = 'http://kenpom.com/index.php'):
@@ -85,7 +89,7 @@ def parse_odds_row(row):
     row_data = [date, time] + teams + ml
     return row_data
 
-def scrape_odds(url):
+def scrape_odds(url="https://www.vegasinsider.com/college-basketball/odds/las-vegas/money/"):
     game_rows = get_table_rows(url)
     data = [parse_odds_row(row) for row in game_rows]
     date = str(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
@@ -98,23 +102,69 @@ def scrape_odds(url):
 def encode_spread_cell(x):
     x = x.encode('utf-8')
     return x
-    
+"""
 def get_line(line_spread):
-    line = [x for x in line_spread if 'u' in x][0]
-    line = line.split('u')[0]
-    return line
+    try:
+        line = [x for x in line_spread if 'u' in x][0]
+        line = line.split('u')[0]
+    except:
+        line = ""
 
+    return line
+"""
 def get_spread(line_spread):
     spread = [x for x in line_spread if 'u' not in x][0]
     spread_i = line_spread.index(spread)
-    spread = spread.split('-')[1]
+    if 'PK' in spread:
+        spread = spread.split('-')[0]
+    else:
+        try:
+            spread = spread.split('-')[1]
+        except:
+            print spread
     return spread, spread_i
 
-def spread_decimal(spread):
-    decimal_uni = "".join(spread.encode('string_escape').split('\\')[1:])
-    unicode_dict = {'xc2xbdxc2xa0': '5', 'xc2xa0': '0'}
-    decimal = unicode_dict[decimal_uni]
-    return decimal
+def update_spread_dict(x, row_dict):
+    regex = "\d{3}"
+    try:
+        line = re.findall(regex, x)[0]
+        row_dict['line'] = line
+    except:
+        result_enc = x.encode('utf-8').strip()
+
+        if 'PK' in result_enc:
+            row_dict['spread'] = '0'
+        else:
+            result_dec = result_enc.decode('ascii', 'ignore')
+            #result_split = result_dec.split('-')
+            try:
+                result = result_dec.split('-')[1]
+                uni_5 = 'xc2\\xbd\\xc2\\xa0'
+                if uni_5 in result_enc.encode('string_escape'):
+                    result = result + '.5'
+                else:
+                    result = result + '.0'
+                row_dict['spread'] = result
+            except:
+                row_dict['spread'] = result_dec
+    return row_dict
+    
+def parse_spread_cells(cell_list):
+    row_dict = {'line': '',
+                'spread': '',
+                'fav_index': None}
+
+    row_dict = update_spread_dict(cell_list[0], row_dict)
+    if row_dict['spread'] != '':
+        row_dict['fav_index'] = 0
+    
+    row_dict = update_spread_dict(cell_list[1], row_dict)
+    
+    if row_dict['fav_index'] is None:
+        if row_dict['spread'] != '' and row_dict['spread'] != '0':
+            row_dict['fav_index'] = 1
+    
+    return row_dict
 
 def parse_spread_row(row):
     td = row.find('td')
@@ -124,23 +174,118 @@ def parse_spread_row(row):
     teams = [a.getText() for a in td.findAll('a')]
     tdo = row.findAll('td')[2]
     tdbr = tdo.findAll('br')
-    line_spread = [encode_spread_cell(x.next_sibling) for x in tdbr]
-    line = get_line(line_spread).decode('ascii', 'ignore')
-    spread_uni, spread_i = get_spread(line_spread)
-    decimal = spread_decimal(spread_uni)
-    spread = spread_uni.decode('ascii', 'ignore')
-    spread = "".join([spread, '.', decimal])
-    favorite = teams[spread_i]
+    cell_content = [x.next_sibling for x in tdbr]
+    row_dict = parse_spread_cells(cell_content)
+    try:
+        favorite = teams[row_dict['fav_index']]
+    except:
+        favorite = ''
+
     row_data = [date, time] + teams
-    row_data.extend([line, spread, favorite])
+    row_data.extend([row_dict['line'], row_dict['spread']])
+    row_data.append(favorite)
     return row_data
 
-def scrape_spreads(url):
+def scrape_spreads(url="https://www.vegasinsider.com/college-basketball/odds/las-vegas/"):
     game_rows = get_table_rows(url)
     data = [parse_spread_row(x) for x in game_rows]
+    for r in data:
+        print r
     date = str(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
     [r.insert(0, date) for r in data]
     columns = ['timestamp', 'game_date', 'game_time', 'team_1', 'team_2',
                'line', 'spread', 'favorite']
     data.insert(0, columns)
     return data
+
+def parse_row_oddsportal(x):
+    row_classes = x['class']
+    if 'nob-border' in row_classes:
+        row_text = x.find('th').get_text()
+        global dt
+        dt = row_text.split(' ')[0:3]
+        dt.insert(0, dt.pop(1))
+        dt = "/".join(dt)
+        result = "NA"
+    elif "deactivate" in row_classes:
+        row_cells = x.find_all('td')
+        row_text = [c.get_text() for c in row_cells]
+        team_text = row_text[1].split(' - ')
+        row_data = [dt] + team_text + [row_text[3], row_text[4]]
+        result = row_data
+    else:
+        result = "NA"
+    
+    return result
+
+def store_data_oddsportal(datdir, data, year, page):
+    year_file = "".join([datdir, "odds", "_", str(year), ".json"])
+    
+    # open results logging json file if it exists
+    try:
+        with open(year_file) as f:
+            year_data = json.load(f)
+    except:
+        year_data = {}
+    
+    # update scores dict with results of current run
+    year_data[str(page)] = data
+
+    # save results file as json
+    with open(year_file, 'w') as f:
+        json.dump(year_data, f, indent=4)
+
+
+def make_url_oddsportal(year):
+    urlb = 'https://www.oddsportal.com/basketball/usa/ncaa'
+    suf = '/results/'
+    year_string = "".join(['-', str(year - 1), '-', str(year)])
+    if year < 2020:
+        url = urlb + year_string + suf
+    else:
+        url = urlb + suf
+    return url
+
+def get_table_oddportal(soup):
+    t = soup.find('table', {'class': ' table-main'})
+    rows = [x for x in t.find_all('tr')]
+    data = map(lambda x: parse_row_oddsportal(x), rows)
+    data = [x for x in data if x is not "NA"]
+    return data
+
+def scrape_oddsportal(datdir, year):
+    all_data = []
+    browser = webdriver.Chrome('driver/chromedriver.exe')
+    url = make_url_oddsportal(year)
+    browser.get(url)
+    
+    time.sleep(4)
+    
+    soup = BeautifulSoup(browser.page_source, 'html.parser')
+
+    pagin = soup.find('div', {'id': 'pagination'}).find_all('a')
+    lh = pagin[-1]['href']
+    lp = int(re.findall(r'\d+', lh)[0])
+    
+    page = 1
+    data = get_table_oddportal(soup)
+    store_data_oddsportal(datdir, data, year, page)
+    all_data.extend(data)
+    """
+    need_pages = range(2, lp + 1)
+    
+    for n in need_pages:
+        try:
+            nav = browser.find_element_by_link_text(str(n))
+            nav.click()
+            time.sleep(4)
+            print year, n
+            soup = BeautifulSoup(browser.page_source, 'html.parser')
+            data = get_table_oddsportal(soup)
+            store_data_oddsportal(data, year, n)
+            all_data.extend(data)
+        except:
+            pass
+    """
+    browser.quit()
+    return all_data
