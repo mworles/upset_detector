@@ -51,7 +51,9 @@ class DBColumn():
     @staticmethod
     def get_column_type(col):
         try:
-            col_f = [str(float(x)) for x in col]
+            col_f = [str(float(x)) if x != '' else 'NULL' for x in col]
+            # only non-null values for decimal format extraction
+            col_f = [x for x in col_f if x != 'NULL']
             dec_splits = [x.split('.') for x in col_f]
             imax = max([len(x[0]) for x in dec_splits])
             dmax = max([len(x[1]) for x in dec_splits])
@@ -59,15 +61,16 @@ class DBColumn():
             col_type = """ DECIMAL (%s, %s) """ % (imax + dmax, dmax)
         except:
             col_type = """ VARCHAR (64) """
-    
+        
         return col_type
 
     @staticmethod
     def format_value(x, col_type):
         """Format string value for MYSQL insert statement."""
+        if x == '':
+            x = 'NULL'
         if "VARCHAR" in col_type:
             x = x.replace("'", r"\'")
-            x = x.replace(".", "")
             xf = r"""'%s'""" % (x)
         elif "DECIMAL" in col_type:
             xf = """%s""" % (x)
@@ -174,8 +177,8 @@ class DBAssist():
     def close(self):
         self.conn.close()
 
-def scrape_insert(scraper, url, name):
-    rows = scraper(url)
+def scrape_insert(scraper, name):
+    rows = scraper()
     dbt = DBTable(name, rows)
     dbt.setup_table()
     dba = DBAssist()
