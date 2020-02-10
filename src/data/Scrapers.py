@@ -99,31 +99,6 @@ def scrape_odds(url="https://www.vegasinsider.com/college-basketball/odds/las-ve
     return data
 
 
-def encode_spread_cell(x):
-    x = x.encode('utf-8')
-    return x
-"""
-def get_line(line_spread):
-    try:
-        line = [x for x in line_spread if 'u' in x][0]
-        line = line.split('u')[0]
-    except:
-        line = ""
-
-    return line
-"""
-def get_spread(line_spread):
-    spread = [x for x in line_spread if 'u' not in x][0]
-    spread_i = line_spread.index(spread)
-    if 'PK' in spread:
-        spread = spread.split('-')[0]
-    else:
-        try:
-            spread = spread.split('-')[1]
-        except:
-            print spread
-    return spread, spread_i
-
 def update_spread_dict(x, row_dict):
     regex = "\d{3}"
     try:
@@ -189,8 +164,6 @@ def parse_spread_row(row):
 def scrape_spreads(url="https://www.vegasinsider.com/college-basketball/odds/las-vegas/"):
     game_rows = get_table_rows(url)
     data = [parse_spread_row(x) for x in game_rows]
-    for r in data:
-        print r
     date = str(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
     [r.insert(0, date) for r in data]
     columns = ['timestamp', 'game_date', 'game_time', 'team_1', 'team_2',
