@@ -16,6 +16,7 @@ It imports the custom Clean module.
 """
 import pandas as pd
 import Clean
+import Odds
 
 def clean_schools(datdir):
     """Returns a dataframe produced by combining data from files in the input 
@@ -81,18 +82,37 @@ def clean_odds_portal(datdir):
     datdir: string
         The relative path to subdirectory containing data files.
     """
-    df = pd.read_csv(datdir + 'external/odds/odds.csv')
+    oddsdir = datdir + "/external/odds/"
+    data = Odds.parse_odds(oddsdir)
+    col_names = ['date', 'team_1', 'team_2', 'odds1', 'odds2']
+    df = pd.DataFrame(data, columns=col_names)
+
+    # list of all unique team names
+    teams = list(set(list(df['team_1']) + list(df['team_2'])))
     
-    # isolate data to unique names
-    t1 = df[['team1']].rename(columns={'team1': 'team_oddsport'})
-    t2 = df[['team2']].rename(columns={'team2': 'team_oddsport'})
+    df = pd.DataFrame({'team_oddsport': teams})
+    df = df[df['team_oddsport'].notnull()]
     
-    tu = pd.concat([t1, t2]).drop_duplicates()
     
-    tu['team_clean'] = map(lambda x: Clean.school_name(x), tu['team_oddsport'])
+    df['team_clean'] = map(lambda x: Clean.school_name(x), df['team_oddsport'])
     
-    return tu
-    
+    return df
+
+def clean_pt(datdir):
+
+    df = Clean.combine_files(datdir + '/external/pt/')
+
+    # list of all unique team names
+    teams = list(set(list(df['home']) + list(df['road'])))
+
+    df = pd.DataFrame({'team_pt': teams})
+    df = df[df['team_pt'].notnull()]
+
+    df['team_clean'] = map(lambda x: Clean.school_name(x), df['team_pt'])
+
+    return df
+
+
 def match_id(df, id):
     """Returns a dataframe produced by matching team names in df to team names 
     in id. 
@@ -164,16 +184,20 @@ def create_key(datdir):
     kp = clean_kp(datdir + 'external/kp/')
     kp_id = match_id(kp, id)    
 
-    # clean and match past odds teams
+    # clean and match oddsportal odds teams
     op = clean_odds_portal(datdir)
     op_id = match_id(op, id)
+    
+    # clean and match predictiontracker teams
+    pt = clean_pt(datdir)
+    pt_id = match_id(pt, id)
 
     # read in master id file
     key = pd.read_csv(datdir + '/scrub/teams.csv')
     key = key[['team_id', 'team_name']]
     
     # create universal key
-    for df in [schools_id, kp_id, op_id]:
+    for df in [schools_id, kp_id, op_id, pt_id]:
         key = pd.merge(key, df, on='team_id', how='left')
 
     # set location to write file and save file
