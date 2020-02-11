@@ -14,7 +14,7 @@ import pandas as pd
 import numpy as np
 import Clean
 
-def set_gameid_index(df, full_date=False, drop_date=True):
+def set_gameid_index(df, date_col='date_id', full_date=False, drop_date=True):
     """
     Returns dataframe with new index in date_team1_team2 format. 
     Ensures a unique identifier for each game to use as primary key. 
@@ -33,10 +33,10 @@ def set_gameid_index(df, full_date=False, drop_date=True):
     """
     # identify date series as either full date or season
     if full_date == True:
-        date = df['date_id']
+        date = df[date_col]
         # remove date col if indicated
         if drop_date == True:
-            df = df.drop(['date_id'], axis=1)
+            df = df.drop([date_col], axis=1)
     else:
         date = df['season'].apply(str)
     
