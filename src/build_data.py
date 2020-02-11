@@ -17,7 +17,7 @@ import features
 
 # location of data directory from constants module
 datdir = Constants.DATA
-
+"""
 # pre-process raw data
 data.Clean.scrub_files(Constants.RAW_MAP)
 
@@ -40,3 +40,6 @@ data.Generate.make_matchups(datdir)
 
 # generate targets for prediction
 data.Generate.make_targets(datdir)
+"""
+data.Odds.clean_odds(datdir)
+data.Spreads.clean_spreads(datdir)
