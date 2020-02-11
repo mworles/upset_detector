@@ -82,8 +82,7 @@ def clean_odds_portal(datdir):
     datdir: string
         The relative path to subdirectory containing data files.
     """
-    oddsdir = datdir + "/external/odds/"
-    data = Odds.parse_odds(oddsdir)
+    data = Odds.parse_odds(datdir)
     col_names = ['date', 'team_1', 'team_2', 'odds1', 'odds2']
     df = pd.DataFrame(data, columns=col_names)
 
@@ -100,7 +99,7 @@ def clean_odds_portal(datdir):
 
 def clean_pt(datdir):
 
-    df = Clean.combine_files(datdir + '/external/pt/')
+    df = Clean.combine_files(datdir)
 
     # list of all unique team names
     teams = list(set(list(df['home']) + list(df['road'])))
@@ -185,11 +184,11 @@ def create_key(datdir):
     kp_id = match_id(kp, id)    
 
     # clean and match oddsportal odds teams
-    op = clean_odds_portal(datdir)
+    op = clean_odds_portal(datdir + 'external/odds/')
     op_id = match_id(op, id)
     
     # clean and match predictiontracker teams
-    pt = clean_pt(datdir)
+    pt = clean_pt(datdir + 'external/pt/')
     pt_id = match_id(pt, id)
 
     # read in master id file
