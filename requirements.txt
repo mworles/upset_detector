@@ -7,6 +7,7 @@ idna==2.8
 lxml==4.5.0
 numpy==1.16.6
 pandas==0.24.2
+PyMySQL==0.9.3
 pyodbc==4.0.28
 python-dateutil==2.8.1
 python-Levenshtein==0.12.0
