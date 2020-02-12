@@ -117,7 +117,7 @@ def convert_team_id(df, id_cols, drop=True):
 def set_games(datdir):
     """Establish neutral team ids and date for each game."""
     r = pd.read_csv(datdir + 'scrub/ncaa_results.csv')
-    s = sk = pd.read_csv(datdir + 'scrub/seasons.csv')
+    s = pd.read_csv(datdir + 'scrub/seasons.csv')
     df = pd.merge(r, s, on='season', how='inner')
     
     # add string date column to games
