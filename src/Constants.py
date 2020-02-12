@@ -40,6 +40,20 @@ RAW_MAP['SecondaryTourneyCompactResults'] = {'new_name': 'nit_results',
                                                          'LTeamID': 'Lteam'}
                                              }
 
+RAW_MAP['NCAATourneyDetailedResults'] = {'new_name': 'ncaa_results_dtl',
+                                        'columns': {'WTeamID': 'Wteam',
+                                                    'LTeamID': 'Lteam'}
+                                        }
+
+RAW_MAP['RegularSeasonDetailedResults'] = {'new_name': 'reg_results_dtl',
+                                          'columns': {'WTeamID': 'Wteam',
+                                                      'LTeamID': 'Lteam'}
+                                          }
+RAW_MAP['SecondaryTourneyCompactResults'] = {'new_name': 'nit_results',
+                                             'columns': {'WTeamID': 'Wteam',
+                                                         'LTeamID': 'Lteam'}
+                                             }
+
 RAW_MAP['TeamCoaches'] = {'new_name': 'coaches',
                           'columns': {'TeamID': 'team_id',
                                       'FirstDayNum': 'first_day',
