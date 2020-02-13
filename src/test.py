@@ -17,13 +17,47 @@ def team_locations(loc_mat):
     team_loc = map(lambda x: get_location(x), loc_mat)
     return team_loc 
 
-"""
+def reduce_margin(df, cap):
+    # reduce outlier scores to limit impact of huge blowouts
+    absdif = (df['team_score'] - df['opp_score']).abs()
+    over15 = (absdif > cap).values
+    marg15 = (absdif - cap).values
+    team_won = (df['team_score'] > df['opp_score']).values
+    team_score = df['team_score'].values
+    opp_score = df['opp_score'].values
+
+    reduce_mat = zip(over15, team_won, marg15, team_score, opp_score)
+
+    def reduced_scores(x):
+        
+        team_score = x[-2]
+        opp_score = x[-1]
+        
+        # if margin was over 15
+        if x[0] == True:
+            # if team won
+            if x[1] == True:
+                # reduce score by margin over 15
+                team_score -= x[2]
+            else:
+                opp_score -= x[2]
+        
+        return [team_score, opp_score]
+
+    team_opp = map(lambda x: reduce_margin(x), reduce_mat)
+
+    df['team_score'] = [x[0] for x in team_opp]
+    df['opp_score'] = [x[1] for x in team_opp]
+    
+    return df
+
+
 # read in data file with game results
 datdir = Constants.DATA
 files = data.Clean.list_of_files(datdir + 'scrub/', tag = 'results_dtl')
 df_list = [pd.read_csv(x) for x in files]
 
-# combine all games to one dataset
+# combine df games to one dataset
 df = pd.concat(df_list, sort=False)
 
 # import and merge seasons for dates
@@ -51,7 +85,7 @@ scores['t2_loc'] = team_locations(t2_mat)
 scores = scores.sort_index()
 
 # adjust scores for team location
-adjust_dict = {'A': 1.875, 'H': -1.875, 'N':0}
+adjust_dict = {'A': 1.875, 'H': -1.875, 'N':1}
 t1_adjust = map(lambda x: adjust_dict[x], scores['t1_loc'].values)
 t2_adjust = map(lambda x: adjust_dict[x], scores['t2_loc'].values)
 
@@ -82,20 +116,22 @@ for col in cols:
     t2_cols.append(result)
 
 t2.columns = t2_cols
-all = pd.concat([df, t2], sort=True)
+df = pd.concat([df, t2], sort=True)
 
-# estimate points per 100 possessions
-all['t1_off'] = 100 * (all['t1_score'] / all['pos'])
-all['t1_def'] = 100 * (all['t2_score'] / all['pos'])
-
-
-cols_rename = [x.replace('t1_', 'team_') for x in all.columns]
+cols_rename = [x.replace('t1_', 'team_') for x in df.columns]
 cols_rename = [x.replace('t2_', 'opp_') for x in cols_rename]
 
-all.columns = cols_rename
+df.columns = cols_rename
 
-all.to_pickle('my_df.pickle')
-"""
+
+df = reduce_margin(df, cap=22)
+
+df['team_off'] = 100 * (df['team_score'] / df['pos'])
+df['team_def'] = 100 * (df['opp_score'] / df['pos'])
+
+
+df.to_pickle('my_df_adj.pickle')
+
 
 def create_team_dict(df, col_name, group_by='opp'):
     team_dict = {}
@@ -162,9 +198,9 @@ def adjust_offense(df, id_array, input='adjusted'):
         
     # offensive efficiency
     # keys are team ids
-    # values 2d matrix with opponents' opponent id and points allowed
+    # values 2d matrix with opponents' opponent id and points dfowed
     team_dict = create_team_dict(df, adjust1_col, group_by=adjust1_grp)
-    # mean points allowed by opponents in games with other teams
+    # mean points dfowed by opponents in games with other teams
     df[adjust1_dem] = map(lambda x: opponent_mean(x, team_dict), id_array)
     # adjust offense to grand mean and defense
     df['team_off_adj'] = (df['team_off'] * df['team_off_gm']) / df[adjust1_dem]
@@ -222,14 +258,14 @@ def condense_df(df):
 
     return df_teams
 
-def run(data, year):
+def run(data, year, n_iters=5):
     
     df = data[data['season'] == year].copy()
     
     dfrun = df.copy()
     
     result = {}
-    n_iters = 25
+    n_iters = n_iters
     n = 0
     
     while n < n_iters:
@@ -252,7 +288,7 @@ def run(data, year):
     
     return df_teams
 
-df = pd.read_pickle('my_df.pickle')
-df_teams = run(df, 2018)
+#df = pd.read_pickle('my_df_adj.pickle')
+df_teams = run(df, 2018, n_iters=10)
 
-print df_teams.sort_values('eff_marg', ascending=False)
+print df_teams.sort_values('eff_marg', ascending=False).head(20)
