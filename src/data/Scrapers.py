@@ -6,7 +6,9 @@ import unicodedata
 import time
 import json
 import re
+import pandas as pd
 #from selenium import webdriver
+
 
 
 def team_ratings(url = 'http://kenpom.com/index.php'):
@@ -262,3 +264,42 @@ def scrape_oddsportal(datdir, year):
     """
     browser.quit()
     return all_data
+
+# %%
+def game_results(date):
+    #now = datetime.datetime.now()
+    #month = now.strftime('%m')
+    #url_date = "".join([str(now.year), '/', month, '/', str(now.day)])
+    
+    urlb = "https://www.ncaa.com/scoreboard/basketball-men/d1/"
+    url = urlb + date + '/all-conf'
+
+    # %%
+    time.sleep(1)
+    r = requests.get(url)
+    soup = BeautifulSoup(r.content, 'html.parser')
+    div_games = soup.find('div', {'class': 'gamePod_content-pod_container'})
+    games_final = div_games.findAll('ul', {'class': 'gamePod-game-teams'})
+
+    def get_team_data(team_div):
+        name_class = 'gamePod-game-team-name'
+        score_class = 'gamePod-game-team-score'
+        name = team_div.find('span', {'class': name_class}).getText()
+        score = team_div.find('span', {'class': score_class}).getText()
+        return [name, score]
+
+    def parse_game(game_div):
+        game_data = []
+        game_teams = game_div.findAll('li')
+        for team in game_teams:
+            game_data.extend(get_team_data(team))
+        return game_data
+
+    games_data = [parse_game(x) for x in games_final]
+    columns = ['team_1', 'score_1', 'team_2', 'score_2']
+    df = pd.DataFrame(games_data, columns = columns)
+    df['game_date'] = date
+    time_stamp = str(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+    df['timestamp'] = time_stamp
+    
+    return df
