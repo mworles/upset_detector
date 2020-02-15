@@ -165,6 +165,12 @@ def year4_from_string(s):
     year4 = int(''.join([pre, year2]))
     return year4
     
+def dataframe_rows(df):
+    """Return 2-d df as list of lists, first list is column names."""
+    col_names = list(df.columns)
+    rows = df.values.tolist()
+    rows.insert(0, col_names)
+    return rows
 
 def game_date(row):
     """Apply along rows to return the string date of each game. Row must contain 
