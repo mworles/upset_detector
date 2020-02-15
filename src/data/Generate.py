@@ -357,3 +357,50 @@ def make_targets(datdir):
     df = score_targets(datdir, scores)
     # save data file
     Clean.write_file(df, datdir + '/processed/', 'targets', keep_index=True)
+
+
+def get_location(row):
+    "Returns string indicator of game location for team."
+    lteam_dict = {'A': 'H', 'H': 'A', 'N': 'N'}
+    if row[0] == row[2]:
+        return row[1]
+    else:
+        return lteam_dict[row[1]]
+
+def team_locations(df):
+    "Given matrix of winner id, winner location, and team id, returns vector of game locations."
+    # matrix for t1_teams
+    t1_mat = df[['wteam', 'wloc', 't1_team_id']].values
+    t2_mat = df[['wteam', 'wloc', 't2_team_id']].values
+    
+    df['t1_loc'] = map(lambda x: get_location(x), t1_mat)
+    df['t2_loc'] = map(lambda x: get_location(x), t1_mat)
+    
+    return df
+
+def neutral_games(datdir):
+    """Create dataset of games with neutral team id, scores, and locations."""
+    # read in data file with game results
+    files = Clean.list_of_files(datdir + 'scrub/', tag = 'results_dtl')
+    df_list = [pd.read_csv(x) for x in files]
+
+    # combine df games to one dataset
+    df = pd.concat(df_list, sort=False)
+
+    # import and merge seasons for dates
+    s = pd.read_csv(datdir + 'scrub/seasons.csv')
+    df = pd.merge(df, s, on='season', how='inner')
+
+    # add string date column to games
+    df['date_id'] = df.apply(Clean.game_date, axis=1)
+
+    # create outcome-neutral team identifier
+    df = convert_team_id(df, ['wteam', 'lteam'], drop=False)
+    # create unique game identifier and set as index
+    df = set_gameid_index(df, full_date=True, drop_date=False)
+
+    # add column indicating score for each team
+    scores = team_scores(df)
+    scores = scores.sort_index()
+    
+    return scores
