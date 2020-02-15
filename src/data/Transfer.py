@@ -186,3 +186,28 @@ def scrape_insert(scraper, name):
     dba.create_table(dbt)
     dba.insert_rows(dbt)
     dba.close()
+
+def create_insert(name, rows):
+    dbt = DBTable(name, rows)
+    dbt.setup_table()
+    dba = DBAssist()
+    dba.connect()
+    dba.create_table(dbt)
+    dba.insert_rows(dbt)
+    dba.close()
+
+def insert(name, rows):
+    dbt = DBTable(name, rows)
+    dbt.setup_table()
+    dba = DBAssist()
+    dba.connect()
+    dba.insert_rows(dbt)
+    dba.close()
+
+def create(name, rows):
+    dbt = DBTable(name, rows)
+    dbt.setup_table()
+    dba = DBAssist()
+    dba.connect()
+    dba.create_table(dbt)
+    dba.close()
