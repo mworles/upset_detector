@@ -188,7 +188,7 @@ def make_matchups(datdir):
     df = matchup_features(datdir, matchups)
     
     # set unique game index
-    df = set_gameid_index(df)
+    df = set_gameid_index(df, full_date=True, drop_date=False)
         
     # save data
     Clean.write_file(df, datdir + 'processed/', 'matchups', keep_index=True)
@@ -330,9 +330,6 @@ def score_targets(datdir, df):
     # add upset labels
     df = get_upsets(datdir, df)
     
-    # keep target columns
-    df = df.loc[:, ['t1_win', 't1_marg', 'upset']]
-    
     return df
     
 def make_targets(datdir):
@@ -346,15 +343,62 @@ def make_targets(datdir):
     # read in data file with game results
     file = datdir + '/scrub/ncaa_results.csv'
     df = pd.read_csv(file)
-    
-    # created outcome-neutral team identifier
+    # import and merge seasons for dates
+    s = pd.read_csv(datdir + 'scrub/seasons.csv')
+    df = pd.merge(df, s, on='season', how='inner')
+
+    # add string date column to games
+    df['date_id'] = df.apply(Clean.game_date, axis=1)
+
+    # create outcome-neutral team identifier
     df = convert_team_id(df, ['wteam', 'lteam'], drop=False)
     # create unique game identifier and set as index
-    df = set_gameid_index(df)
+    df = set_gameid_index(df, full_date=True, drop_date=False)
+
     # add column indicating score for each team
     scores = team_scores(df)
     # create targets data
     df = score_targets(datdir, scores)
+    
+    # spreads
+    file_spreads = datdir + '/interim/spreads.csv'
+    spreads = pd.read_csv(file_spreads, index_col=0)
+    spreads = spreads.drop(['t1_team_id', 't2_team_id'], axis=1)
+    
+    # merge spreads with targets
+    df = pd.merge(df, spreads, how='left', left_index=True, right_index=True)
+    
+    # keep target columns
+    df = df.loc[:, ['t1_win', 't1_marg', 'upset', 't1_spread']]
+    
+    t1_smarg = - df['t1_spread']
+    
+    def cover_spread(x):
+        margin = x[0]
+        spread = x[1]
+        if spread < 0:
+            if margin >= -spread:
+                result = 1
+            else:
+                result = 0
+        elif spread > 0:
+            if margin < 0:
+                if -margin < spread:
+                    result = 1
+                else:
+                    result = 0
+            else:
+                result = 1
+        else:
+            if margin >= 0:
+                result = 1
+            else:
+                result = 0
+        return result
+    
+    margins_spreads = df[['t1_marg', 't1_spread']].values
+    df['t1_cover'] = map(cover_spread, margins_spreads)    
+    
     # save data file
     Clean.write_file(df, datdir + '/processed/', 'targets', keep_index=True)
 
