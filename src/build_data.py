@@ -21,6 +21,11 @@ datdir = Constants.DATA
 # pre-process raw data
 data.Clean.scrub_files(Constants.RAW_MAP)
 
+# clean odds and spreads data
+data.Odds.clean_odds(datdir)
+data.Spreads.clean_spreads(datdir)
+data.Spreads.spreads_sbro(datdir)
+
 # create files matching school names to numeric identifiers
 data.Match.create_key(datdir)
 
@@ -35,11 +40,9 @@ features.Create.team_ratings(datdir)
 # merge features
 features.Create.merge_features(datdir)
 
+
 # combine features for both teams in matchups
 data.Generate.make_matchups(datdir)
-
+"""
 # generate targets for prediction
 data.Generate.make_targets(datdir)
-"""
-data.Odds.clean_odds(datdir)
-data.Spreads.clean_spreads(datdir)
