@@ -4,6 +4,7 @@ import numpy as np
 import Clean
 import Odds
 import Generate
+import re
 
 def spread_date(x):
     dl = x.split('/')
@@ -16,8 +17,6 @@ def spread_date(x):
 def spread_format(x):
     try:
         spread = float(x)
-        if spread < 0:
-            spread = - spread
     except:
         spread = np.nan
     return spread
@@ -45,8 +44,10 @@ def spread_id(x, id_key):
     
 def spread_t1(row):
     t1_spread = row['spread']
-    if row['home'] == row['favorite']:
+    if row['id_home'] == row['t1_team_id']:
         t1_spread = - t1_spread
+    else:
+        pass
     return t1_spread
 
 def clean_spreads(datdir):
@@ -61,13 +62,9 @@ def clean_spreads(datdir):
     # convert spreads to numeric
     df['spread'] = df['line'].apply(spread_format)
 
-    # identify favorite
-    df['favorite'] = df.apply(spread_favorite, axis=1)
-
     df = df.drop('line', axis=1)
 
     id_key = Odds.get_id_key(datdir, df, 'team_pt')
-
     df['id_home'] = df['home'].apply(lambda x: spread_id(x, id_key))
     df['id_road'] = df['road'].apply(lambda x: spread_id(x, id_key))
 
@@ -87,3 +84,90 @@ def clean_spreads(datdir):
     data_out = datdir + '/interim/'
     # save school stats data file
     Clean.write_file(df_new, data_out, 'spreads', keep_index=True)
+
+def date_sbro(date, years):
+    datelen = len(str(date))
+    if datelen == 3:
+        month = str(0) + str(date)[:1]
+        year = str(years[1])
+    else:
+        month = str(date)[:2]
+        year = str(years[0])
+    day = str(date)[-2:]
+    date = "/".join([year, month, day])
+    return date
+
+def game_sbro(game_rows, col_map):
+    teams = [r[col_map['Team']] for r in game_rows]
+    decode = lambda x: x.encode('utf-8').strip().decode('ascii', 'ignore')
+    teams = [decode(x) for x in teams]
+    close = [r[col_map['Close']] for r in game_rows]
+    close = [x if x != 'pk' else 0 for x in close]
+    date = game_rows[0][col_map['Date']]
+    
+    nls = [x for x in close if x == 'NL']
+    if len(nls) == 2:
+        spread, total = '', ''
+        fave = teams[1]
+    elif len(nls) ==1:
+        close_val = [x for x in close if x != 'NL'][0]
+        if int(close_val) > 50:
+            spread = close_val
+            total = 'NL'
+            spread_i = close.index(spread)
+            fave = teams[spread_i]
+        else:
+            spread = 'NL'
+            total = close_val
+            fave = teams[1]
+    else:
+        spread = min(close)
+        spread_i = close.index(spread)
+        fave = teams[spread_i]
+        
+        total = [x for x in close if x != spread][0]
+    
+    game_dict = {'away': teams[0],
+                 'home': teams[1],
+                 'spread': spread,
+                 'total': total,
+                 'favorite': fave,
+                 'date': date}
+    return game_dict
+
+
+def parse_sbro(file):
+    year = int(re.findall(r'[0-9]{4}', file)[0])
+    years = [year, year+1]
+    
+    df = pd.read_excel(file)
+
+    cols = list(df.columns)
+    
+    col_map = {}
+    for c in ['Team', 'Close', 'Date']:
+        col_map[c] = cols.index(c)
+
+    vals = df.values
+
+    n_rows = len(df)
+    r1 = range(0, n_rows - 1, 2)
+
+    game_rows = [list(vals[x:x+2]) for x in r1]
+
+    
+    games = map(lambda x: game_sbro(x, col_map), game_rows)
+    
+    df = pd.DataFrame(games)
+    
+    # add year to date
+    dates = df['date'].values
+    df['date'] = map(lambda x: date_sbro(x, years), dates)
+
+    return df
+
+def spreads_sbro(datdir):
+    files = Clean.list_of_files(datdir + 'external/sbro/')
+    file_data = [parse_sbro(x) for x in files]
+    df = pd.concat(file_data, sort=False)
+    Clean.write_file(df, datdir + 'interim/', 'spreads_sbro')
