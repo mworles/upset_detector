@@ -5,6 +5,7 @@ import Clean
 import time
 import pymysql
 import os
+import json
 
 def rows_from_file(file):
     """Extract and return all rows from data file as list of lists."""
@@ -211,3 +212,21 @@ def create(name, rows):
     dba.connect()
     dba.create_table(dbt)
     dba.close()
+
+def create_from_query(query):
+    dba = DBAssist()
+    dba.connect()
+    dba.cursor.execute(query)
+    dba.conn.commit()
+    dba.close()
+
+def create_from_schema(table_name):
+    schema_file = 'data/schema.json'
+    with open(schema_file, 'r') as f:
+        schema = json.load(f)[table_name]
+        
+    query_create = """CREATE TABLE """ + table_name
+    cols = [str(" ".join([c['name'], c['type']])) for c in schema]
+    cols_one = ", \n".join(cols)
+    query_create = " ".join([query_create, "(", cols_one, ");"])
+    return query_create

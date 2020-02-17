@@ -1,0 +1,9 @@
+{
+    "game_scores": [{"name": "away", "type": "VARCHAR (64)"},
+                    {"name": "home", "type": "VARCHAR (64)"},
+                    {"name": "neutral", "type": "DECIMAL (1,0)"},
+                    {"name": "away_score", "type": "DECIMAL (3,0)"},
+                    {"name": "home_score", "type": "DECIMAL (3,0)"},
+                    {"name": "date", "type": "VARCHAR (64)"},
+                    {"name": "timestamp", "type": "VARCHAR (64)"}]
+                 }

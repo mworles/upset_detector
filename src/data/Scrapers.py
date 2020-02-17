@@ -265,41 +265,85 @@ def scrape_oddsportal(datdir, year):
     browser.quit()
     return all_data
 
-# %%
-def game_results(date):
-    #now = datetime.datetime.now()
-    #month = now.strftime('%m')
-    #url_date = "".join([str(now.year), '/', month, '/', str(now.day)])
-    
-    urlb = "https://www.ncaa.com/scoreboard/basketball-men/d1/"
-    url = urlb + date + '/all-conf'
+def decode(x): 
+    return x.encode('utf-8').strip().decode('ascii', 'ignore')
 
-    # %%
+def tcpalm_score(x):
+    score = decode(x)
+    try:
+        int(score)
+        return score
+    except:
+        return ''
+
+def tcpalm_game(table):
+    trs = table.findAll('tr')[1:]
+    tds = [r.findAll('td')[-1] for r in trs]
+    scores = [td.getText() for td in tds]
+    scores = [tcpalm_score(x) for x in scores]
+    return scores
+
+def tcpalm_team(team):
+    name = re.sub(r'\([0-9]*\)', '', team)
+    return str(decode(name))
+
+def tcpalm_header(header):
+    text = header.getText()
+    
+    if ' at ' in text:
+        neutral = 0
+        split_on = ' at '
+    elif ' vs ' in text:
+        neutral = 1
+        split_on =  'vs '
+    
+    teams = text.split(split_on)
+    names = [tcpalm_team(x) for x in teams]
+    
+    team_info = names + [neutral]
+    return team_info
+
+def tcpalm_section(div):
+    headers = div.findAll('div', {'class': 'sdi-so-title'})
+    tables = div.findAll('table')
+    team_info = [tcpalm_header(x) for x in headers]
+    scores = [tcpalm_game(x) for x in tables]
+    game_info = [t + s for t, s in zip(team_info, scores)]
+    return game_info
+
+def game_results(date):
     time.sleep(1)
+    timestamp = str(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+    urlb = 'http://stats.tcpalm.com/sports-scores/College-Basketball-Scores-Matchups.aspx?'
+    date_split = date.split('/')
+    year_i = int(date_split[0])
+    year = "Year=" + date_split[0]
+    period = "Period=" + "".join(date_split[1:])
+    month = int(date_split[1])
+    if month > 9:
+        season = "".join(["CurrentSeason=", str(year_i), "-", str(year_i+1)])
+    else:
+        season = "".join(["CurrentSeason=", str(year_i-1), "-", str(year_i)])
+    url_suf = "&".join([year, period, season])
+    url = "".join([urlb, url_suf])
     r = requests.get(url)
     soup = BeautifulSoup(r.content, 'html.parser')
-    div_games = soup.find('div', {'class': 'gamePod_content-pod_container'})
-    games_final = div_games.findAll('ul', {'class': 'gamePod-game-teams'})
+    try:
+        div = soup.find('div', {'class': 'sdi-divScoreColumn_1-2'})
+        games = tcpalm_section(div)
+        try:
+            div2 = soup.find('div', {'class': 'sdi-divScoreColumn_2-2'})
+            div2_games = tcpalm_section(div2)
+            games.extend(div2_games)
+        except:
+            pass
+        
+        [g.extend([date, timestamp]) for g in games]
+    except:
+        games = [[]]
 
-    def get_team_data(team_div):
-        name_class = 'gamePod-game-team-name'
-        score_class = 'gamePod-game-team-score'
-        name = team_div.find('span', {'class': name_class}).getText()
-        score = team_div.find('span', {'class': score_class}).getText()
-        return [name, score]
-
-    def parse_game(game_div):
-        game_data = []
-        game_teams = game_div.findAll('li')
-        for team in game_teams:
-            game_data.extend(get_team_data(team))
-        return game_data
-
-    games_data = [parse_game(x) for x in games_final]
-    columns = ['team_1', 'score_1', 'team_2', 'score_2']
-    df = pd.DataFrame(games_data, columns = columns)
-    df['game_date'] = date
-    time_stamp = str(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-    df['timestamp'] = time_stamp
+    col_names = ['away', 'home', 'neutral', 'away_score', 'home_score',
+                 'date', 'time_stamp']
+    games.insert(0, col_names)   
     
-    return df
+    return games
