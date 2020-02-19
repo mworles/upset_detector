@@ -2,8 +2,8 @@ from data import Scrapers
 from data import Transfer
 import datetime 
 
-sdate = datetime.date(2019, 11, 15)
-edate = datetime.date(2019, 11, 18)
+sdate = datetime.date(2019, 11, 30)
+edate = datetime.date(2020, 2, 17)
 
 delta = edate - sdate
 
@@ -14,13 +14,9 @@ for i in range(delta.days + 1):
     date = date.strftime("%Y/%m/%d")
     get_dates.append(date)
 
-#create_query = Transfer.query_from_schema('game_box')
-#Transfer.create_from_query(create_query)
-
 for date in get_dates:
     results = Scrapers.game_results(date)
     try:
-        Transfer.insert('game_box', results)
+        Transfer.insert('game_box', results, at_once=False)
     except Exception as e:
         print e
-        

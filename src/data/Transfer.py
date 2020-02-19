@@ -92,22 +92,24 @@ class DBTable():
         q_create = """ """.join(["CREATE TABLE IF NOT EXISTS", self.name, "(", q_columns, ");"])
         self.query_create = q_create
 
-    def get_query_rows(self):
+    def get_row_values(self):
         values_conv = [c.convert_values() for c in self.columns]
         rows_conv = map(list, zip(*values_conv))
         rows_joined = [", ".join(r) for r in rows_conv]
-        rows_queries = ["".join(["(", r, ")"]) for r in rows_joined]
-        rows_combined = ",\n".join(rows_queries)
-        return rows_combined
+        self.row_values = ["".join(["(", r, ")"]) for r in rows_joined]
         
     def get_query_insert(self):
-        query_rows = self.get_query_rows()
-        pref = " ".join(["INSERT INTO ", self.name, "VALUES"])
-        self.query_insert = " ".join([pref, query_rows, ";"])
+        rows_combined = ",\n".join(self.row_values)
+        col_pref = ", ".join(self.column_names)
+        col_pref = "".join(['(', col_pref, ')'])
+        pref = " ".join(["INSERT INTO ", self.name, col_pref, "VALUES"])
+        self.query_insert = " ".join([pref, rows_combined, ";"])
+        self.query_rows = [pref + r for r in self.row_values]
         
     def setup_table(self):
         self.setup_columns()
         self.get_query_create()
+        self.get_row_values()
         self.get_query_insert()
 
 
@@ -164,10 +166,14 @@ class DBAssist():
         self.cursor.execute(table.query_create)
         self.conn.commit()
 
-    def insert_rows(self, table):
+    def insert_rows(self, table, at_once=True):
         """Given table name with list of rows, insert all rows."""
         # obtain full insert query for all rows
-        self.cursor.execute(table.query_insert)
+        if at_once == True:
+            self.cursor.execute(table.query_insert)
+        else:
+            map(lambda x: self.cursor.execute(x), table.query_rows)
+        
         self.conn.commit()
 
     def run_query(self, query):
@@ -197,12 +203,12 @@ def create_insert(name, rows):
     dba.insert_rows(dbt)
     dba.close()
 
-def insert(name, rows):
+def insert(name, rows, at_once=True):
     dbt = DBTable(name, rows)
     dbt.setup_table()
     dba = DBAssist()
     dba.connect()
-    dba.insert_rows(dbt)
+    dba.insert_rows(dbt, at_once=at_once)
     dba.close()
 
 def create(name, rows):

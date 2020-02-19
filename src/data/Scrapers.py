@@ -329,37 +329,6 @@ def tcpalm_url(date):
     url = "".join([urlb, url_suf])
     return url
 
-def div_links(div):
-    divs = div.findAll('div', {'class': 'onoff'})
-    
-    base = 'http://stats.tcpalm.com'
-    links = []
-    for d in divs:
-        for a in d.findAll('a'):
-            if a.getText() == 'Boxscore':
-                href = a['href']
-                link = "".join([base, href])
-                links.append(link)
-    
-    return links
-
-
-def box_links(date):
-    url = tcpalm_url(date)
-    r = requests.get(url)
-    soup = BeautifulSoup(r.content, 'html.parser')
-    divs = soup.findAll('div', {'class': 'onoff'})
-    
-    base = 'http://stats.tcpalm.com'
-    links = []
-    for d in divs:
-        for a in d.findAll('a'):
-            if a.getText() == 'Boxscore':
-                href = a['href']
-                link = "".join([base, href])
-                links.append(link)
-    
-    return links
 
 def make_link(gid):
     url_b = "http://stats.tcpalm.com/basketball/ncaab-boxscores.aspx?page=/data/NCAAB/results/2019-2020/boxscore"
@@ -371,44 +340,36 @@ def box_row(row):
     row_text = [decode(x) for x in row_cells]
     return row_text
 
-def team_name(div):
-    team = decode(div.find('div').getText())
-    return team
-    
-def team_box(div):
+def process_team(div):
     box_rows = div.findAll('tr')
     box_data = [box_row(row) for row in box_rows]
-    return box_data
-
-def team_data(box_data):
     row_leads = [x[0] for x in box_data]
     total_i = row_leads.index('TOTAL')
     team_totals = box_data[total_i][1:]
     team_cols = box_data[1][1:]
     team_cols = [c.replace('-', '') for c in team_cols]
-    return zip(team_cols, team_totals)
-    
-def process_team(div):
-    box_data = team_box(div)
-    team_totals = team_data(box_data)
-    return team_totals
+    return zip(team_cols, team_totals)    
 
 def game_box(url):
     time.sleep(1)
-    r = requests.get(url)
-    soup = BeautifulSoup(r.content, 'html.parser')
-    divs = soup.findAll('div', {'class': 'sdi-so'})[1:3]
-    team_totals = [process_team(div) for div in divs]
-    cols = [x[0] for x in team_totals[0]]
-    team_dicts = [{k:v for k, v in t} for t in team_totals]
-    cols_both = ['away_' + c for c in cols] + ['home_' + c for c in cols]
-    team_data = [[td[c] for c in cols] for td in team_dicts]
-    game_data = team_data[0] + team_data[1]
-    # box id
-    bid = re.findall(r'\d+', url.split('/')[-1])[0]
-    cols_both.insert(0, 'bid')
-    game_data.insert(0, bid)
-    return [cols_both, game_data]
+    try:
+        r = requests.get(url)
+        bid = re.findall(r'\d+', url.split('/')[-1])[0]
+        soup = BeautifulSoup(r.content, 'html.parser')
+        divs = soup.findAll('div', {'class': 'sdi-so'})[1:3]
+        team_totals = [process_team(div) for div in divs]
+        cols = [x[0] for x in team_totals[0]]
+        team_dicts = [{k:v for k, v in t} for t in team_totals]
+        cols_both = ['away_' + c for c in cols] + ['home_' + c for c in cols]
+        team_data = [[td[c] for c in cols] for td in team_dicts]
+        game_data = team_data[0] + team_data[1]
+        # box id
+        bid = re.findall(r'\d+', url.split('/')[-1])[0]
+        cols_both.insert(0, 'bid')
+        game_data.insert(0, bid)
+        return [cols_both, game_data]
+    except:
+        return [[]]
 
 
 def game_dict(game_rows):
@@ -438,50 +399,39 @@ def game_results(date):
     url = tcpalm_url(date)
     r = requests.get(url)
     soup = BeautifulSoup(r.content, 'html.parser')
-    
-    test_n = 5
-    
+        
     try:
         div = soup.find('div', {'class': 'sdi-divScoreColumn_1-2'})
         games = tcpalm_section(div)
-        games = games[0:test_n]
         gids = [game[-1] for game in games]
         links = [make_link(g) for g in gids]
-        links = links[0:test_n]
         boxes = [game_box(x) for x in links]
 
         try:
             div2 = soup.find('div', {'class': 'sdi-divScoreColumn_2-2'})
             div2_games = tcpalm_section(div2)
-            div2_games = div2_games[0:test_n]
             gids2 = [game[-1] for game in div2_games]
-            games.extend(div2_games)
             links2 = [make_link(g) for g in gids2]
-            links2 = links2[0:test_n]
             div2_boxes = [game_box(x) for x in links2]
             # first row is col names, not needed
+            games.extend(div2_games)
             boxes.extend(div2_boxes)
         except:
             pass
-        
+            
         [g.extend([date, timestamp]) for g in games]
-
+    
+        box_data = date_boxes(boxes)
+        col_names = ['away_team', 'home_team', 'neutral', 'away_score', 'home_score', 'sid',
+                     'date', 'timestamp']
+        col_names.extend(box_data[0])
+        
+        # first row of box_data is column names, don't include
+        all_data = [g + b for g, b in zip(games, box_data[1:])]
+        
+        all_data.insert(0, col_names)
+        
     except:
-        games = [[]]
-    
-    box_data = date_boxes(boxes)
-    col_names = ['away_team', 'home_team', 'neutral', 'away_score', 'home_score', 'sid',
-                 'date', 'time_stamp']
-    col_names.extend(box_data[0])
-    
-    #max_wide = max([len(b) for b in box_data])
-    # first row of box_data is column names, don't include
-    all_data = [g + b for g, b in zip(games, box_data[1:])]
-    
-    all_data.insert(0, col_names)
+        all_data = [['date', 'timestamp'], [date, timestamp]]
 
-    for a in all_data:
-        print len(a)
-        print a
-    
     return all_data
