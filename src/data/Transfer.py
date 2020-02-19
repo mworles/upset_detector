@@ -122,21 +122,9 @@ class DBAssist():
         parser = ConfigParser.ConfigParser()
         config_path = os.path.join(os.path.abspath(os.path.dirname(__file__)), '../../.config')
         parser.readfp(open(config_path))
-        driver = parser.get('RDS', 'driver')
-        server = parser.get('RDS', 'server')
-        database = parser.get('RDS', 'database')
-        uid = parser.get('RDS', 'uid')
-        code = parser.get('RDS', 'code')
         pwd = parser.get('Local', 'pwd')
         db = parser.get('Local', 'db')
-        """
-        self.conn = pyodbc.connect('DRIVER='+driver+';'
-                                   'SERVER='+server+';'
-                                   'DATABASE='+database+';'
-                                   'UID='+uid+';'
-                                   'PWD='+code+';'
-                                   'charset=utf8mb4;')
-        """
+
         self.conn = pymysql.connect(host='127.0.0.1',
                                     port=3306,
                                     user='root',
