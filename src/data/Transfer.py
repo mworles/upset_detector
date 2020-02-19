@@ -223,3 +223,7 @@ def query_from_schema(table_name):
     cols_one = ", \n".join(cols)
     query_create = " ".join([query_create, "(", cols_one, ");"])
     return query_create
+
+def create_from_schema(table_name):
+    query_create = query_from_schema(table_name)
+    create_from_query(query_create)

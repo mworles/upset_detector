@@ -1,20 +1,16 @@
 {
-    "game_scores": [{"name": "away", "type": "VARCHAR (64)"},
-                    {"name": "home", "type": "VARCHAR (64)"},
+    "game_scores": [{"name": "gid", "type": "VARCHAR (64)"},
+                    {"name": "away_team", "type": "VARCHAR (64)"},
+                    {"name": "home_team", "type": "VARCHAR (64)"},
                     {"name": "neutral", "type": "DECIMAL (1,0)"},
                     {"name": "away_score", "type": "DECIMAL (3,0)"},
                     {"name": "home_score", "type": "DECIMAL (3,0)"},
                     {"name": "date", "type": "VARCHAR (64)"},
                     {"name": "timestamp", "type": "VARCHAR (64)"}],
-    "game_box":    [{"name": "away_team", "type": "VARCHAR (64)"},
+
+    "game_box":    [{"name": "gid", "type": "VARCHAR (64)"},
+                    {"name": "away_team", "type": "VARCHAR (64)"},
                     {"name": "home_team", "type": "VARCHAR (64)"},
-                    {"name": "neutral", "type": "DECIMAL (1,0)"},
-                    {"name": "away_score", "type": "DECIMAL (3,0)"},
-                    {"name": "home_score", "type": "DECIMAL (3,0)"},
-                    {"name": "sid", "type": "VARCHAR (64)"},
-                    {"name": "date", "type": "VARCHAR (64)"},
-                    {"name": "timestamp", "type": "VARCHAR (64)"},
-                    {"name": "bid", "type": "VARCHAR (64)"},
                     {"name": "away_MIN", "type": "VARCHAR (64)"},
                     {"name": "away_FGMA", "type": "VARCHAR (64)"},
                     {"name": "away_3PMA", "type": "VARCHAR (64)"},
@@ -40,5 +36,7 @@
                     {"name": "home_STL", "type": "VARCHAR (64)"},
                     {"name": "home_TO", "type": "VARCHAR (64)"},
                     {"name": "home_BLK", "type": "VARCHAR (64)"},
-                    {"name": "home_PTS", "type": "VARCHAR (64)"}]
+                    {"name": "home_PTS", "type": "VARCHAR (64)"},
+                    {"name": "date", "type": "VARCHAR (64)"},
+                    {"name": "timestamp", "type": "VARCHAR (64)"}]
     }
