@@ -246,7 +246,6 @@ def scrape_oddsportal(datdir, year):
     data = get_table_oddportal(soup)
     store_data_oddsportal(datdir, data, year, page)
     all_data.extend(data)
-    """
     need_pages = range(2, lp + 1)
     
     for n in need_pages:
@@ -254,14 +253,13 @@ def scrape_oddsportal(datdir, year):
             nav = browser.find_element_by_link_text(str(n))
             nav.click()
             time.sleep(4)
-            print year, n
             soup = BeautifulSoup(browser.page_source, 'html.parser')
             data = get_table_oddsportal(soup)
             store_data_oddsportal(data, year, n)
             all_data.extend(data)
         except:
             pass
-    """
+
     browser.quit()
     return all_data
 
@@ -305,10 +303,11 @@ def tcpalm_header(header):
 
 def tcpalm_section(div):
     headers = div.findAll('div', {'class': 'sdi-so-title'})
+    gids = [decode(h['id'].replace('Title_7_', '')) for h in headers]
     tables = div.findAll('table')
     team_info = [tcpalm_header(x) for x in headers]
     scores = [tcpalm_game(x) for x in tables]
-    game_info = [t + s for t, s in zip(team_info, scores)]
+    game_info = [t + s + [i] for t, s, i in zip(team_info, scores, gids)]
     return game_info
 
 def game_results(date):
@@ -330,32 +329,20 @@ def tcpalm_url(date):
     url = "".join([urlb, url_suf])
     return url
 
-def game_results(date):
-    time.sleep(1)
-    timestamp = str(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-    url = tcpalm_url(date)
-    r = requests.get(url)
-    soup = BeautifulSoup(r.content, 'html.parser')
+def div_links(div):
+    divs = div.findAll('div', {'class': 'onoff'})
     
-    try:
-        div = soup.find('div', {'class': 'sdi-divScoreColumn_1-2'})
-        games = tcpalm_section(div)
-        try:
-            div2 = soup.find('div', {'class': 'sdi-divScoreColumn_2-2'})
-            div2_games = tcpalm_section(div2)
-            games.extend(div2_games)
-        except:
-            pass
-        
-        [g.extend([date, timestamp]) for g in games]
-    except:
-        games = [[]]
+    base = 'http://stats.tcpalm.com'
+    links = []
+    for d in divs:
+        for a in d.findAll('a'):
+            if a.getText() == 'Boxscore':
+                href = a['href']
+                link = "".join([base, href])
+                links.append(link)
+    
+    return links
 
-    col_names = ['away', 'home', 'neutral', 'away_score', 'home_score',
-                 'date', 'time_stamp']
-    games.insert(0, col_names)   
-    
-    return games
 
 def box_links(date):
     url = tcpalm_url(date)
@@ -374,6 +361,11 @@ def box_links(date):
     
     return links
 
+def make_link(gid):
+    url_b = "http://stats.tcpalm.com/basketball/ncaab-boxscores.aspx?page=/data/NCAAB/results/2019-2020/boxscore"
+    url = "".join([url_b, gid, ".html"])
+    return url
+    
 def box_row(row):
     row_cells = [td.getText() for td in row.findAll('td')]
     row_text = [decode(x) for x in row_cells]
@@ -393,50 +385,103 @@ def team_data(box_data):
     total_i = row_leads.index('TOTAL')
     team_totals = box_data[total_i][1:]
     team_cols = box_data[1][1:]
-    team_dict = {k:v for k, v in zip(team_cols, team_totals)}
-    return team_dict
+    team_cols = [c.replace('-', '') for c in team_cols]
+    return zip(team_cols, team_totals)
     
-def player_data(box_data):
-    players = []
-    team_cols = box_data[1]
-    for i in range(2, len(box_data) -2):
-        players.append({k:v for k, v in zip(team_cols, box_data[i])})
-    return players
-
 def process_team(div):
-    name = team_name(div)
     box_data = team_box(div)
-    team_dict = team_data(box_data)
-    team_dict['team'] = name
-    return team_dict
+    team_totals = team_data(box_data)
+    return team_totals
 
 def game_box(url):
+    time.sleep(1)
     r = requests.get(url)
     soup = BeautifulSoup(r.content, 'html.parser')
     divs = soup.findAll('div', {'class': 'sdi-so'})[1:3]
-    data_teams = [process_team(div) for div in divs]
-    keys = data_teams[0].keys()
-    team_data = [[x[k] for k in keys] for x in data_teams]
-    team_data.insert(0, keys)
-    return team_data
+    team_totals = [process_team(div) for div in divs]
+    cols = [x[0] for x in team_totals[0]]
+    team_dicts = [{k:v for k, v in t} for t in team_totals]
+    cols_both = ['away_' + c for c in cols] + ['home_' + c for c in cols]
+    team_data = [[td[c] for c in cols] for td in team_dicts]
+    game_data = team_data[0] + team_data[1]
+    # box id
+    bid = re.findall(r'\d+', url.split('/')[-1])[0]
+    cols_both.insert(0, 'bid')
+    game_data.insert(0, bid)
+    return [cols_both, game_data]
 
-"""
-def game_box(date):
+
+def game_dict(game_rows):
+    gd = {k:v for k, v in zip(game_rows[0], game_rows[1])}
+    return gd
+    
+def data_from_dict(key, game_dict):
+    try:
+        result = game_dict[key]
+    except:
+        result = ""
+    return result
+
+def date_boxes(box_list):
+    # to ensure same shape for box scores missing some statistics
+    unique_cols = list(set([col for game in box_list for col in game[0]]))
+    unique_cols.sort()
+    game_dicts = [game_dict(x) for x in box_list]
+    data = [[data_from_dict(k, gd) for k in unique_cols] for gd in game_dicts]
+    data.insert(0, unique_cols)
+    return data
+
+def game_results(date):
+    print 'date %s' % (date)
     time.sleep(1)
     timestamp = str(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
     url = tcpalm_url(date)
     r = requests.get(url)
     soup = BeautifulSoup(r.content, 'html.parser')
-    divs = soup.findAll('div', {'class': 'onoff'})
     
-    base = 'http://stats.tcpalm.com'
-    links = []
-    for d in divs:
-        for a in d.findAll('a'):
-            if a.getText() == 'Boxscore':
-                href = a['href']
-                link = "".join([base, href])
-                links.append(link)
+    test_n = 5
     
-    return links
-"""
+    try:
+        div = soup.find('div', {'class': 'sdi-divScoreColumn_1-2'})
+        games = tcpalm_section(div)
+        games = games[0:test_n]
+        gids = [game[-1] for game in games]
+        links = [make_link(g) for g in gids]
+        links = links[0:test_n]
+        boxes = [game_box(x) for x in links]
+
+        try:
+            div2 = soup.find('div', {'class': 'sdi-divScoreColumn_2-2'})
+            div2_games = tcpalm_section(div2)
+            div2_games = div2_games[0:test_n]
+            gids2 = [game[-1] for game in div2_games]
+            games.extend(div2_games)
+            links2 = [make_link(g) for g in gids2]
+            links2 = links2[0:test_n]
+            div2_boxes = [game_box(x) for x in links2]
+            # first row is col names, not needed
+            boxes.extend(div2_boxes)
+        except:
+            pass
+        
+        [g.extend([date, timestamp]) for g in games]
+
+    except:
+        games = [[]]
+    
+    box_data = date_boxes(boxes)
+    col_names = ['away_team', 'home_team', 'neutral', 'away_score', 'home_score', 'sid',
+                 'date', 'time_stamp']
+    col_names.extend(box_data[0])
+    
+    #max_wide = max([len(b) for b in box_data])
+    # first row of box_data is column names, don't include
+    all_data = [g + b for g, b in zip(games, box_data[1:])]
+    
+    all_data.insert(0, col_names)
+
+    for a in all_data:
+        print len(a)
+        print a
+    
+    return all_data
