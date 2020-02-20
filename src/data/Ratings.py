@@ -306,5 +306,3 @@ def run(df):
                 p.start()
             
             results = [output.get() for p in processes]
-
-run(df)
