@@ -14,8 +14,8 @@ for i in range(delta.days + 1):
     date = date.strftime("%Y/%m/%d")
     get_dates.append(date)
 
-Transfer.create_from_schema('game_scores')
-Transfer.create_from_schema('game_box')
+Transfer.create_from_schema('game_scores', 'schema.json')
+Transfer.create_from_schema('game_box', 'schema.json')
 
 for date in get_dates:
     
