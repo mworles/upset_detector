@@ -38,5 +38,16 @@
                     {"name": "home_BLK", "type": "VARCHAR (64)"},
                     {"name": "home_PTS", "type": "VARCHAR (64)"},
                     {"name": "date", "type": "VARCHAR (64)"},
-                    {"name": "timestamp", "type": "VARCHAR (64)"}]
+                    {"name": "timestamp", "type": "VARCHAR (64)"}],
+    "games_for_ratings":    [{"name": "game_id", "type": "VARCHAR (64)"},
+                             {"name": "daynum", "type": "DECIMAL (3,0)"},
+                             {"name": "pos", "type": "DECIMAL (6,3)"},
+                             {"name": "season", "type": "DECIMAL (4, 0)"},
+                             {"name": "team_score", "type": "DECIMAL (6,3)"},
+                             {"name": "team_team_id", "type": "DECIMAL (4, 0)"},
+                             {"name": "opp_score", "type": "DECIMAL (6,3)"},
+                             {"name": "opp_team_id", "type": "DECIMAL (4,0)"},
+                             {"name": "team_off", "type": "DECIMAL (6,3)"},
+                             {"name": "team_def", "type": "DECIMAL (6,3)"},
+                             {"name": "weight", "type": "DECIMAL (5,4)"}]
     }
