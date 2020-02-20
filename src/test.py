@@ -1,4 +1,4 @@
-from data import Transfer, Match, Generate, Ratings
+from data import Transfer, Match, Generate, Ratings, Clean
 import pandas as pd
 import numpy as np
 import Constants
@@ -19,17 +19,18 @@ def tcp_conversion(df):
 
 dba = Transfer.DBAssist()
 dba.connect()
-"""
+
 table = dba.return_table('game_scores')
 df = pd.DataFrame(table[1:], columns=table[0])
+season = max([x.split('/')[0] for x in df['date'].values])
+df['season'] = season
+
 df = Match.id_from_name(datdir, df, 'team_tcp', 'away_team', drop=False)
 df = Match.id_from_name(datdir, df, 'team_tcp', 'home_team', drop=False)
 df = tcp_conversion(df)
 df = Generate.convert_team_id(df, ['wteam', 'lteam'], drop=False)
 
 
-# create unique game identifier and set as index
-df = Generate.set_gameid_index(df, date_col = 'date', full_date=True, drop_date=False)
 # add column indicating score for each team
 df = Generate.team_scores(df)
 # remove games without scores
@@ -39,9 +40,11 @@ df = df.dropna(how='any', subset=['t1_score', 't2_score', 't1_loc', 't2_loc'])
 df['t1_score'] = df['t1_score'].astype(int)
 df['t2_score'] = df['t2_score'].astype(int)
 df = Ratings.location_adjustment(df)
-"""
+
 tbox = dba.return_table('game_box')
+
 box = pd.DataFrame(tbox[1:], columns=tbox[0])
+
 
 def split_makes_attempts(elem):
     try:
@@ -62,28 +65,42 @@ for team in ['home_', 'away_']:
 
 # remove missing rows missing any posession cols
 pos_list = ['_fta', '_fga', '_OFF', '_TO']
-pos_list = [x for x in pos_list if not '_TOT' in x]
 pos_cols = [x for x in box.columns if any(ele in x for ele in pos_list)]
-print pos_cols
+pos_cols = [x for x in pos_cols if not '_TOT' in x]
+
 box = box.dropna(subset=pos_cols, how='any')
+bp = box[['gid'] + pos_cols]
+bp = bp.set_index('gid').astype(int)
 
+# compute posessions
+pos = ((bp['home_fga'] + bp['away_fga']) + 0.475 * 
+       (bp['home_fta'] + bp['away_fta']) - 
+       (bp['home_OFF'] + bp['away_OFF']) + (bp['home_TO'] + bp['away_TO'])) / 2
 
-# need to merge in box scores
+bp['pos'] = pos.round(2)
+bp = bp.reset_index().drop(columns=pos_cols)
+df = pd.merge(df, bp, left_on='gid', right_on='gid', how='inner')
+df = df[df['pos'] != 0]
+df = Generate.set_gameid_index(df, date_col = 'date', full_date=True, drop_date=False)
 
+df = Ratings.games_by_team(df)
+df = Ratings.reduce_margin(df, cap=22)
 
-'''
+df['team_off'] = (100 * (df['team_score'] / df['pos'])).round(3)
+df['team_def'] = (100 * (df['opp_score'] / df['pos'])).round(3)
+df = Ratings.add_weights(df)
 
-    df = compute_posessions(df)
-    keep = ['season', 'daynum', 't1_team_id', 't2_team_id', 't1_score', 't2_score',
-            'pos']
-    df = df[keep]
-    df = games_by_team(df)
-    df = reduce_margin(df, cap=22)
+udates = pd.unique(df.sort_values('date')['date']).tolist()
+date_daynum = {k:v for (k, v) in zip(udates, range(0, len(udates) + 1))}
+df['daynum'] = df['date'].map(date_daynum)
 
-    # compute points per 100 possessions
-    df['team_off'] = (100 * (df['team_score'] / df['pos'])).round(3)
-    df['team_def'] = (100 * (df['opp_score'] / df['pos'])).round(3)
-    df = add_weights(df)
-    Clean.write_file(df, datdir + '/interim/', 'games_for_ratings', keep_index=True)
-    return df
-'''
+keep = ['daynum', 'pos', 'season', 'team_score', 'team_team_id', 'opp_score',
+        'opp_team_id', 'team_off', 'team_def', 'weight']
+df = df[keep]
+df = df.sort_values(['daynum', 'team_team_id'])
+df = df.reset_index()
+
+#Clean.write_file(df, datdir + '/interim/', 'games_for_ratings_current', keep_index=True)
+#Transfer.create_from_schema('games_for_ratings', 'data/schema.json')
+rows = Transfer.dataframe_rows(df)
+Transfer.insert('games_for_ratings', rows, at_once=False)
