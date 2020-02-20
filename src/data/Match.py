@@ -120,6 +120,7 @@ def clean_tcpalm(table_name):
     
     # all unique team names
     teams = list(set(list(df['home_team']) + list(df['away_team'])))
+    teams = [t for t in teams if team is not None]
     
     df = pd.DataFrame({'team_tcp': teams})
     df['team_clean'] = map(lambda x: Clean.school_name(x), df['team_tcp'])
