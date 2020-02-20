@@ -40,14 +40,18 @@ def reduce_margin(df, cap):
     return df
 
 
-def add_weights(df, wc = 1):
+def add_weights(df, one_season=True, date_col = 'date', wc = 1):
     """wc is a weight coeffficient where values above 1 apply a stronger
     adjustment for recency"""
+    if one_season==True:
+        group_by_cols = ['team_team_id']
+    else:
+        group_by_cols = ['season']
     # add game weights
-    df = df.sort_values(['season', 'team_team_id', 'daynum'], ascending=True)
+    df = df.sort_values(group_by_cols + [date_col], ascending=True)
     df['game'] = 1
-    df['game_n'] = df.groupby(['season', 'team_team_id'])['game'].transform('cumsum')
-    df['game_max'] = df.groupby(['season', 'team_team_id'])['game_n'].transform('max')
+    df['game_n'] = df.groupby(group_by_cols)['game'].transform('cumsum')
+    df['game_max'] = df.groupby(group_by_cols)['game_n'].transform('max')
     
     # weight coefficient
     rel_rec = 1- (((df['game_max']*wc - df['game_n']*wc) / df['game_max']*wc))
