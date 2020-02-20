@@ -17,6 +17,7 @@ It imports the custom Clean module.
 import pandas as pd
 import Clean
 import Odds
+import Transfer
 
 def clean_schools(datdir):
     """Returns a dataframe produced by combining data from files in the input 
@@ -111,7 +112,21 @@ def clean_pt(datdir):
 
     return df
 
-
+def clean_tcpalm(table_name):
+    dba = Transfer.DBAssist()
+    dba.connect()
+    table = dba.return_table(table_name)
+    df = pd.DataFrame(table[1:], columns=table[0])
+    
+    # all unique team names
+    teams = list(set(list(df['home_team']) + list(df['away_team'])))
+    
+    df = pd.DataFrame({'team_tcp': teams})
+    df['team_clean'] = map(lambda x: Clean.school_name(x), df['team_tcp'])
+    
+    return df
+    
+    
 def match_id(df, id):
     """Returns a dataframe produced by matching team names in df to team names 
     in id. 
@@ -191,19 +206,23 @@ def create_key(datdir):
     pt = clean_pt(datdir + 'external/pt/')
     pt_id = match_id(pt, id)
 
+    # clean tcpalm teams
+    tcp = clean_tcpalm('game_scores')
+    tcp_id = match_id(tcp, id)
+    
     # read in master id file
     key = pd.read_csv(datdir + '/scrub/teams.csv')
     key = key[['team_id', 'team_name']]
     
     # create universal key
-    for df in [schools_id, kp_id, op_id, pt_id]:
+    for df in [schools_id, kp_id, op_id, pt_id, tcp_id]:
         key = pd.merge(key, df, on='team_id', how='left')
 
     # set location to write file and save file
     data_out = datdir + 'interim/'
     Clean.write_file(key, data_out, 'id_key')
 
-def id_from_name(datdir, df, key_col, name_col, drop_name=True):
+def id_from_name(datdir, df, key_col, name_col, drop=True):
     """From input data containing team name column specified in 'name_col', 
     returns dataframe containing team numeric identifiers.
 
@@ -223,14 +242,20 @@ def id_from_name(datdir, df, key_col, name_col, drop_name=True):
     id = pd.read_csv(id_file)
     # from id key data, only need numeric identifer and key_col to merge on
     id = id[['team_id', key_col]]
+    # remove duplicates
+    id = id[~id.duplicated()]
     # join data the id key file using specified inputs
     mrg = pd.merge(df, id, left_on=name_col, right_on=key_col, how='inner')
     # list of cols to drop, key_col is redundant with name_col
     drop_cols = [key_col]
     # add name_col to drop list, if desired
-    if drop_name == True:
+    if drop == True:
         drop_cols.append(name_col)
     # remove columns from dataframe
-    mrg = mrg.drop([key_col, name_col], axis=1)
+    mrg = mrg.drop(drop_cols, axis=1)
+    
+    # create unique column name for added id
+    id_name = name_col + '_id'
+    mrg = mrg.rename(columns={'team_id': id_name})
     
     return mrg
