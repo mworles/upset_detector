@@ -33,7 +33,7 @@ def set_gameid_index(df, date_col='date_id', full_date=False, drop_date=True):
     """
     # identify date series as either full date or season
     if full_date == True:
-        date = df[date_col]
+        date = df[date_col].str.replace('/', '_')
         # remove date col if indicated
         if drop_date == True:
             df = df.drop([date_col], axis=1)
@@ -418,7 +418,7 @@ def team_locations(df):
     t2_mat = df[['wteam', 'wloc', 't2_team_id']].values
     
     df['t1_loc'] = map(lambda x: get_location(x), t1_mat)
-    df['t2_loc'] = map(lambda x: get_location(x), t1_mat)
+    df['t2_loc'] = map(lambda x: get_location(x), t2_mat)
     
     return df
 

@@ -1,5 +1,4 @@
 import ConfigParser
-import pyodbc
 import csv
 import Clean
 import time
@@ -168,6 +167,17 @@ class DBAssist():
         self.cursor.execute(query)
         result = self.cursor.fetchall()
         return result
+
+    def return_table(self, table_name):
+        self.cursor = self.conn.cursor(pymysql.cursors.DictCursor) 
+        query_cols = """SHOW COLUMNS FROM %s;""" % (table_name)
+        result = self.run_query(query_cols)
+        columns = [r['Field'] for r in result]
+        query_rows = """SELECT * FROM %s;""" % (table_name)
+        result = self.run_query(query_rows)
+        rows = [[r[c] for c in columns] for r in result]
+        table = [columns] + rows
+        return table
 
     def close(self):
         self.conn.close()
