@@ -214,8 +214,7 @@ def create_from_query(query):
     dba.conn.commit()
     dba.close()
 
-def query_from_schema(table_name):
-    schema_file = 'data/schema.json'
+def query_from_schema(table_name, schema_file):
     with open(schema_file, 'r') as f:
         schema = json.load(f)[table_name]
     query_create = """CREATE TABLE """ + table_name
@@ -224,6 +223,6 @@ def query_from_schema(table_name):
     query_create = " ".join([query_create, "(", cols_one, ");"])
     return query_create
 
-def create_from_schema(table_name):
-    query_create = query_from_schema(table_name)
+def create_from_schema(table_name, schema_file):
+    query_create = query_from_schema(table_name, schema_file)
     create_from_query(query_create)
