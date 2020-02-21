@@ -146,7 +146,10 @@ def create_team_dict(df, col_name, group_by='opp'):
 
 def opponent_mean(team_opp, team_dict, weighted=False):
     opponents_scores = [x[1] for x in team_dict[team_opp[1]] if x[0] != team_opp[0]]
-    
+    # if opponents have no other opponents in data
+    if len(opponents_scores) < 1:
+        opponents_scores = [x[1] for x in team_dict[team_opp[1]]]
+
     if not weighted:
         opponents_mean = np.mean(opponents_scores)
     else:
@@ -208,7 +211,7 @@ def adjust_offense(df, id_array, input='adjusted', weighted=False):
     
     return df
 
-def adjust_defense(df, id_array, weighted=False):
+def adjust_defense(df, id_array, weighted=True):
     # keys are team ids
     # values 2d matrix with opponent id and points scored
     team_dict = create_team_dict(df, 'team_off_adj', group_by='team')
@@ -279,34 +282,22 @@ def minimum_day(df, n_games=3):
     day_min = df[df['game_n'] == n_games]['daynum'].max()
     return day_min
 
-def run_day(df, year, day_max, output):
-    n_iters = 15
+def run_day(df, year, day_max, n_iters=15):
     weighted = True
     df = df[df['daynum'] < day_max]
+    df = add_weights(df, one_season=True, date_col = 'daynum', wc = 0.75)
     df_teams = get_ratings(df, n_iters=n_iters, weighted=weighted)
     df_teams['season'] = year   
     df_teams['daynum'] = day_max
-    rows = Clean.dataframe_rows(df)
-    #return rows
+    rows = Transfer.dataframe_rows(df_teams)
     Transfer.insert('ratings_at_day', rows)
     print 'day %s, season %s' % (day_max, year)
-    output.put(rows)
+    return len(rows)
 
 def run(df):
-    if __name__ == '__main__':
-        years = list(set(df['season']))
-        years.sort()
-        output = mp.Queue()
-
-        for year in years:
-            dfy = df[df['season'] == year]
-            day_min = minimum_day(dfy, n_games=3)
-            all_days = list(set(dfy['daynum'].values))
-            rate_days = [x for x in all_days if x >=day_min]
-            
-            processes = [mp.Process(target=run_day, args=(dfy, year, x, output)) for x in rate_days]
-            
-            for p in processes:
-                p.start()
-            
-            results = [output.get() for p in processes]
+    year = pd.unique(df['season'])[0]
+    day_min = minimum_day(df, n_games=3)
+    all_days = list(set(df['daynum'].values))
+    all_days.sort()
+    rate_days = [x for x in all_days if x >=day_min]
+    results = map(lambda x: run_day(df, year, x, n_iters=2), rate_days)
