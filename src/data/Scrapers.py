@@ -348,7 +348,6 @@ def game_box(url):
     try:
         r = requests.get(url)
         gid = re.findall(r'\d+', url.split('/')[-1])[0]
-        print gid
         soup = BeautifulSoup(r.content, 'html.parser')
         divs = soup.findAll('div', {'class': 'sdi-so'})
         div_teams = divs[0]
@@ -376,12 +375,12 @@ def game_box(url):
 
 
 def game_scores(date):
-    print 'date %s' % (date)
     time.sleep(1)
     timestamp = str(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
     url = tcpalm_url(date)
     r = requests.get(url)
     soup = BeautifulSoup(r.content, 'html.parser')
+
     try:
         div = soup.find('div', {'class': 'sdi-divScoreColumn_1-2'})
         games = tcpalm_section(div)

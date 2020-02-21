@@ -2,34 +2,25 @@ import Scrapers
 import Transfer
 import datetime 
 
-sdate = datetime.date(2019, 11, 05)
-edate = datetime.date(2020, 2, 18)
+date = datetime.datetime.now()
+# will schedule to run overnight, get results for yesterday's date
+date = date - datetime.timedelta(days=1)
+date = date.strftime('%Y/%m/%d')
 
-delta = edate - sdate
+#Transfer.create_from_schema('game_scores', 'schema.json')
+#Transfer.create_from_schema('game_box', 'schema.json')
+date = ('2020/02/19')    
+game_scores = Scrapers.game_scores(date)
 
-get_dates = []
+try:
+    Transfer.insert('game_scores', game_scores, at_once=False)
+except Exception as e:
+    print e
 
-for i in range(delta.days + 1):
-    date = sdate + datetime.timedelta(days=i)
-    date = date.strftime("%Y/%m/%d")
-    get_dates.append(date)
+boxes = Scrapers.get_boxes(date)
 
-Transfer.create_from_schema('game_scores', 'schema.json')
-Transfer.create_from_schema('game_box', 'schema.json')
-
-for date in get_dates:
-    
-    game_scores = Scrapers.game_scores(date)
-    
+for b in boxes:
     try:
-        Transfer.insert('game_scores', game_scores, at_once=False)
+        Transfer.insert('game_box', b, at_once=False)
     except Exception as e:
         print e
-
-    boxes = Scrapers.get_boxes(date)
-    
-    for b in boxes:
-        try:
-            Transfer.insert('game_box', b, at_once=False)
-        except Exception as e:
-            print e
