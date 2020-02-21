@@ -422,7 +422,6 @@ def box_links(date):
     return links
 
 def get_boxes(date):
-    print 'date %s' % (date)
     timestamp = str(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
     links = box_links(date)
     boxes = []
