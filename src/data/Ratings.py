@@ -1,9 +1,8 @@
 import pandas as pd
 import numpy as np
 import os
-import Clean, Generate, Transfer
+import Clean, Generate, Transfer, Match
 import math
-import multiprocessing as mp
 
 def reduce_margin(df, cap):
     # reduce outlier scores to limit impact of huge blowouts
@@ -40,13 +39,10 @@ def reduce_margin(df, cap):
     return df
 
 
-def add_weights(df, one_season=True, date_col = 'date', wc = 1):
+def add_weights(df, date_col = 'date', wc = 1):
     """wc is a weight coeffficient where values above 1 apply a stronger
     adjustment for recency"""
-    if one_season==True:
-        group_by_cols = ['team_team_id']
-    else:
-        group_by_cols = ['season']
+    group_by_cols = ['team_team_id']
     # add game weights
     df = df.sort_values(group_by_cols + [date_col], ascending=True)
     df['game'] = 1
@@ -113,10 +109,11 @@ def games_by_team(df):
 def games_ratings(datdir):
     """Create a dataset with the requirements for computing team ratings."""
     df = Generate.neutral_games(datdir)
+    df['date'] = df['date_id'].str.replace('_', '/')
     df = Generate.team_locations(df)
     df = location_adjustment(df)
     df = compute_posessions(df)
-    keep = ['season', 'daynum', 't1_team_id', 't2_team_id', 't1_score', 't2_score',
+    keep = ['season', 'date', 't1_team_id', 't2_team_id', 't1_score', 't2_score',
             'pos']
     df = df[keep]
     df = games_by_team(df)
@@ -125,9 +122,123 @@ def games_ratings(datdir):
     # compute points per 100 possessions
     df['team_off'] = (100 * (df['team_score'] / df['pos'])).round(3)
     df['team_def'] = (100 * (df['opp_score'] / df['pos'])).round(3)
-    df = add_weights(df)
-    Clean.write_file(df, datdir + '/interim/', 'games_for_ratings', keep_index=True)
+    
     return df
+
+def game_box_convert(df):
+    home_won = df['home_score'] > df['away_score']
+    df['wteam'] = np.where(home_won, df['home_team_id'], df['away_team_id'])
+    df['lteam'] = np.where(home_won, df['away_team_id'], df['home_team_id'])
+    df['wscore'] = np.where(home_won, df['home_score'], df['away_score'])
+    df['lscore'] = np.where(home_won, df['away_score'], df['home_score'])
+    df['wloc'] = np.where(home_won, 'H', 'A')
+    df['wloc'] = np.where(df['neutral'] == 1, 'N', df['wloc'])
+    return df
+
+def game_box_games(df):
+    # add season column
+    season = max([x.split('/')[0] for x in df['date'].values])
+    df['season'] = season
+    
+    # remove games without scores, so below computations complete
+    df = df.dropna(how='any', subset=['home_score', 'away_score', 'neutral'])
+    
+    # add numeric team id
+    df = Match.id_from_name(df, 'team_tcp', 'away_team', drop=False)
+    df = Match.id_from_name(df, 'team_tcp', 'home_team', drop=False)
+    
+    # convert columns to apply neutral id function
+    df = game_box_convert(df)
+    # create team_1 and team_2 id identifer columns
+    df = Generate.convert_team_id(df, ['wteam', 'lteam'], drop=False)
+    # add column indicating scores and locations for each team
+    df = Generate.team_scores(df)
+    df = Generate.team_locations(df)
+    # adjust score for location of game
+    df = location_adjustment(df)
+    
+    return df
+
+def game_box_possessions(df):
+    
+    def split_makes_attempts(elem):
+        try:
+            elem_split = elem.split('-')
+            return (elem_split[0], elem_split[1])
+        except:
+            return None
+
+    for team in ['home_', 'away_']:
+        old_col = team + 'FGMA'
+        makes_attempts = map(split_makes_attempts, df[old_col].values)
+        new_col = team + 'fga'
+        df[new_col] = [x[1] if x is not None else None for x in makes_attempts]
+        old_col = team + 'FTMA'
+        makes_attempts = map(split_makes_attempts, df[old_col].values)
+        new_col = team + 'fta'
+        df[new_col] = [x[1] if x is not None else None for x in makes_attempts]
+
+    # remove missing rows missing any posession cols
+    pos_list = ['_fta', '_fga', '_OFF', '_TO']
+    pos_cols = [x for x in df.columns if any(ele in x for ele in pos_list)]
+    pos_cols = [x for x in pos_cols if not '_TOT' in x]
+
+    df = df.dropna(subset=pos_cols, how='any')
+    bp = df[['gid'] + pos_cols]
+    bp = bp.set_index('gid').astype(int)
+
+    # compute posessions
+    pos = ((bp['home_fga'] + bp['away_fga']) +          # combined fg attempts
+           0.475 * (bp['home_fta'] + bp['away_fta'])    # estimate ft adjustment 
+           - (bp['home_OFF'] + bp['away_OFF']) +        # less offensive rbs
+           (bp['home_TO'] + bp['away_TO'])) / 2         # combined TOs
+
+    bp['pos'] = pos.round(2)
+    bp = bp.reset_index().drop(columns=pos_cols)
+    bp = bp[bp['pos'] != 0]
+    return bp
+
+def game_box_for_ratings(date=None):
+    dba = Transfer.DBAssist()
+    dba.connect()
+    table = dba.return_table('game_scores')
+    tbox = dba.return_table('game_box')
+
+    dfo = pd.DataFrame(table[1:], columns=table[0])
+    box = pd.DataFrame(tbox[1:], columns=tbox[0])
+    
+    # if date given, only include games on that date
+    if date is not None:
+        dfo = dfo[dfo['date'] == date]
+        box = box[box['date'] == date]
+    
+    df = game_box_games(dfo)
+    pos = game_box_possessions(box)
+    
+    # join possessions to scores
+    df = pd.merge(df, pos, left_on='gid', right_on='gid', how='inner')
+
+    # assign unique game identifer from date and teams
+    df = Generate.set_gameid_index(df, date_col='date', full_date=True,
+                                   drop_date=False)
+
+    # create duplicate of games so each team has row for each game
+    df = games_by_team(df)
+    # adjust victory margins to minimize impact of blowouts
+    df = reduce_margin(df, cap=22)
+
+    # compute points scored and allowed per 100 possessions
+    # pace-independent metric of efficiency
+    df['team_off'] = (100 * (df['team_score'] / df['pos'])).round(3)
+    df['team_def'] = (100 * (df['opp_score'] / df['pos'])).round(3)
+
+    # keep only columns needed for ratings program
+    keep = ['date', 'pos', 'season', 'team_score', 'team_team_id', 'opp_score',
+            'opp_team_id', 'team_off', 'team_def']
+    df = df[keep]
+    
+    return df
+
 
 def create_team_dict(df, col_name, group_by='opp'):
     team_dict = {}
@@ -282,19 +393,43 @@ def minimum_day(df, n_games=3):
     day_min = df[df['game_n'] == n_games]['daynum'].max()
     return day_min
 
-def run_day(df, year, day_max, n_iters=15):
-    weighted = True
-    df = df[df['daynum'] < day_max]
-    df = add_weights(df, one_season=True, date_col = 'daynum', wc = 0.75)
-    df_teams = get_ratings(df, n_iters=n_iters, weighted=weighted)
-    df_teams['season'] = year   
-    df_teams['daynum'] = day_max
-    rows = Transfer.dataframe_rows(df_teams)
-    Transfer.insert('ratings_at_day', rows)
-    print 'day %s, season %s' % (day_max, year)
-    return len(rows)
+def day_number(df):
+    udates = pd.unique(df.sort_values('date')['date']).tolist()
+    date_daynum = {k:v for (k, v) in zip(udates, range(0, len(udates) + 1))}
+    df['daynum'] = df['date'].map(date_daynum)
+    return df
 
-def run(df):
+def run_day(year = None, day_max = None, n_iters=15):
+    weighted = True
+    dba = Transfer.DBAssist()
+    dba.connect()
+    table = dba.return_table('games_for_ratings')
+    df = pd.DataFrame(table[1:], columns=table[0])
+    cols_numeric = [c for c in df.columns if c not in ['date']]
+    for c in cols_numeric:
+        df[c] = df[c].astype('float')
+
+    
+    df = day_number(df)
+
+    if year is None:
+        year = max(df['season'].values)
+    df = df[df['season'] == year]
+    if day_max is None:
+        day_max = max(df['daynum'].values)
+    df = df[df['daynum'] < day_max]
+    date = max(df['date'])
+    print '%s, season %s' % (day_max, year)
+    df = add_weights(df, date_col = 'date', wc = 0.75)
+    df_teams = get_ratings(df, n_iters=n_iters, weighted=weighted)
+    df_teams['season'] = year
+    df_teams['date'] = date
+    rows = Transfer.dataframe_rows(df_teams)
+    Transfer.insert('ratings_at_day_test', rows)
+
+def run_year(df):
+    # create a day count column for each unique date
+    df = day_number(df)
     year = pd.unique(df['season'])[0]
     day_min = minimum_day(df, n_games=3)
     all_days = list(set(df['daynum'].values))
