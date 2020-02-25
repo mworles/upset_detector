@@ -102,8 +102,8 @@ def game_sbro(game_rows, col_map):
     decode = lambda x: x.encode('utf-8').strip().decode('ascii', 'ignore')
     teams = [decode(x) for x in teams]
     close = [r[col_map['Close']] for r in game_rows]
-    close = [x if x != 'pk' else 0 for x in close]
-    date = game_rows[0][col_map['Date']]
+    # return value or 0 if value is 'pickem'
+    close = [x if x not in ['pk', 'PK'] else 0 for x in close]
     
     nls = [x for x in close if x == 'NL']
     if len(nls) == 2:
@@ -126,7 +126,8 @@ def game_sbro(game_rows, col_map):
         fave = teams[spread_i]
         
         total = [x for x in close if x != spread][0]
-    
+
+    date = game_rows[0][col_map['Date']]
     game_dict = {'away': teams[0],
                  'home': teams[1],
                  'spread': spread,
@@ -154,7 +155,6 @@ def parse_sbro(file):
     r1 = range(0, n_rows - 1, 2)
 
     game_rows = [list(vals[x:x+2]) for x in r1]
-
     
     games = map(lambda x: game_sbro(x, col_map), game_rows)
     
@@ -170,4 +170,5 @@ def spreads_sbro(datdir):
     files = Clean.list_of_files(datdir + 'external/sbro/')
     file_data = [parse_sbro(x) for x in files]
     df = pd.concat(file_data, sort=False)
-    Clean.write_file(df, datdir + 'interim/', 'spreads_sbro')
+    return df
+    #Clean.write_file(df, datdir + 'external/sbro/', 'spreads_sbro')

@@ -1,106 +1,107 @@
-from data import Transfer, Match, Generate, Ratings, Clean
+from data import Transfer, Generate, Ratings, Match, Odds, Clean, Spreads
+import Constants
 import pandas as pd
 import numpy as np
-import Constants
-datdir = Constants.DATA
 
-def tcp_conversion(df):
-    home_won = df['home_score'] > df['away_score']
-    df['wteam'] = np.where(home_won, df['home_team_id'], df['away_team_id'])
-    df['lteam'] = np.where(home_won, df['away_team_id'], df['home_team_id'])
-    df['wscore'] = np.where(home_won, df['home_score'], df['away_score'])
-    df['lscore'] = np.where(home_won, df['away_score'], df['home_score'])
-    df['wloc'] = np.where(home_won, 'H', 'A')
-    df['wloc'] = np.where(df['neutral'] == 1, 'N', df['wloc'])
-    return df
+#Transfer.create_from_schema('team_key', 'data/schema.json')
+#key = pd.read_csv(Constants.DATA + 'interim/team_key.csv')
+#key = key.fillna('')
+#key = key.drop_duplicates()
 
-#Match.create_key(datdir)
-
-
+#rows = Transfer.dataframe_rows(key)
+#Transfer.insert('team_key', rows, at_once=False) 
+"""
+# connect to mysql
 dba = Transfer.DBAssist()
 dba.connect()
 
-table = dba.return_table('game_scores')
-df = pd.DataFrame(table[1:], columns=table[0])
-season = max([x.split('/')[0] for x in df['date'].values])
-df['season'] = season
+# create database table
+Transfer.create_from_schema('games_for_ratings', 'data/schema.json')
 
-df = Match.id_from_name(datdir, df, 'team_tcp', 'away_team', drop=False)
-df = Match.id_from_name(datdir, df, 'team_tcp', 'home_team', drop=False)
-df = tcp_conversion(df)
-df = Generate.convert_team_id(df, ['wteam', 'lteam'], drop=False)
+# insert rows up to season 2019
+#df = Ratings.games_ratings(Constants.DATA)
+#rows = Transfer.dataframe_rows(df)
+#Transfer.insert('games_for_ratings', rows, at_once=False)    
 
-
-# add column indicating score for each team
-df = Generate.team_scores(df)
-# remove games without scores
-df = df.sort_index()
-df = Generate.team_locations(df)
-df = df.dropna(how='any', subset=['t1_score', 't2_score', 't1_loc', 't2_loc'])
-df['t1_score'] = df['t1_score'].astype(int)
-df['t2_score'] = df['t2_score'].astype(int)
-df = Ratings.location_adjustment(df)
-
-tbox = dba.return_table('game_box')
-
-box = pd.DataFrame(tbox[1:], columns=tbox[0])
-
-
-def split_makes_attempts(elem):
-    try:
-        elem_split = elem.split('-')
-        return (elem_split[0], elem_split[1])
-    except:
-        return None
-
-for team in ['home_', 'away_']:
-    old_col = team + 'FGMA'
-    makes_attempts = map(split_makes_attempts, box[old_col].values)
-    new_col = team + 'fga'
-    box[new_col] = [x[1] if x is not None else None for x in makes_attempts]
-    old_col = team + 'FTMA'
-    makes_attempts = map(split_makes_attempts, box[old_col].values)
-    new_col = team + 'fta'
-    box[new_col] = [x[1] if x is not None else None for x in makes_attempts]
-
-# remove missing rows missing any posession cols
-pos_list = ['_fta', '_fga', '_OFF', '_TO']
-pos_cols = [x for x in box.columns if any(ele in x for ele in pos_list)]
-pos_cols = [x for x in pos_cols if not '_TOT' in x]
-
-box = box.dropna(subset=pos_cols, how='any')
-bp = box[['gid'] + pos_cols]
-bp = bp.set_index('gid').astype(int)
-
-# compute posessions
-pos = ((bp['home_fga'] + bp['away_fga']) + 0.475 * 
-       (bp['home_fta'] + bp['away_fta']) - 
-       (bp['home_OFF'] + bp['away_OFF']) + (bp['home_TO'] + bp['away_TO'])) / 2
-
-bp['pos'] = pos.round(2)
-bp = bp.reset_index().drop(columns=pos_cols)
-df = pd.merge(df, bp, left_on='gid', right_on='gid', how='inner')
-df = df[df['pos'] != 0]
-df = Generate.set_gameid_index(df, date_col = 'date', full_date=True, drop_date=False)
-
-df = Ratings.games_by_team(df)
-df = Ratings.reduce_margin(df, cap=22)
-
-df['team_off'] = (100 * (df['team_score'] / df['pos'])).round(3)
-df['team_def'] = (100 * (df['opp_score'] / df['pos'])).round(3)
-df = Ratings.add_weights(df)
-
-udates = pd.unique(df.sort_values('date')['date']).tolist()
-date_daynum = {k:v for (k, v) in zip(udates, range(0, len(udates) + 1))}
-df['daynum'] = df['date'].map(date_daynum)
-
-keep = ['daynum', 'pos', 'season', 'team_score', 'team_team_id', 'opp_score',
-        'opp_team_id', 'team_off', 'team_def', 'weight']
-df = df[keep]
-df = df.sort_values(['daynum', 'team_team_id'])
-df = df.reset_index()
-
-#Clean.write_file(df, datdir + '/interim/', 'games_for_ratings_current', keep_index=True)
-#Transfer.create_from_schema('games_for_ratings', 'data/schema.json')
+# insert current season rows
+df = Ratings.game_box_for_ratings()
 rows = Transfer.dataframe_rows(df)
-Transfer.insert('games_for_ratings', rows, at_once=False)
+Transfer.insert('games_for_ratings', rows, at_once=False) 
+
+# close msyql connection
+dba.close()
+"""
+#Transfer.create_from_schema('ratings_at_day_test', 'data/schema.json')
+"""
+date = "2020/02/19"
+df = Ratings.game_box_for_ratings(date=date)
+rows = Transfer.dataframe_rows(df)
+Transfer.insert('games_for_ratings', rows, at_once=False) 
+df = Ratings.run_day(n_iters=5)
+"""
+"""
+Transfer.create_from_schema('odds_clean', 'data/schema.json')
+datdir = Constants.DATA
+df = Odds.clean_oddsportal(datdir)
+rows = Transfer.dataframe_rows(df)
+
+Transfer.insert('odds_clean', rows, at_once=False) 
+
+dba = Transfer.DBAssist()
+dba.connect()
+df = dba.return_df('odds')
+    
+df = Odds.current_odds(df)
+df = Match.id_from_name(df, 'team_vi_odds', 'team_1', drop=False)
+df = Match.id_from_name(df, 'team_vi_odds', 'team_2', drop=False)
+
+l_games = Odds.get_odds_dicts(df)
+df = Generate.convert_team_id(df, ['team_1_id', 'team_2_id'], drop=False)
+df = Odds.team_odds(df, l_games)
+
+years = map(lambda x: x.split('-')[0], df['timestamp'].values)
+dates = ["/".join([x, y]) for x, y in zip(years, df['game_date'].values)]
+df['date'] = dates
+df = Generate.set_gameid_index(df, date_col='date', full_date=True, drop_date=False)
+keep_cols = ['date', 't1_team_id', 't2_team_id', 't1_odds', 't2_odds']
+df = df[keep_cols].sort_values('date').reset_index()
+
+rows = Transfer.dataframe_rows(df)
+Transfer.insert('odds_clean', rows, at_once=False) 
+"""
+#Match.create_key(Constants.DATA)
+datdir = Constants.DATA
+df = Spreads.spreads_sbro(datdir)
+"""
+df = pd.read_csv(datdir + 'external/sbro/spreads_sbro.csv')
+
+
+df = Match.id_from_name(df, 'team_sbro', 'away', drop=False)
+df = Match.id_from_name(df, 'team_sbro', 'home', drop=False)
+
+df['fav_loc'] = np.where(df['favorite'] == df['home'], 'H', 'A')
+df['fav_id'] = np.where(df['fav_loc'] == 'H', df['home_id'], df['away_id'])
+df = Generate.convert_team_id(df, ['home_id', 'away_id'], drop=False)
+
+
+def spread_format(x):
+    try:
+        spread = float(x)
+    except:
+        spread = np.nan
+    return spread
+    
+df['spnum'] = map(spread_format, df['spread'].values)
+df['over_under'] = map(spread_format, df['total'].values)
+
+df['t1_spread'] = np.where(df['t1_team_id'] == df['fav_id'], -df['spnum'], df['spnum'])
+df = Generate.set_gameid_index(df, date_col='date', full_date=True, drop_date=False)
+keep_cols = ['date', 't1_team_id', 't2_team_id', 't1_spread', 'over_under']
+df = df[keep_cols].reset_index()
+df = df.sort_values(['date', 't1_team_id'])
+
+print df.describe()
+#Transfer.create_from_schema('spreads_clean', 'data/schema.json')
+#rows = Transfer.dataframe_rows(df)
+#Transfer.insert('spreads_clean', rows, at_once=False) 
+"""
