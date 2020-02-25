@@ -5,6 +5,8 @@ import time
 import pymysql
 import os
 import json
+import pandas as pd
+import math
 
 def rows_from_file(file):
     """Extract and return all rows from data file as list of lists."""
@@ -55,9 +57,11 @@ class DBColumn():
     @staticmethod
     def get_column_type(col):
         try:
-            col_f = [str(float(x)) if x != '' else 'NULL' for x in col]
+            col_f = [x for x in col if x is not None]
+            col_f = [str(float(x)) if x != '' else 'NULL' for x in col_f]
             # only non-null values for decimal format extraction
             col_f = [x for x in col_f if x != 'NULL']
+            col_f = [x for x in col_f if math.isnan(float(x)) == False]
             dec_splits = [x.split('.') for x in col_f]
             imax = max([len(x[0]) for x in dec_splits])
             dmax = max([len(x[1]) for x in dec_splits])
@@ -65,15 +69,21 @@ class DBColumn():
             col_type = """ DECIMAL (%s, %s) """ % (imax + dmax, dmax)
         except:
             col_type = """ VARCHAR (64) """
-        
         return col_type
 
     @staticmethod
     def format_value(x, col_type):
-        """Format string value for MYSQL insert statement."""
-        if x == '':
+        if x == None:
             x = 'NULL'
+        try:
+            if math.isnan(x) == True:
+                x = 'NULL'
+        except:
+            if x == '':
+                x = 'NULL'
+
         if "VARCHAR" in col_type:
+            x = str(x)
             x = x.replace("'", r"\'")
             xf = r"""'%s'""" % (x)
         elif "DECIMAL" in col_type:
@@ -182,6 +192,11 @@ class DBAssist():
         rows = [[r[c] for c in columns] for r in result]
         table = [columns] + rows
         return table
+    
+    def return_df(self, table_name):
+        table = self.return_table(table_name)
+        df = pd.DataFrame(table[1:], columns=table[0])
+        return df
 
     def close(self):
         self.conn.close()
