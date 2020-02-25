@@ -244,9 +244,9 @@ def team_scores(df):
 
     # apply get_score function to get scores for both teams
     t1_score = lambda x: get_score(x, 't1_team_id', score_dict)
-    df['t1_score'] = df.apply(t1_score, axis=1)
+    df['t1_score'] = df.apply(t1_score, axis=1).astype(int)
     t2_score = lambda x: get_score(x, 't2_team_id', score_dict)
-    df['t2_score'] = df.apply(t2_score, axis=1)
+    df['t2_score'] = df.apply(t2_score, axis=1).astype(int)
     
     return df
 
