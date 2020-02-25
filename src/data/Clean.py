@@ -124,7 +124,7 @@ def school_name(x):
     return x
 
 
-def fuzzy_match(x, options, cutoff=85):
+def fuzzy_match(x, options, cutoff=85, with_score=False):
     """Indentify the closest match between a given string and a list of
     strings.
     
@@ -141,16 +141,19 @@ def fuzzy_match(x, options, cutoff=85):
     """
     # return the matched string and the match score
     best_match, match_score = process.extractOne(x, options)
-    # if matched string is at or above cutoff, return
-    if match_score >= cutoff:
-        return best_match
-    # otherwise print message and return None
+    
+    if with_score == True:
+        return (best_match, match_score)
     else:
-        print 'team not matched'
-        # show the original string, the best match, and the score
-        print x, best_match, match_score
-        return None
-
+    # if matched string is at or above cutoff, return
+        if match_score >= cutoff:
+            return best_match
+        # otherwise print message and return None
+        else:
+            print 'team not matched'
+            # show the original string, the best match, and the score
+            print x, best_match, match_score
+            return None
 
 def year4_from_string(s):
     """Returns numeric 4-digit year from string containing 2-digit year."""
