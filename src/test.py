@@ -4,7 +4,9 @@ import pandas as pd
 import numpy as np
 import math
 
-
+# location of data directory from constants module
+datdir = Constants.DATA
+Clean.scrub_files(Constants.RAW_MAP)
 
 # create database table
 #Transfer.create_from_schema('games_for_ratings', 'data/schema.json')
@@ -75,5 +77,5 @@ Transfer.insert('odds_clean', rows, at_once=False)
 
 #Transfer.create_from_schema('ratings_at_day', 'data/schema.json')
 
-if __name__ == '__main__':
-    Ratings.run_years(n_iters=15)
+#if __name__ == '__main__':
+    #Ratings.run_years(n_iters=15)

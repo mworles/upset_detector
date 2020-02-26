@@ -16,45 +16,41 @@ RAW_MAP = {}
 # 'new_name' value is string for new file name
 # 'columns' value is another dict with key:value pairs of strings
 # key is raw column name and value is string to rename column
-RAW_MAP['Teams'] = {'new_name': 'teams',
+RAW_MAP['MTeams'] = {'new_name': 'teams',
                      'columns': {'TeamID': 'team_id',
                                  'TeamName': 'team_name'}
                       }
 
-RAW_MAP['TeamSpellings'] = {'new_name': 'team_spellings',
+RAW_MAP['MTeamSpellings'] = {'new_name': 'team_spellings',
                             'columns': {'TeamID': 'team_id',
                                         'TeamNameSpelling': 'name_spelling'}
                             }
 
-RAW_MAP['NCAATourneyCompactResults'] = {'new_name': 'ncaa_results',
+RAW_MAP['MNCAATourneyCompactResults'] = {'new_name': 'ncaa_results',
                                         'columns': {'WTeamID': 'Wteam',
                                                     'LTeamID': 'Lteam'}
                                         }
 
-RAW_MAP['RegularSeasonCompactResults'] = {'new_name': 'reg_results',
+RAW_MAP['MRegularSeasonCompactResults'] = {'new_name': 'reg_results',
                                           'columns': {'WTeamID': 'Wteam',
                                                       'LTeamID': 'Lteam'}
                                           }
-RAW_MAP['SecondaryTourneyCompactResults'] = {'new_name': 'nit_results',
+RAW_MAP['MSecondaryTourneyCompactResults'] = {'new_name': 'nit_results',
                                              'columns': {'WTeamID': 'Wteam',
                                                          'LTeamID': 'Lteam'}
                                              }
 
-RAW_MAP['NCAATourneyDetailedResults'] = {'new_name': 'ncaa_results_dtl',
+RAW_MAP['MNCAATourneyDetailedResults'] = {'new_name': 'ncaa_results_dtl',
                                         'columns': {'WTeamID': 'Wteam',
                                                     'LTeamID': 'Lteam'}
                                         }
 
-RAW_MAP['RegularSeasonDetailedResults'] = {'new_name': 'reg_results_dtl',
+RAW_MAP['MRegularSeasonDetailedResults'] = {'new_name': 'reg_results_dtl',
                                           'columns': {'WTeamID': 'Wteam',
                                                       'LTeamID': 'Lteam'}
                                           }
-RAW_MAP['SecondaryTourneyCompactResults'] = {'new_name': 'nit_results',
-                                             'columns': {'WTeamID': 'Wteam',
-                                                         'LTeamID': 'Lteam'}
-                                             }
 
-RAW_MAP['TeamCoaches'] = {'new_name': 'coaches',
+RAW_MAP['MTeamCoaches'] = {'new_name': 'coaches',
                           'columns': {'TeamID': 'team_id',
                                       'FirstDayNum': 'first_day',
                                       'LastDayNum': 'last_day',
@@ -62,11 +58,11 @@ RAW_MAP['TeamCoaches'] = {'new_name': 'coaches',
                                       }
                           }
 
-RAW_MAP['NCAATourneySeeds'] = {'new_name': 'seeds',
+RAW_MAP['MNCAATourneySeeds'] = {'new_name': 'seeds',
                                'columns': {'TeamID': 'team_id'}
                                }
 
-RAW_MAP['Seasons'] = {'new_name': 'seasons'}
+RAW_MAP['MSeasons'] = {'new_name': 'seasons'}
 
 # seed number to use for random data processses
 RANDOM_SEED = 40195
