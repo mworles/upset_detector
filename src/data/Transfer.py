@@ -207,8 +207,7 @@ def scrape_insert(scraper, name):
     dbt.setup_table()
     dba = DBAssist()
     dba.connect()
-    dba.create_table(dbt)
-    dba.insert_rows(dbt)
+    dba.insert_rows(dbt, at_once=False)
     dba.close()
 
 def create_insert(name, rows):
