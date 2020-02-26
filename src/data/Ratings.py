@@ -402,7 +402,7 @@ def day_number(df):
     df.loc[:, 'daynum'] = df['date'].map(date_daynum)
     return df
 
-def run_day(df, day_max = None, n_iters=15):
+def run_day(df, day_max = None, n_iters=15, output=None):
     cols_numeric = [c for c in df.columns if c not in ['date']]
     for c in cols_numeric:
         df[c] = df[c].astype('float')
@@ -420,27 +420,28 @@ def run_day(df, day_max = None, n_iters=15):
     df_teams = get_ratings(df, n_iters=n_iters)
     df_teams['season'] = year
     df_teams['date'] = date
-    #return df_teams
     rows = Transfer.dataframe_rows(df_teams)
     Transfer.insert('ratings_at_day', rows)
+    if output is not None:
+        output.put(rows)
 
 
-def run_year(df, n_iters = 15, multiprocessing=True):
-    df = day_number(df)
-    year = pd.unique(df['season'])[0]
-    day_min = minimum_day(df, n_games=3)
-    all_days = list(set(df['daynum'].values))
+def run_year(df, n_iters = 15, multiprocessing=True, output=None):
+    dfy = day_number(df)
+    year = pd.unique(dfy['season'])[0]
+    day_min = minimum_day(dfy, n_games=3)
+    all_days = list(set(dfy['daynum'].values))
     all_days.sort()
     rate_days = [x for x in all_days if x >=day_min]
-    
+
     if multiprocessing==False:
         results = map(lambda x: run_day(df, x, n_iters=n_iters), rate_days)
     
     else:
-        output = mp.Queue()
-        processes = [mp.Process(target=run_day, args=(dfy, x, n_iters=n_iters)) for x in rate_days]
+        processes = [mp.Process(target=run_day, args=(dfy, x, n_iters, output)) for x in rate_days]
         for p in processes:
             p.start()
+        
         results = [output.get() for p in processes]
 
 
@@ -450,8 +451,9 @@ def run_years(n_iters=15, multiprocessing=True):
     df = dba.return_df('games_for_ratings')
     years = list(set(df['season']))
     years.sort()
-
-    for year in years:
+    output = mp.Queue()
+    
+    for year in years[1:]:
         year = float(year)
         dfy = df[df['season'] == year].copy()
-        run_year(df, n_iters=n_iters, multiprocessing=multiprocessing)
+        run_year(dfy, n_iters = 15, multiprocessing=True, output=output )
