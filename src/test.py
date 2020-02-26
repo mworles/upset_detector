@@ -5,14 +5,14 @@ import numpy as np
 import math
 
 # location of data directory from constants module
-datdir = Constants.DATA
-Clean.scrub_files(Constants.RAW_MAP)
+#datdir = Constants.DATA
+#Clean.scrub_files(Constants.RAW_MAP)
 
 # create database table
 #Transfer.create_from_schema('games_for_ratings', 'data/schema.json')
 # create and insert games for ratings up to season 2019
 """
-df = Ratings.games_ratings(Constants.DATA)
+df = Ratings.games_ratings(Constants.DATA, year=2019)
 rows = Transfer.dataframe_rows(df)
 Transfer.insert('games_for_ratings', rows, at_once=False)
 """
@@ -26,9 +26,12 @@ rows = Transfer.dataframe_rows(df)
 Transfer.insert('games_for_ratings', rows, at_once=False) 
 """
 
-"""
-add code to compute historical ratings_at_day
-"""
+
+#2Transfer.create_from_schema('ratings_at_day', 'data/schema.json')
+
+if __name__ == '__main__':
+    Ratings.run_year(year=2019, n_iters=15)
+
 
 
 """
@@ -74,8 +77,3 @@ df = Spreads.spreads_vi(date=None)
 rows = Transfer.dataframe_rows(df)
 Transfer.insert('odds_clean', rows, at_once=False) 
 """
-
-#Transfer.create_from_schema('ratings_at_day', 'data/schema.json')
-
-#if __name__ == '__main__':
-    #Ratings.run_years(n_iters=15)

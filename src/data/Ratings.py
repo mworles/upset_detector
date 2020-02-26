@@ -107,9 +107,11 @@ def games_by_team(df):
 
     return df
 
-def games_ratings(datdir):
+def games_ratings(datdir, year=None):
     """Create a dataset with the requirements for computing team ratings."""
     df = Generate.neutral_games(datdir)
+    if year is not None:
+        df = df[df['season'] == year]
     df['date'] = df['date_id'].str.replace('_', '/')
     df = Generate.team_locations(df)
     df = location_adjustment(df)
@@ -423,14 +425,18 @@ def run_day(df, day_max = None, n_iters=15, output=None):
     rows = Transfer.dataframe_rows(df_teams)
     Transfer.insert('ratings_at_day', rows)
     if output is not None:
-        output.put(rows)
+        output.put(len(rows))
 
 
-def run_year(df, n_iters = 15, multiprocessing=True, output=None):
-    dfy = day_number(df)
-    year = pd.unique(dfy['season'])[0]
-    day_min = minimum_day(dfy, n_games=3)
-    all_days = list(set(dfy['daynum'].values))
+def run_year(year, n_iters = 15, multiprocessing=True):
+    dba = Transfer.DBAssist()
+    dba.connect()
+    df = dba.return_df('games_for_ratings')
+    dba.close()
+    df = df[df['season'] == year].copy()
+    df = day_number(df)
+    day_min = minimum_day(df, n_games=3)
+    all_days = list(set(df['daynum'].values))
     all_days.sort()
     rate_days = [x for x in all_days if x >=day_min]
 
@@ -438,22 +444,9 @@ def run_year(df, n_iters = 15, multiprocessing=True, output=None):
         results = map(lambda x: run_day(df, x, n_iters=n_iters), rate_days)
     
     else:
-        processes = [mp.Process(target=run_day, args=(dfy, x, n_iters, output)) for x in rate_days]
+        output = mp.Queue()
+        processes = [mp.Process(target=run_day, args=(df, x, n_iters, output)) for x in rate_days]
         for p in processes:
             p.start()
         
         results = [output.get() for p in processes]
-
-
-def run_years(n_iters=15, multiprocessing=True):
-    dba = Transfer.DBAssist()
-    dba.connect()
-    df = dba.return_df('games_for_ratings')
-    years = list(set(df['season']))
-    years.sort()
-    output = mp.Queue()
-    
-    for year in years[1:]:
-        year = float(year)
-        dfy = df[df['season'] == year].copy()
-        run_year(dfy, n_iters = 15, multiprocessing=True, output=output )
