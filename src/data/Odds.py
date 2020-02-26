@@ -2,7 +2,7 @@ import json
 import pandas as pd
 import numpy as np
 import calendar
-import Clean, Generate, Match
+import Clean, Generate, Match, Transfer
 
 def oddsportal_games(year_file):
     
@@ -115,4 +115,35 @@ def clean_oddsportal(datdir):
     
     keep_cols = ['date', 't1_team_id', 't2_team_id', 't1_odds', 't2_odds']
     df = df[keep_cols].sort_values('date').reset_index()
+    
+    # drop rows with no odds
+    df = df.dropna(subset=['t1_odds', 't2_odds'], how='all')
+    
     return df
+
+def odds_vi(date=None):
+    dba = Transfer.DBAssist()
+    dba.connect()
+    df = dba.return_df('odds')
+
+    years = map(lambda x: x.split('-')[0], df['timestamp'].values)
+    dates = ["/".join([x, y]) for x, y in zip(years, df['game_date'].values)]
+    df['date'] = dates
+    if date is not None:
+        df = df[df['date'] == date]
+        
+    df = current_odds(df)
+    df = Match.id_from_name(df, 'team_vi_odds', 'team_1', drop=False)
+    df = Match.id_from_name(df, 'team_vi_odds', 'team_2', drop=False)
+
+    l_games = get_odds_dicts(df)
+    df = Generate.convert_team_id(df, ['team_1_id', 'team_2_id'], drop=False)
+    df = team_odds(df, l_games)
+
+    df = Generate.set_gameid_index(df, date_col='date', full_date=True, drop_date=False)
+    keep_cols = ['date', 't1_team_id', 't2_team_id', 't1_odds', 't2_odds']
+    df = df[keep_cols].sort_values('date').reset_index()
+    
+    return df
+    #rows = Transfer.dataframe_rows(df)
+    #Transfer.insert('odds_clean', rows, at_once=False) 

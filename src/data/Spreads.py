@@ -5,18 +5,30 @@ import Clean
 import Odds
 import Generate
 import re
+import Match
+import math
 
 def spread_date(x):
     dl = x.split('/')
     y = dl[-1]
     m = dl[0]
     d = dl[1]
-    ds = "_".join([y, m, d])
+    ds = "/".join([y, m, d])
     return ds
-        
-def spread_format(x):
+
+
+def line_format(x, type='spread'):
     try:
-        spread = float(x)
+        spread = round(float(x), 1)
+        if type == 'spread':
+            if spread < -50:
+                spread = np.nan
+            elif spread > 50:
+                spread = np.nan
+            else:
+                pass
+        else:
+            pass
     except:
         spread = np.nan
     return spread
@@ -50,40 +62,40 @@ def spread_t1(row):
         pass
     return t1_spread
 
-def clean_spreads(datdir):
-    datdirectory = '../../data/external/pt/'
+def spreads_pt(datdir):
     df = Clean.combine_files(datdir + '/external/pt/')
     df = df[['date', 'home', 'road', 'line']]
 
     df = df[df['date'].notnull()]
-    df['game_date'] = df['date'].apply(spread_date)
-    df = df.drop('date', axis=1)
+    df['date'] = df['date'].apply(spread_date)
 
-    # convert spreads to numeric
-    df['spread'] = df['line'].apply(spread_format)
+    # convert spreads to numeric, correct some values
+    format_spread = lambda x: line_format(x, type='spread')
+    df['spread'] = map(format_spread, df['line'].values)
 
     df = df.drop('line', axis=1)
 
-    id_key = Odds.get_id_key(datdir, df, 'team_pt')
-    df['id_home'] = df['home'].apply(lambda x: spread_id(x, id_key))
-    df['id_road'] = df['road'].apply(lambda x: spread_id(x, id_key))
+    df = Match.id_from_name(df, 'team_pt', 'home', drop=False)
+    df = Match.id_from_name(df, 'team_pt', 'road', drop=False)
+    
+    df = df.dropna(how='any', subset=['home_id', 'road_id'])
 
-    df = df.dropna(how='any', subset=['id_home', 'id_road'])
-
-    df['t1_team_id'] = df[['id_home', 'id_road']].apply(min, axis=1).astype(int)
-    df['t2_team_id'] = df[['id_home', 'id_road']].apply(max, axis=1).astype(int)
-
-    df['t1_spread'] = df.apply(spread_t1, axis=1)
-
-    df_new = Generate.set_gameid_index(df, date_col='game_date', full_date=True,
+    df = Generate.convert_team_id(df, ['home_id', 'road_id'], drop=False)
+    
+    df['t1_spread'] = np.where(df['t1_team_id'] == df['home_id'], -df['spread'], df['spread'])
+    
+    df = Generate.set_gameid_index(df, date_col='date', full_date=True,
                                        drop_date=False)
-    df_new = df_new.sort_index()
+    df = df.sort_index()
 
-    df_new = df_new[[ 't1_team_id', 't2_team_id', 't1_spread']]
+    df = df[['date', 't1_team_id', 't2_team_id', 't1_spread']]
 
-    data_out = datdir + '/interim/'
+    df = df.dropna()
+    
     # save school stats data file
-    Clean.write_file(df_new, data_out, 'spreads', keep_index=True)
+    data_out = datdir + '/interim/'
+    Clean.write_file(df, data_out, 'spreads_pt', keep_index=True)
+    return df
 
 def date_sbro(date, years):
     datelen = len(str(date))
@@ -111,7 +123,8 @@ def game_sbro(game_rows, col_map):
         fave = teams[1]
     elif len(nls) ==1:
         close_val = [x for x in close if x != 'NL'][0]
-        if int(close_val) > 50:
+        # set cutoff of 60 for calling value a spread
+        if int(close_val) < 60:
             spread = close_val
             total = 'NL'
             spread_i = close.index(spread)
@@ -131,7 +144,7 @@ def game_sbro(game_rows, col_map):
     game_dict = {'away': teams[0],
                  'home': teams[1],
                  'spread': spread,
-                 'total': total,
+                 'over_under': total,
                  'favorite': fave,
                  'date': date}
     return game_dict
@@ -163,12 +176,96 @@ def parse_sbro(file):
     # add year to date
     dates = df['date'].values
     df['date'] = map(lambda x: date_sbro(x, years), dates)
-
+    
     return df
 
 def spreads_sbro(datdir):
-    files = Clean.list_of_files(datdir + 'external/sbro/')
+    files = Clean.list_of_files(datdir + 'external/sbro/', tag='ncaa basketball')
     file_data = [parse_sbro(x) for x in files]
     df = pd.concat(file_data, sort=False)
+    
+    # round spread and total
+    format_spread = lambda x: line_format(x, type='spread')
+    format_ovun = lambda x: line_format(x, type='line')
+    df['spread'] = map(format_spread, df['spread'].values)
+    df['over_under'] = map(format_ovun, df['over_under'].values)
+
+    df = Match.id_from_name(df, 'team_sbro', 'away', drop=False)
+    df = Match.id_from_name(df, 'team_sbro', 'home', drop=False)
+
+    df['fav_loc'] = np.where(df['favorite'] == df['home'], 'H', 'A')
+    df['fav_id'] = np.where(df['fav_loc'] == 'H', df['home_id'], df['away_id'])
+    
+    df = Generate.convert_team_id(df, ['home_id', 'away_id'], drop=False)
+
+    df['t1_spread'] = np.where(df['t1_team_id'] == df['fav_id'], -df['spread'], df['spread'])
+    
+    df = Generate.set_gameid_index(df, date_col='date', full_date=True, drop_date=False)
+    
+    keep_cols = ['date', 't1_team_id', 't2_team_id', 't1_spread', 'over_under']
+    df = df[keep_cols]
+    df = df.sort_values(['date', 't1_team_id'])
+    
+    data_out = datdir + '/interim/'
+    Clean.write_file(df, data_out, 'spreads_sbro', keep_index=True)
     return df
-    #Clean.write_file(df, datdir + 'external/sbro/', 'spreads_sbro')
+
+def blend_spreads(datdir):
+    sbro = spreads_sbro(datdir)
+    sbro = sbro.rename(columns={'t1_spread': 't1_spread_sbro'})
+    
+    pt = spreads_pt(datdir)
+    pt = pt.rename(columns={'t1_spread': 't1_spread_pt'})
+    
+    merge_on= ['t1_team_id', 't2_team_id', 'game_id', 'date']
+    df = pd.merge(sbro, pt, left_on=merge_on, right_on=merge_on, how='outer')
+    
+    both_spreads = zip(df['t1_spread_sbro'].values, df['t1_spread_pt'].values)
+    
+    def pick_spread(spread_tuple):
+        if math.isnan(spread_tuple[0]):
+            spread = spread_tuple[1]
+        else:
+            spread = spread_tuple[0]
+        return spread
+
+    df['t1_spread'] = map(pick_spread, both_spreads)
+    df = df.drop(columns=['t1_spread_sbro', 't1_spread_pt'])
+    
+    df = df.dropna(subset=['t1_spread'])
+    
+    return df
+
+def spreads_vi(date=None):
+    dba = Transfer.DBAssist()
+    dba.connect()
+    df = dba.return_df('spreads')
+    years = map(lambda x: x.split('-')[0], df['timestamp'].values)
+    dates = ["/".join([x, y]) for x, y in zip(years, df['game_date'].values)]
+    df['date'] = dates
+    if date is not None:
+        df = df[df['date'] == date]
+
+    df = Odds.current_odds(df)
+    df = Match.id_from_name(df, 'team_vi_spreads', 'team_1', drop=False)
+    df = Match.id_from_name(df, 'team_vi_spreads', 'team_2', drop=False)
+    format_spread = lambda x: Spreads.line_format(x, type='spread')
+    format_ovun = lambda x: Spreads.line_format(x, type='line')
+    df['over_under'] = map(format_ovun, df['line'].values)
+    spread_vals = map(format_spread, df['spread'].values)
+
+
+    fav = np.where(df['team_1'] == df['favorite'], df['team_1_id'], df['team_2_id'])
+    df = Generate.convert_team_id(df, ['team_1_id', 'team_2_id'], drop=False)
+    t1_fav = df['t1_team_id'] == fav
+    vals_t1 = zip(spread_vals, t1_fav)
+    df['t1_spread'] = [-x[0] if x[1] == True else x[0] for x in vals_t1]
+
+    df = Generate.set_gameid_index(df, date_col='date', full_date=True,
+                                   drop_date=False)
+
+    keep_cols = ['date', 't1_team_id', 't2_team_id', 't1_spread', 'over_under']
+    df = df[keep_cols].sort_values('date').reset_index()
+    return df
+    #Transfer.create_from_schema('spreads_clean', 'data/schema.json')
+    #Transfer.insert('spreads_clean', rows, at_once=False)

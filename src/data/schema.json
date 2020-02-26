@@ -48,7 +48,7 @@
                              {"name": "opp_team_id", "type": "DECIMAL (4,0)"},
                              {"name": "team_off", "type": "DECIMAL (6,3)"},
                              {"name": "team_def", "type": "DECIMAL (6,3)"}],
-    "ratings_at_day_test":
+    "ratings_at_day":
                     [{"name": "team_id", "type": "DECIMAL(4,0)"},
                     {"name": "team_off_adj", "type": "DECIMAL (6,3)"},
                     {"name": "team_def_adj", "type": "DECIMAL (6,3)"},

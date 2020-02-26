@@ -3,6 +3,7 @@ import numpy as np
 import os
 import Clean, Generate, Transfer, Match
 import math
+import multiprocessing as mp
 
 def reduce_margin(df, cap):
     # reduce outlier scores to limit impact of huge blowouts
@@ -237,6 +238,8 @@ def game_box_for_ratings(date=None):
             'opp_team_id', 'team_off', 'team_def']
     df = df[keep]
     
+    df = df.sort_values('date')
+    
     return df
 
 
@@ -285,7 +288,7 @@ def add_grand_mean(df, colname, on_day=True):
     
     return df
 
-def adjust_tempo(df, id_array, input='adjusted', weighted=False):
+def adjust_tempo(df, id_array, input='adjusted', weighted=True):
     adjust_col = 'pos'
     if input == 'adjusted':
         adjust_col += '_adj'
@@ -301,7 +304,7 @@ def adjust_tempo(df, id_array, input='adjusted', weighted=False):
     df = df.drop(columns=['team_pos_mn', 'opp_pos_mn'])
     return df
 
-def adjust_offense(df, id_array, input='adjusted', weighted=False):
+def adjust_offense(df, id_array, input='adjusted', weighted=True):
     if input == 'adjusted':
         adjust1_col = 'team_def_adj'
         adjust1_grp = 'team'
@@ -333,7 +336,7 @@ def adjust_defense(df, id_array, weighted=True):
 
     return df
 
-def adjusted_scores(df, input='adjusted', weighted=False):
+def adjusted_scores(df, input='adjusted'):
     # compute grand means
     df = add_grand_mean(df, 'team_off')
     df = add_grand_mean(df, 'team_def')
@@ -341,9 +344,9 @@ def adjusted_scores(df, input='adjusted', weighted=False):
 
     id_array = df[['team_team_id', 'opp_team_id']].values
     
-    df = adjust_offense(df, id_array, input=input, weighted=weighted)
-    df = adjust_defense(df, id_array, weighted=weighted)
-    df = adjust_tempo(df, id_array, input=input)
+    df = adjust_offense(df, id_array, input=input)
+    df = adjust_defense(df, id_array)
+    df = adjust_tempo(df, id_array, input=input, weighted=False)
 
     return df
 
@@ -368,7 +371,7 @@ def condense_df(df):
     df_teams = df_teams.round(decimals=3)
     return df_teams
 
-def get_ratings(data, n_iters=10, weighted=False):
+def get_ratings(data, n_iters=10):
     dfrun = data.copy()
 
     n_iters = n_iters
@@ -396,43 +399,59 @@ def minimum_day(df, n_games=3):
 def day_number(df):
     udates = pd.unique(df.sort_values('date')['date']).tolist()
     date_daynum = {k:v for (k, v) in zip(udates, range(0, len(udates) + 1))}
-    df['daynum'] = df['date'].map(date_daynum)
+    df.loc[:, 'daynum'] = df['date'].map(date_daynum)
     return df
 
-def run_day(year = None, day_max = None, n_iters=15):
-    weighted = True
-    dba = Transfer.DBAssist()
-    dba.connect()
-    table = dba.return_table('games_for_ratings')
-    df = pd.DataFrame(table[1:], columns=table[0])
+def run_day(df, day_max = None, n_iters=15):
     cols_numeric = [c for c in df.columns if c not in ['date']]
     for c in cols_numeric:
         df[c] = df[c].astype('float')
 
-    
     df = day_number(df)
 
-    if year is None:
-        year = max(df['season'].values)
+    year = max(df['season'].values)
     df = df[df['season'] == year]
     if day_max is None:
         day_max = max(df['daynum'].values)
     df = df[df['daynum'] < day_max]
     date = max(df['date'])
-    print '%s, season %s' % (day_max, year)
+    print 'season %s, day %s' % (year, day_max)
     df = add_weights(df, date_col = 'date', wc = 0.75)
-    df_teams = get_ratings(df, n_iters=n_iters, weighted=weighted)
+    df_teams = get_ratings(df, n_iters=n_iters)
     df_teams['season'] = year
     df_teams['date'] = date
+    #return df_teams
     rows = Transfer.dataframe_rows(df_teams)
-    Transfer.insert('ratings_at_day_test', rows)
+    Transfer.insert('ratings_at_day', rows)
 
-def run_year(df):
-    # create a day count column for each unique date
+
+def run_year(df, n_iters = 15, multiprocessing=True):
     df = day_number(df)
     year = pd.unique(df['season'])[0]
     day_min = minimum_day(df, n_games=3)
     all_days = list(set(df['daynum'].values))
     all_days.sort()
     rate_days = [x for x in all_days if x >=day_min]
-    results = map(lambda x: run_day(df, year, x, n_iters=2), rate_days)
+    
+    if multiprocessing==False:
+        results = map(lambda x: run_day(df, x, n_iters=n_iters), rate_days)
+    
+    else:
+        output = mp.Queue()
+        processes = [mp.Process(target=run_day, args=(dfy, x, n_iters=n_iters)) for x in rate_days]
+        for p in processes:
+            p.start()
+        results = [output.get() for p in processes]
+
+
+def run_years(n_iters=15, multiprocessing=True):
+    dba = Transfer.DBAssist()
+    dba.connect()
+    df = dba.return_df('games_for_ratings')
+    years = list(set(df['season']))
+    years.sort()
+
+    for year in years:
+        year = float(year)
+        dfy = df[df['season'] == year].copy()
+        run_year(df, n_iters=n_iters, multiprocessing=multiprocessing)
