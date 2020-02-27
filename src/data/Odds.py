@@ -61,7 +61,7 @@ def format_odds(x):
     
     return result
 
-def current_odds(df):
+def most_recent_odds(df):
     gbc = ['game_date', 'team_1', 'team_2']
     dfgb = df.groupby(gbc)
     dfgb = dfgb.apply(lambda x: x.sort_values(['timestamp'], ascending=False))
@@ -129,10 +129,14 @@ def odds_vi(date=None):
     years = map(lambda x: x.split('-')[0], df['timestamp'].values)
     dates = ["/".join([x, y]) for x, y in zip(years, df['game_date'].values)]
     df['date'] = dates
+    
     if date is not None:
         df = df[df['date'] == date]
-        
-    df = current_odds(df)
+        df = most_recent_odds(df)
+    else:
+        most_recent = max(df['timestamp'].values)
+        df = df[df['timestamp'] == most_recent]
+    
     df = Match.id_from_name(df, 'team_vi_odds', 'team_1', drop=False)
     df = Match.id_from_name(df, 'team_vi_odds', 'team_2', drop=False)
 
@@ -145,5 +149,3 @@ def odds_vi(date=None):
     df = df[keep_cols].sort_values('date').reset_index()
     
     return df
-    #rows = Transfer.dataframe_rows(df)
-    #Transfer.insert('odds_clean', rows, at_once=False) 

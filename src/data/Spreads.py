@@ -7,6 +7,7 @@ import Generate
 import re
 import Match
 import math
+import Transfer
 
 def spread_date(x):
     dl = x.split('/')
@@ -243,14 +244,19 @@ def spreads_vi(date=None):
     years = map(lambda x: x.split('-')[0], df['timestamp'].values)
     dates = ["/".join([x, y]) for x, y in zip(years, df['game_date'].values)]
     df['date'] = dates
+
+    
     if date is not None:
         df = df[df['date'] == date]
+        df = most_recent_odds(df)
+    else:
+        most_recent = max(df['timestamp'].values)
+        df = df[df['timestamp'] == most_recent]
 
-    df = Odds.current_odds(df)
     df = Match.id_from_name(df, 'team_vi_spreads', 'team_1', drop=False)
     df = Match.id_from_name(df, 'team_vi_spreads', 'team_2', drop=False)
-    format_spread = lambda x: Spreads.line_format(x, type='spread')
-    format_ovun = lambda x: Spreads.line_format(x, type='line')
+    format_spread = lambda x: line_format(x, type='spread')
+    format_ovun = lambda x: line_format(x, type='line')
     df['over_under'] = map(format_ovun, df['line'].values)
     spread_vals = map(format_spread, df['spread'].values)
 
