@@ -408,25 +408,25 @@ def run_day(df, day_max = None, n_iters=15, output=None):
     cols_numeric = [c for c in df.columns if c not in ['date']]
     for c in cols_numeric:
         df[c] = df[c].astype('float')
-
+    
     df = day_number(df)
 
-    year = max(df['season'].values)
-    df = df[df['season'] == year]
-    if day_max is None:
+    if day_max is not None:
         day_max = max(df['daynum'].values)
-    df = df[df['daynum'] < day_max]
-    date = max(df['date'])
-    print 'season %s, day %s' % (year, day_max)
+    
     df = add_weights(df, date_col = 'date', wc = 0.75)
     df_teams = get_ratings(df, n_iters=n_iters)
-    df_teams['season'] = year
-    df_teams['date'] = date
-    rows = Transfer.dataframe_rows(df_teams)
-    Transfer.insert('ratings_at_day', rows)
+    df_teams['season'] = max(df['season'].values)
+    df_teams['date'] = max(df['date'])
+    
     if output is not None:
+        rows = Transfer.dataframe_rows(df_teams)
+        Transfer.insert('ratings_at_day', rows)
         output.put(len(rows))
+    else:
+        return df_teams
 
+    return df
 
 def run_year(year, n_iters = 15, multiprocessing=True):
     dba = Transfer.DBAssist()
