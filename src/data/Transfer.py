@@ -219,11 +219,14 @@ def create_insert(name, rows):
     dba.insert_rows(dbt)
     dba.close()
 
-def insert(name, rows, at_once=True):
+def insert(name, rows, at_once=True, delete=False):
     dbt = DBTable(name, rows)
     dbt.setup_table()
     dba = DBAssist()
     dba.connect()
+    if delete == True:
+        query = "DELETE FROM %s" % (name)
+        dba.run_query(query)
     dba.insert_rows(dbt, at_once=at_once)
     dba.close()
 
@@ -254,3 +257,10 @@ def query_from_schema(table_name, schema_file):
 def create_from_schema(table_name, schema_file):
     query_create = query_from_schema(table_name, schema_file)
     create_from_query(query_create)
+
+def return_data(table_name):
+    dba = DBAssist()
+    dba.connect()
+    df = dba.return_df(table_name)
+    dba.close()
+    return df
