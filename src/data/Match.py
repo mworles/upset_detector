@@ -364,8 +364,7 @@ def id_from_name(df, key_col, name_col, drop=True):
         The name of team name column in the input df.
     """ 
     # read in the id key data
-    id_file = '../data/interim/team_key.csv'
-    id = pd.read_csv(id_file)
+    id = Transfer.return_data('team_key')
     # from id key data, only need numeric identifer and key_col to merge on
     id = id[['team_id', key_col]]
     # remove duplicates
