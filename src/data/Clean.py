@@ -270,6 +270,8 @@ def add_team_name(df, datdir='../data/'):
     path = "".join([datdir, 'scrub/teams.csv'])
     nm = pd.read_csv(path)
     
+    nm = nm[['team_id', 'team_name']]
+    
     # merge and create name column for team 1
     mrg = pd.merge(df, nm, left_on='t1_team_id', right_on='team_id',
                    how='inner')
@@ -428,3 +430,25 @@ def scrub_files(file_map):
     # scrub and write each file
     for f in files:
         scrub_write(f, file_map)
+
+def date_range(start_date, end_date="today"):
+    sds = start_date.split('/')
+    sds = [int(x) for x in sds]
+    sdate = datetime.date(sds[0], sds[1], sds[2])
+    if end_date != "today":
+        eds = end_date.split('/')
+        eds = [int(x) for x in eds]
+        edate = datetime.date(eds[0], eds[1], eds[2])
+    else:
+        edate = datetime.datetime.now().date()
+    
+    delta = edate - sdate
+    
+    dates = []
+    
+    for i in range(delta.days + 1):
+        date = sdate + datetime.timedelta(days=i)
+        date = date.strftime("%Y/%m/%d")
+        dates.append(date)
+    
+    return dates
