@@ -1,5 +1,4 @@
 import Transfer, Ratings, Odds, Spreads
-import Constants
 import pandas as pd
 import numpy as np
 import math
@@ -18,7 +17,7 @@ def create(schema_file):
 
 def build(datdir, ratings=False):
     """Run once to insert data gathered from flat files."""
-    df = Ratings.games_ratings(Constants.DATA)
+    df = Ratings.games_ratings(datdir)
     rows = Transfer.dataframe_rows(df)
     Transfer.insert('games_for_ratings', rows, at_once=False)
     
