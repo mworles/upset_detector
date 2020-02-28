@@ -182,33 +182,27 @@ class DBAssist():
         result = self.cursor.fetchall()
         return result
 
-    def return_table(self, table_name):
+    def return_table(self, table_name, modifier=None):
         self.cursor = self.conn.cursor(pymysql.cursors.DictCursor) 
         query_cols = """SHOW COLUMNS FROM %s;""" % (table_name)
         result = self.run_query(query_cols)
         columns = [r['Field'] for r in result]
-        query_rows = """SELECT * FROM %s;""" % (table_name)
+        query_rows = """SELECT * FROM %s""" % (table_name)
+        if modifier is not None:
+            query_rows += ' ' + modifier
+        query_rows += """;"""
         result = self.run_query(query_rows)
         rows = [[r[c] for c in columns] for r in result]
         table = [columns] + rows
         return table
     
-    def return_df(self, table_name):
-        table = self.return_table(table_name)
+    def return_df(self, table_name, modifier=None):
+        table = self.return_table(table_name, modifier=modifier)
         df = pd.DataFrame(table[1:], columns=table[0])
         return df
 
     def close(self):
         self.conn.close()
-
-def scrape_insert(scraper, name):
-    rows = scraper()
-    dbt = DBTable(name, rows)
-    dbt.setup_table()
-    dba = DBAssist()
-    dba.connect()
-    dba.insert_rows(dbt, at_once=False)
-    dba.close()
 
 def create_insert(name, rows):
     dbt = DBTable(name, rows)
@@ -238,13 +232,6 @@ def create(name, rows):
     dba.create_table(dbt)
     dba.close()
 
-def create_from_query(query):
-    dba = DBAssist()
-    dba.connect()
-    dba.cursor.execute(query)
-    dba.conn.commit()
-    dba.close()
-
 def query_from_schema(table_name, schema_file):
     with open(schema_file, 'r') as f:
         schema = json.load(f)[table_name]
@@ -255,12 +242,16 @@ def query_from_schema(table_name, schema_file):
     return query_create
 
 def create_from_schema(table_name, schema_file):
-    query_create = query_from_schema(table_name, schema_file)
-    create_from_query(query_create)
-
-def return_data(table_name):
+    query = query_from_schema(table_name, schema_file)
     dba = DBAssist()
     dba.connect()
-    df = dba.return_df(table_name)
+    dba.cursor.execute(query)
+    dba.conn.commit()
+    dba.close()    
+
+def return_data(table_name, modifier=None):
+    dba = DBAssist()
+    dba.connect()
+    df = dba.return_df(table_name, modifier=modifier)
     dba.close()
     return df
