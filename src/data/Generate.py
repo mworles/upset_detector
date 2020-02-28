@@ -41,8 +41,8 @@ def set_gameid_index(df, date_col='date_id', full_date=False, drop_date=True):
         date = df['season'].apply(str)
     
     # need team numeric identifiers as string type
-    id_lower = df['t1_team_id'].astype(str)
-    id_upper = df['t2_team_id'].astype(str)    
+    id_lower = df['t1_team_id'].astype(int).astype(str)
+    id_upper = df['t2_team_id'].astype(int).astype(str)
     
     # game_id is date combined with both team series
     df['game_id'] = date + '_' + id_lower + '_' + id_upper
