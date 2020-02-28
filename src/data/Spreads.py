@@ -248,7 +248,11 @@ def spreads_vi(date=None):
     
     if date is not None:
         df = df[df['date'] == date]
-        df = most_recent_odds(df)
+        # if no data for date, return empty df
+        if df.shape[0] == 0:
+            return df
+        else:
+            df = Odds.most_recent_odds(df)
     else:
         most_recent = max(df['timestamp'].values)
         df = df[df['timestamp'] == most_recent]
@@ -273,5 +277,3 @@ def spreads_vi(date=None):
     keep_cols = ['date', 't1_team_id', 't2_team_id', 't1_spread', 'over_under']
     df = df[keep_cols].sort_values('date').reset_index()
     return df
-    #Transfer.create_from_schema('spreads_clean', 'data/schema.json')
-    #Transfer.insert('spreads_clean', rows, at_once=False)

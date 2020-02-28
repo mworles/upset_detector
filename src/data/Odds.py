@@ -92,12 +92,16 @@ def clean_oddsportal(datdir):
     date_new = oddsportal_dates(df['date'].values)
     df = df.drop('date', axis=1)
     df['date'] = date_new
+    
+    # remove duplicates
+    df = df.drop_duplicates(subset=['date', 'team_1', 'team_2'])
 
     odds1 = df['odds1'].apply(format_odds).values
     odds2 = df['odds2'].apply(format_odds).values
     df = df.drop(['odds1', 'odds2'], axis=1)
     df['odds1'] = odds1
     df['odds2'] = odds2
+    
 
     df = Match.id_from_name(df, 'team_oddsport', 'team_1', drop=False)
     df = Match.id_from_name(df, 'team_oddsport', 'team_2', drop=False)
@@ -132,7 +136,11 @@ def odds_vi(date=None):
     
     if date is not None:
         df = df[df['date'] == date]
-        df = most_recent_odds(df)
+        # if no data for date, return empty df
+        if df.shape[0] == 0:
+            return df
+        else:
+            df = most_recent_odds(df)
     else:
         most_recent = max(df['timestamp'].values)
         df = df[df['timestamp'] == most_recent]
