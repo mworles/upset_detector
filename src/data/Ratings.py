@@ -410,18 +410,22 @@ def run_day(df, day_max = None, n_iters=15, output=None):
         df[c] = df[c].astype('float')
     
     df = day_number(df)
-
+    
     if day_max is not None:
-        day_max = max(df['daynum'].values)
+        date = max(df[df['daynum'] <= day_max]['date'])
+        df = df[df['daynum'] < day_max]
+    else:
+        date = max(df['date'])
     
     df = add_weights(df, date_col = 'date', wc = 0.75)
     df_teams = get_ratings(df, n_iters=n_iters)
     df_teams['season'] = max(df['season'].values)
-    df_teams['date'] = max(df['date'])
+    df_teams['date'] = date
     
     if output is not None:
         rows = Transfer.dataframe_rows(df_teams)
         Transfer.insert('ratings_at_day', rows)
+        print 'inserting %s %s' % (day_max, max(df['date']))
         output.put(len(rows))
     else:
         return df_teams
