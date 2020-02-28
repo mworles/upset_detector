@@ -11,7 +11,7 @@ def create(schema_file):
         schema = json.load(f)
     for k in schema.keys():
         try:
-            Transfer.create_from_schema(k, 'data/schema.json')
+            Transfer.create_from_schema(k, schema_file)
         except Exception as E:
             print E
 
