@@ -91,5 +91,9 @@
                         {"name": "t1_team_id", "type": "DECIMAL(4,0)"},
                         {"name": "t2_team_id", "type": "DECIMAL(4,0)"},
                         {"name": "t1_spread", "type": "DECIMAL(4, 2)"},
-                        {"name": "over_under", "type": "DECIMAL(5, 2)"}]
-    }
+                        {"name": "over_under", "type": "DECIMAL(5, 2)"}],
+    "matchups_current": [{"name": "game_id", "type": "VARCHAR (64)"},
+                         {"name": "date", "type": "VARCHAR (64)"},
+                         {"name": "t1_team_id", "type": "DECIMAL(4,0)"},
+                         {"name": "t2_team_id", "type": "DECIMAL(4,0)"}]
+                 }
