@@ -4,3 +4,4 @@ import Generate
 import Transfer
 import Odds
 import Spreads
+import Scrapers
