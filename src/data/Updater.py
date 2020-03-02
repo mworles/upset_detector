@@ -1,11 +1,9 @@
-import Transfer, Ratings, Odds, Spreads, Clean, Generate
-from features import Create
+import Transfer, Ratings, Odds, Spreads, Clean, Generate, Features
 import pandas as pd
 import numpy as np
 import math
 import json
 import datetime
-import features
 
 def create(schema_file):
     with open(schema_file, 'r') as f:
@@ -52,13 +50,13 @@ def build(datdir, ratings=False):
     # stored results
     for table in ['reg_results', 'ncaa_results', 'nit_results']:
         df = Transfer.return_data(table)
-        df = Create.results_home(df)
+        df = Features.results_home(df)
         results = Transfer.dataframe_rows(df)
         Transfer.insert('team_home', results, at_once=False, create=False,
                         delete=False)
 
     # scraped results
-    results = Create.game_home(date=None)
+    results =Features.game_home(date=None)
     Transfer.insert('team_home', results, at_once=False, create=False,
                     delete=False)
 
@@ -108,14 +106,14 @@ def update_day(date):
     Transfer.insert('game_info', rows, at_once=False)
     
     # get team location for day's games, insert rows to team_home
-    rows = features.Create.game_home(date)
+    rows = Features.game_home(date)
     Transfer.insert('team_home', rows, at_once=False)
 
     # get team location for next week's scheduled games
     start = Clean.date_plus(date, 1)
     end = Clean.date_plus(start, 5)
     dates = Clean.date_range(start, end)
-    rows = Create.game_home(dates)
+    rows = Features.game_home(dates)
     Transfer.insert("team_home_current", rows, at_once=True, delete=True)
 
 def update_current():
@@ -178,39 +176,3 @@ def current_matchup_features():
     df = df.drop(cols_remove, axis=1).copy()
     
     return df
-
-def update_day_tmp(date):
-    # pull all existing games for ratings from current season
-    year = float(date.split('/')[0])
-    modifier = "WHERE season = %s" % (str(year))
-    df = Transfer.return_data('games_for_ratings', modifier=modifier)
-    year = Clean.season_from_date(date)
-    df = df[df['season'] == year]
-    
-    # use only games occuring up to date
-    df = df[df['date'] <= date]
-    
-    # compute ratings up to date
-    df = Ratings.run_day(df, n_iters=15)
-    # insert current ratings to table
-    rows = Transfer.dataframe_rows(df)
-    Transfer.insert('ratings_at_day', rows)
-    
-    # insert rows to game_info table for day's games
-    mod = """where date = '%s'""" % (date)
-    df = Transfer.return_data('game_scores', modifier=mod)
-    df = Generate.convert_game_scores(df)
-    df = Generate.make_game_info(df)
-    rows = Transfer.dataframe_rows(df)
-    Transfer.insert('game_info', rows, at_once=False)
-    
-    # get team location for day's games, insert rows to team_home
-    rows = features.Create.game_home(date)
-    Transfer.insert('team_home', rows, at_once=False)
-
-    # get team location for upcoming games
-    start = Clean.date_plus(date, 1)
-    end = Clean.date_plus(start, 5)
-    dates = Clean.date_range(start, end)
-    rows = Create.game_home(dates)
-    Transfer.insert("team_home_current", rows, at_once=True, delete=True)
