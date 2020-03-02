@@ -80,7 +80,7 @@ def update_day(date):
     year = float(date.split('/')[0])
     modifier = "WHERE season = %s" % (str(year))
     df = Transfer.return_data('games_for_ratings', modifier=modifier)
-    year = float(date.split('/')[0])
+    year = Clean.season_from_date(date)
     df = df[df['season'] == year]
     
     # compute ratings up to date
@@ -117,7 +117,6 @@ def update_day(date):
     dates = Clean.date_range(start, end)
     rows = Create.game_home(dates)
     Transfer.insert("team_home_current", rows, at_once=True, delete=True)
-
 
 def update_current():
     """Run as frequently as desired to update current matchups."""

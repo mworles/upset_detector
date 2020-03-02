@@ -403,11 +403,14 @@ def run_day(df, day_max = None, n_iters=15, output=None):
     df = day_number(df)
     
     if day_max is not None:
+        # date is latest date for all games in the set
         date = max(df[df['daynum'] <= day_max]['date'])
+        # data is all games occuring prior to date
         df = df[df['daynum'] < day_max]
     else:
         # add one day to date
         # ratings account for all games occurring prior to date
+        # prevents leakage when using for prediction
         date = max(df['date'])
         date = datetime.datetime.strptime(date, '%Y/%m/%d')
         date += datetime.timedelta(days=1)
