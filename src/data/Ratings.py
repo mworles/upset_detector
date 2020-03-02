@@ -4,6 +4,7 @@ import os
 import Clean, Generate, Transfer, Match
 import math
 import multiprocessing as mp
+import datetime
 
 def reduce_margin(df, cap):
     # reduce outlier scores to limit impact of huge blowouts
@@ -62,7 +63,7 @@ def add_weights(df, date_col = 'date', wc = 1):
 
 # adjust scores for team location
 def location_adjustment(df):
-    """Perform locationn adjustment to scores for team ratings."""
+    """Perform location adjustment to scores for team ratings."""
     adjust_dict = {'A': 1.875, 'H': -1.875, 'N':0}
     
     t1_adjust = map(lambda x: adjust_dict[x], df['t1_loc'].values)
@@ -128,16 +129,6 @@ def games_ratings(datdir, year=None):
     
     return df
 
-def game_box_convert(df):
-    home_won = df['home_score'] > df['away_score']
-    df['wteam'] = np.where(home_won, df['home_team_id'], df['away_team_id'])
-    df['lteam'] = np.where(home_won, df['away_team_id'], df['home_team_id'])
-    df['wscore'] = np.where(home_won, df['home_score'], df['away_score'])
-    df['lscore'] = np.where(home_won, df['away_score'], df['home_score'])
-    df['wloc'] = np.where(home_won, 'H', 'A')
-    df['wloc'] = np.where(df['neutral'] == 1, 'N', df['wloc'])
-    return df
-
 def game_box_games(df):
     # add season column
     season = max([x.split('/')[0] for x in df['date'].values])
@@ -151,7 +142,7 @@ def game_box_games(df):
     df = Match.id_from_name(df, 'team_tcp', 'home_team', drop=False)
     
     # convert columns to apply neutral id function
-    df = game_box_convert(df)
+    df = Generate.game_box_convert(df)
     # create team_1 and team_2 id identifer columns
     df = Generate.convert_team_id(df, ['wteam', 'lteam'], drop=False)
     # add column indicating scores and locations for each team
@@ -356,7 +347,7 @@ def schedule_strength(df_games, df_teams):
     dfsub = df_games[['daynum', 'team_team_id', 'opp_team_id']]
     dfsub = pd.merge(dfsub, df_teams, left_on=['opp_team_id'],
                      right_on=['team_id'], how='inner')
-    sos = dfsub.groupby(['team_id'])['eff_marg'].median()
+    sos = dfsub.groupby(['team_team_id'])['eff_marg'].mean()
     sos = sos.reset_index()
     sos = sos.rename(columns={'team_team_id': 'team_id', 'eff_marg': 'sos_adj'})
     return sos
@@ -415,8 +406,13 @@ def run_day(df, day_max = None, n_iters=15, output=None):
         date = max(df[df['daynum'] <= day_max]['date'])
         df = df[df['daynum'] < day_max]
     else:
+        # add one day to date
+        # ratings account for all games occurring prior to date
         date = max(df['date'])
-    
+        date = datetime.datetime.strptime(date, '%Y/%m/%d')
+        date += datetime.timedelta(days=1)
+        date = date.strftime('%Y/%m/%d')
+        
     df = add_weights(df, date_col = 'date', wc = 0.75)
     df_teams = get_ratings(df, n_iters=n_iters)
     df_teams['season'] = max(df['season'].values)
@@ -425,24 +421,19 @@ def run_day(df, day_max = None, n_iters=15, output=None):
     if output is not None:
         rows = Transfer.dataframe_rows(df_teams)
         Transfer.insert('ratings_at_day', rows)
-        print 'inserting %s %s' % (day_max, max(df['date']))
         output.put(len(rows))
     else:
         return df_teams
 
-    return df
-
 def run_year(year, n_iters = 15, multiprocessing=True):
-    dba = Transfer.DBAssist()
-    dba.connect()
-    df = dba.return_df('games_for_ratings')
-    dba.close()
-    df = df[df['season'] == year].copy()
+    modifier = "WHERE season = %s" % (str(year))
+    df = Transfer.return_data('games_for_ratings', modifier=modifier)
     df = day_number(df)
     day_min = minimum_day(df, n_games=3)
     all_days = list(set(df['daynum'].values))
     all_days.sort()
     rate_days = [x for x in all_days if x >=day_min]
+    rate_days = rate_days
 
     if multiprocessing==False:
         results = map(lambda x: run_day(df, x, n_iters=n_iters), rate_days)
