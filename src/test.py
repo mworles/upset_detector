@@ -1,4 +1,4 @@
-from data import Updater
+from data import Updater, Clean
 
 dates = Clean.date_range("2020/02/25", end_date="2020/02/29")
 
