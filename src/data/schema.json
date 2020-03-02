@@ -95,5 +95,23 @@
     "matchups_current": [{"name": "game_id", "type": "VARCHAR (64)"},
                          {"name": "date", "type": "VARCHAR (64)"},
                          {"name": "t1_team_id", "type": "DECIMAL(4,0)"},
-                         {"name": "t2_team_id", "type": "DECIMAL(4,0)"}]
-                 }
+                         {"name": "t2_team_id", "type": "DECIMAL(4,0)"}],
+    "team_home":        [{"name": "game_id", "type": "VARCHAR (64)"},
+                        {"name": "date", "type": "VARCHAR (64)"},
+                        {"name": "team_id", "type": "DECIMAL(4,0)"},
+                        {"name": "home", "type": "INTEGER"}],
+    "team_home_current":        [{"name": "game_id", "type": "VARCHAR (64)"},
+                                {"name": "date", "type": "VARCHAR (64)"},
+                                {"name": "team_id", "type": "DECIMAL(4,0)"},
+                                {"name": "home", "type": "INTEGER"}],
+    "game_info":        [{"name": "game_id", "type": "VARCHAR (64)"},
+                        {"name": "season", "type": "INTEGER"},
+                        {"name": "date", "type": "VARCHAR (64)"},
+                        {"name": "game_cat", "type": "VARCHAR (64)"},
+                        {"name": "t1_team_id", "type": "INTEGER"},
+                        {"name": "t2_team_id", "type": "INTEGER"},
+                        {"name": "t1_score", "type": "INTEGER"},
+                        {"name": "t2_score", "type": "INTEGER"},
+                        {"name": "t1_win", "type": "INTEGER"},
+                        {"name": "t1_marg", "type": "INTEGER"}]
+                    }
