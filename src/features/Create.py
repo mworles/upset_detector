@@ -10,7 +10,7 @@ This script requires `pandas` and `numpy`. It imports the custom Clean module.
 """
 import pandas as pd
 import numpy as np
-import data.Clean
+import data
 
 def team_seeds(datdir):
     """Create data containing team seeds."""
@@ -206,3 +206,78 @@ def merge_features(datdir):
     df = tourney_teams(datdir, df)
     # save file to features directory
     data.Clean.write_file(df, feat_dir, 'team_features', keep_index=False)
+
+def tcp_team_home(df):
+    game_id = df.index.values.tolist()
+    date = df['date'].values.tolist()
+
+    home_id = df['home_team_id'].values
+    home = zip(df['neutral'].values, home_id)
+    home_loc = [1 if x[0] == 0 else 0 for x in home]
+    away_loc = [0 for x in range(0, len(home))]
+
+    home_comb = zip(game_id, date, home_id, home_loc)
+    away_comb = zip(game_id, date, df['away_team_id'].values, away_loc)
+    rows = [[a, b, c, d] for a, b, c, d in home_comb]
+    rows.extend([[a, b, c, d] for a, b, c, d in away_comb])
+
+    rows.sort(key=lambda x: x[0])
+    rows.insert(0, ['game_id', 'date', 'team_id', 'home'])
+    return rows
+
+def game_home(date=None):
+    if date is not None:
+        if type(date) == str:
+            results = data.Scrapers.game_scores(date, future=True)
+            df = pd.DataFrame(results[1:], columns=results[0])
+        elif type(date) == list:
+            scheduled = []
+            for date in date:
+                results = data.Scrapers.game_scores(date, future=True)    
+                if len(scheduled) == 0:
+                    scheduled.extend(results)
+                else:
+                    scheduled.extend(results[1:])
+            df = pd.DataFrame(scheduled[1:], columns=scheduled[0])
+    else:
+        df = data.Transfer.return_data('game_scores')
+        df = df.drop(columns=['home_score', 'away_score'])
+    
+    df = data.Match.id_from_name(df, 'team_tcp', 'away_team', drop=False)
+    df = data.Match.id_from_name(df, 'team_tcp', 'home_team', drop=False)
+    df = data.Generate.convert_team_id(df, ['home_team_id', 'away_team_id'], drop=False)
+    df = data.Generate.set_gameid_index(df, date_col='date', full_date=True,
+                                   drop_date=False)
+    rows = tcp_team_home(df)
+    
+    return rows
+
+def results_home(df):
+
+    mat = df[['wteam', 'lteam', 'wloc']].values
+
+    s = data.Transfer.return_data('seasons')
+    df = pd.merge(df, s, on='season', how='inner')
+
+    # add string date column to games
+    df['date'] = df.apply(data.Clean.game_date, axis=1)
+
+    df = data.Generate.convert_team_id(df, ['wteam', 'lteam'], drop=False)
+    df = data.Generate.set_gameid_index(df, date_col='date', full_date=True,
+                                   drop_date=False)
+
+    df = data.Generate.team_locations(df)
+    
+    home_dict = {'H': 1, 'A': 0, 'N': 0}
+
+    t1 = df[['date', 't1_team_id', 't1_loc']].copy()
+    t1['home'] = t1['t1_loc'].map(home_dict)
+    t1 = t1.drop(columns='t1_loc').rename(columns={'t1_team_id': 'team_id'})
+
+    t2 = df[['date', 't2_team_id', 't2_loc']].copy()
+    t2['home'] = t2['t2_loc'].map(home_dict)
+    t2 = t2.drop(columns='t2_loc').rename(columns={'t2_team_id': 'team_id'})
+
+    df = pd.concat([t1, t2], sort=False)
+    df = df.sort_index().reset_index()    
+    return df
