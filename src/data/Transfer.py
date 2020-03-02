@@ -162,20 +162,21 @@ class DBAssist():
         return result
 
     def create_table(self, table):
-        #table_exists = self.check_table(table)
-        #if table_exists == False:
         self.cursor.execute(table.query_create)
         self.conn.commit()
 
+    def execute_commit(self, query):
+        self.cursor.execute(query)
+        self.conn.commit()
+        
     def insert_rows(self, table, at_once=True):
         """Given table name with list of rows, insert all rows."""
         # obtain full insert query for all rows
         if at_once == True:
             self.cursor.execute(table.query_insert)
+            self.conn.commit()
         else:
-            map(lambda x: self.cursor.execute(x), table.query_rows)
-        
-        self.conn.commit()
+            map(lambda x: self.execute_commit(x), table.query_rows)
 
     def run_query(self, query):
         self.cursor.execute(query)
@@ -187,13 +188,23 @@ class DBAssist():
         query_cols = """SHOW COLUMNS FROM %s;""" % (table_name)
         result = self.run_query(query_cols)
         columns = [r['Field'] for r in result]
+        column_types = [r['Type'] for r in result]
+        # list of column indices where type is decimal
+        i_dec = [result.index(r) for r in result if 'decimal' in r['Type']]
         query_rows = """SELECT * FROM %s""" % (table_name)
         if modifier is not None:
             query_rows += ' ' + modifier
         query_rows += """;"""
         result = self.run_query(query_rows)
-        rows = [[r[c] for c in columns] for r in result]
-        table = [columns] + rows
+        rows_raw = [[r[c] for c in columns] for r in result]
+        if len(rows_raw) == 0:
+            table = [[]]
+        else:
+            data_by_cols = map(list, zip(*rows_raw))
+            for i in i_dec:
+                data_by_cols[i] = [float(x) if x is not None else None for x in data_by_cols[i]]
+            rows = map(list, zip(*data_by_cols))
+            table = [columns] + rows
         return table
     
     def return_df(self, table_name, modifier=None):
@@ -204,32 +215,20 @@ class DBAssist():
     def close(self):
         self.conn.close()
 
-def create_insert(name, rows):
+def insert(name, rows, at_once=True, create=False, delete=False):
     dbt = DBTable(name, rows)
     dbt.setup_table()
     dba = DBAssist()
     dba.connect()
-    dba.create_table(dbt)
-    dba.insert_rows(dbt)
-    dba.close()
-
-def insert(name, rows, at_once=True, delete=False):
-    dbt = DBTable(name, rows)
-    dbt.setup_table()
-    dba = DBAssist()
-    dba.connect()
+    if create == True:
+        try:
+            dba.create_table(dbt)
+        except Exception as e:
+            print e
     if delete == True:
         query = "DELETE FROM %s" % (name)
         dba.run_query(query)
     dba.insert_rows(dbt, at_once=at_once)
-    dba.close()
-
-def create(name, rows):
-    dbt = DBTable(name, rows)
-    dbt.setup_table()
-    dba = DBAssist()
-    dba.connect()
-    dba.create_table(dbt)
     dba.close()
 
 def query_from_schema(table_name, schema_file):
@@ -252,6 +251,6 @@ def create_from_schema(table_name, schema_file):
 def return_data(table_name, modifier=None):
     dba = DBAssist()
     dba.connect()
-    df = dba.return_df(table_name, modifier=modifier)
+    df = dba.return_df(table_name, modifier=modifier)    
     dba.close()
     return df
