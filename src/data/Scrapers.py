@@ -301,13 +301,16 @@ def tcpalm_header(header):
     team_info = names + [neutral]
     return team_info
 
-def tcpalm_section(div):
+def tcpalm_section(div, future=False):
     headers = div.findAll('div', {'class': 'sdi-so-title'})
     gids = [decode(h['id'].replace('Title_7_', '')) for h in headers]
     tables = div.findAll('table')
     team_info = [tcpalm_header(x) for x in headers]
-    scores = [tcpalm_game(x) for x in tables]
-    game_info = [[i] + t + s for i, t, s, in zip(gids, team_info, scores)]
+    if future == False:
+        scores = [tcpalm_game(x) for x in tables]
+        game_info = [[i] + t + s for i, t, s, in zip(gids, team_info, scores)]
+    else:
+        game_info = [[i] + t for i, t, in zip(gids, team_info)]
     return game_info
 
 def tcpalm_url(date):
@@ -374,7 +377,7 @@ def game_box(url):
         return [['gid'], [gid]]
 
 
-def game_scores(date):
+def game_scores(date, future=False):
     time.sleep(1)
     timestamp = str(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
     url = tcpalm_url(date)
@@ -383,10 +386,10 @@ def game_scores(date):
 
     try:
         div = soup.find('div', {'class': 'sdi-divScoreColumn_1-2'})
-        games = tcpalm_section(div)
+        games = tcpalm_section(div, future=future)
         try:
             div2 = soup.find('div', {'class': 'sdi-divScoreColumn_2-2'})
-            div2_games = tcpalm_section(div2)
+            div2_games = tcpalm_section(div2, future=future)
             games.extend(div2_games)
         except:
             pass
@@ -395,7 +398,38 @@ def game_scores(date):
         
         col_names = ['gid', 'away_team', 'home_team', 'neutral', 'away_score',
                      'home_score', 'date', 'timestamp']
+        if future == True:
+            col_names = [x for x in col_names if '_score' not in x]
 
+        games.insert(0, col_names)
+        
+    except Exception as e:
+        print e
+        games = [['date', 'timestamp'], [date, timestamp]]
+
+    return games
+
+def game_schedule(date):
+    time.sleep(1)
+    timestamp = str(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+    url = tcpalm_url(date)
+    r = requests.get(url)
+    soup = BeautifulSoup(r.content, 'html.parser')
+
+    try:
+        div = soup.find('div', {'class': 'sdi-divScoreColumn_1-2'})
+        games = tcpalm_section(div, future=True)
+        try:
+            div2 = soup.find('div', {'class': 'sdi-divScoreColumn_2-2'})
+            div2_games = tcpalm_section(div2, future=True)
+            games.extend(div2_games)
+        except:
+            pass
+
+        games = [g + [date] + [timestamp] for g in games]
+        
+        col_names = ['gid', 'away_team', 'home_team', 'neutral', 'date', 'timestamp']
+        
         games.insert(0, col_names)
         
     except Exception as e:
