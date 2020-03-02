@@ -14,7 +14,7 @@ import os
 import re
 import datetime
 from fuzzywuzzy import process
-
+import Transfer
 
 def write_file(df, data_out, file_name, keep_index=False):
     """Specify location and save .csv data file in one line.
@@ -181,7 +181,6 @@ def game_date(row):
     date = dz + datetime.timedelta(days=dn)
     # convert date object to string format, inserting '_'
     date_id = date.strftime("%Y/%m/%d")
-    date_id = date_id.replace('/', '_')
     # return string
     return date_id
 
@@ -349,19 +348,10 @@ def round_floats(df, prec=2):
             df[c] = df[c].round(decimals=prec)
     return df
 
-
+    
 def scrub_file(name, file_map):
     """Returns dataframe identified by file name with column names formatted and
     renamed according to file map. For files located in 'raw' subdirectory.
-
-    Arguments
-    ----------
-    name: string
-        Contains string identifer used for file name and as key in RAW_MAP in
-        the Constants file. 
-    file_map: dictionary
-        Must contain key to match file name. Value is a dict that may contain 
-        'columns' key indicating columns to rename.
     """
     # create relative path to file and read data as dataframe
     file = '../data/raw/' + name + '.csv'
@@ -374,48 +364,14 @@ def scrub_file(name, file_map):
     # column names all lower case for consistency across project
     df.columns = df.columns.str.lower()
     
+    # fix unicode text in some team names
+    if 'name_spelling' in df.columns:
+        df['name_spelling'] = map(fix_unicode, df['name_spelling'].values)
+    
     return df
 
-def scrub_write(name, file_map):
-    """Write scrubbed data to file.
 
-    Arguments
-    ----------
-    name: string
-        String used as file name and key in file_map. 
-    file_map: dictionary
-        Must contain key to match file name. Value is a dict that must contain
-        'new_name' key paired with value as string of new file name. Dict may 
-        contain 'columns' key indicating columns to rename.
-    """
-    
-    def scrub_file(name, file_map):
-        """Returns dataframe identified by file name with column names formatted and
-        renamed according to file map. For files located in 'raw' subdirectory.
-        """
-        # create relative path to file and read data as dataframe
-        file = '../data/raw/' + name + '.csv'
-        df = pd.read_csv(file)
-        
-        # if file map has columns to rename, rename them
-        if 'columns' in file_map[name].keys():
-            df = df.rename(columns=file_map[name]['columns'])
-        
-        # column names all lower case for consistency across project
-        df.columns = df.columns.str.lower()
-        
-        return df
-
-    # obtain data with columns reformatted
-    df = scrub_file(name, file_map)
-    # identify relative path to write file
-    data_out = '../data/scrub/'
-    # for naming new file
-    name_new = file_map[name]['new_name']
-    # write file
-    write_file(df, data_out, name_new, keep_index=False)
-
-def scrub_files(file_map):
+def scrub_files(file_map, out='mysql'):
     """Scrubs and writes all files identified in Constants file map.
 
     Arguments
@@ -429,7 +385,18 @@ def scrub_files(file_map):
     files = file_map.keys()
     # scrub and write each file
     for f in files:
-        scrub_write(f, file_map)
+            # obtain data with columns reformatted
+            df = scrub_file(f, file_map)
+            # get table name
+            table_name = file_map[f]['new_name']
+            # insert into mysql or save csv files
+            if out == 'mysql':
+                rows = Transfer.dataframe_rows(df)
+                Transfer.insert(table_name, rows, at_once=False, create=True,
+                            delete=True)
+            else:
+                data_out = '../data/scrub/'
+                write_file(df, data_out, table_name, keep_index=False)
 
 def date_range(start_date, end_date="today"):
     sds = start_date.split('/')
@@ -452,3 +419,22 @@ def date_range(start_date, end_date="today"):
         dates.append(date)
     
     return dates
+
+def date_plus(date, days):
+    date_to = datetime.datetime.strptime(date, "%Y/%m/%d")
+    next_to = date_to + datetime.timedelta(days=days)
+    date_next = next_to.strftime("%Y/%m/%d")
+    return date_next
+
+
+def season_from_date(date):
+    date_split = date.split('/')
+    month = int(date_split[1])
+    year = int(date_split[0])
+    if month > 5:
+        return year + 1
+    else:
+        return year
+
+def fix_unicode(x):
+    return x.decode('ascii', 'ignore')
