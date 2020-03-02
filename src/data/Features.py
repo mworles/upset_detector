@@ -11,7 +11,6 @@ This script requires `pandas` and `numpy`. It imports the custom Clean module.
 import pandas as pd
 import numpy as np
 import Clean, Match, Scrapers, Transfer, Generate
-import data
 
 def team_seeds(datdir):
     """Create data containing team seeds."""
