@@ -12,7 +12,7 @@ This script requires `pandas` and `numpy`. It imports the custom Clean module.
 
 import pandas as pd
 import numpy as np
-import Clean
+import Clean, Match, Ratings
 
 def set_gameid_index(df, date_col='date_id', full_date=False, drop_date=True):
     """
@@ -106,8 +106,8 @@ def convert_team_id(df, id_cols, drop=True):
     
     """
     # use min and max to create new identifiers
-    df['t1_team_id'] = df[id_cols].min(axis=1)
-    df['t2_team_id'] = df[id_cols].max(axis=1)
+    df['t1_team_id'] = df[id_cols].min(axis=1).astype(int)
+    df['t2_team_id'] = df[id_cols].max(axis=1).astype(int)
     # drop original identifers if desired
     if drop == True:
         df = df.drop(columns=id_cols)
@@ -209,44 +209,20 @@ def team_scores(df):
         't2_team_id' for otehr team. 
 
     """
-        
-    def get_score(row, team_id, score_dict):
-        """Function to apply over dataframe rows and obtain team score.
-        
-        Arguments
-        ----------
-        row: row of pandas dataframe
-            Each row to apply function, called when function is applied.
-        team_id: string
-            The column of 
-        score_dict: dictionary
-            Contains keys with unique game identifier. Key paired with dict 
-            with two key:value pairs (one for each team in game) with key as 
-            team id and value as the score for that team.   
-        """
-        # extract game identifier
-        row_gameid = row.name
-        # extract team identifier
-        row_team = row[team_id]
-        # use both identifiers to extract team score
-        team_score = score_dict[row_gameid][row_team]
-        # return score
-        return team_score
     
+    score_mat = df[['wteam', 'wscore', 'lteam', 'lscore']].values
     
-    # create dict containing data for all games
-    score_dict = {}
-    for i, r in df.iterrows():
-        # creates unique key for each game
-        # value is a dict with team_id:score for both teams in game
-        score_dict[i] = {r['wteam']: r['wscore'],
-                         r['lteam']: r['lscore']}
-
-    # apply get_score function to get scores for both teams
-    t1_score = lambda x: get_score(x, 't1_team_id', score_dict)
-    df['t1_score'] = df.apply(t1_score, axis=1).astype(int)
-    t2_score = lambda x: get_score(x, 't2_team_id', score_dict)
-    df['t2_score'] = df.apply(t2_score, axis=1).astype(int)
+    def team_score(row, team_id):
+        if team_id == row[0]:
+            return row[1]
+        else:
+            return row[3]
+    
+    t1 = df['t1_team_id'].values
+    t2 = df['t2_team_id'].values
+    
+    df['t1_score'] = [team_score(x, y) for x, y in zip(score_mat, t1)]
+    df['t2_score'] = [team_score(x, y) for x, y in zip(score_mat, t2)]
     
     return df
 
@@ -448,3 +424,62 @@ def neutral_games(datdir):
     scores = scores.sort_index()
     
     return scores
+
+
+def convert_past_games():
+    df1 = Transfer.return_data('reg_results')
+    df1['game_cat'] = 'regular'
+
+    df2 = Transfer.return_data('nit_results')
+    df2 = df2.rename(columns={'secondarytourney': 'game_cat'})
+
+    df3 = Transfer.return_data('ncaa_results')
+    df3['game_cat'] = 'ncaa'
+
+    df = pd.concat([df1, df2, df3], sort=True)
+
+    s = Transfer.return_data('seasons')
+    s = s[['season', 'dayzero']]
+
+    df = pd.merge(df, s, on='season', how='inner')
+    # add string date column to games
+    df['date'] = df.apply(Clean.game_date, axis=1)
+    df['season'] = df['season'].astype(int)
+    return df
+
+def make_game_info(df):
+    # create team_1 and team_2 id identifer columns
+    df = convert_team_id(df, ['wteam', 'lteam'], drop=False)
+    df = set_gameid_index(df, date_col='date', full_date=True,
+                                   drop_date=False)
+    # add column indicating scores and locations for each team
+    df = team_scores(df)
+    df['t1_win'] = np.where(df['t1_score'] > df['t2_score'], 1, 0)
+    df['t1_marg'] = df['t1_score'] - df['t2_score']
+
+    cols_keep = ['season', 'date', 'game_cat', 't1_team_id', 't2_team_id', 't1_score',
+                 't2_score', 't1_win', 't1_marg']
+    df = df.sort_index()
+    df = df[cols_keep].reset_index()
+    return df
+
+
+def game_box_convert(df):
+    home_won = df['home_score'] > df['away_score']
+    df['wteam'] = np.where(home_won, df['home_team_id'], df['away_team_id'])
+    df['lteam'] = np.where(home_won, df['away_team_id'], df['home_team_id'])
+    df['wscore'] = np.where(home_won, df['home_score'], df['away_score'])
+    df['lscore'] = np.where(home_won, df['away_score'], df['home_score'])
+    df['wloc'] = np.where(home_won, 'H', 'A')
+    df['wloc'] = np.where(df['neutral'] == 1, 'N', df['wloc'])
+    return df
+    
+def convert_game_scores(df):
+    df = Match.id_from_name(df, 'team_tcp', 'away_team', drop=False)
+    df = Match.id_from_name(df, 'team_tcp', 'home_team', drop=False)
+
+    df['game_cat'] = "NA"
+    df['season'] = map(Clean.season_from_date, df['date'].values)
+    # convert columns to apply neutral id function
+    df = game_box_convert(df)
+    return df
