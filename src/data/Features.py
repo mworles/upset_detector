@@ -10,6 +10,7 @@ This script requires `pandas` and `numpy`. It imports the custom Clean module.
 """
 import pandas as pd
 import numpy as np
+import Clean, Match, Scrapers, Transfer, Generate
 import data
 
 def team_seeds(datdir):
@@ -19,11 +20,11 @@ def team_seeds(datdir):
     df = pd.read_csv(data_in)
     
     # obtain the integer value from string seed
-    df['seed'] = df['seed'].apply(data.Clean.get_integer)
+    df['seed'] = df['seed'].apply(Clean.get_integer)
     
     # save data file
     data_out = datdir + '/features/'
-    data.Clean.write_file(df, data_out, 'team_seeds', keep_index=False)
+    Clean.write_file(df, data_out, 'team_seeds', keep_index=False)
 
 def team_ratings(datdir):
     """Create data containing team ratings."""
@@ -45,11 +46,11 @@ def team_ratings(datdir):
     ratings_dir = datdir + '/external/kp/'
     
     # create list of file names from directory
-    files = data.Clean.list_of_files(ratings_dir)
+    files = Clean.list_of_files(ratings_dir)
 
     # use files to get lists of season numbers and dataframes
     # data has no season column so must be collected from file name and added
-    seasons = [data.Clean.year4_from_string(x) for x in files]
+    seasons = [Clean.year4_from_string(x) for x in files]
     dfs = [pd.read_csv(x) for x in files]
 
     # used nested function to create consistent season column
@@ -59,7 +60,7 @@ def team_ratings(datdir):
     df = pd.concat(data_list, sort=False)
 
     # ratings data has team names, must be linked to numeric ids
-    df = data.Match.id_from_name(datdir, df, 'team_kp', 'TeamName')
+    df = Match.id_from_name(datdir, df, 'team_kp', 'TeamName')
     
     # for consistency
     df.columns = map(str.lower, df.columns)
@@ -69,7 +70,7 @@ def team_ratings(datdir):
     df['rankem'] = np.where(df['rankem'].isnull(), df['rankadjem'], df['rankem'])
 
     # reduce float value precision
-    df = data.Clean.round_floats(df, prec=2)
+    df = Clean.round_floats(df, prec=2)
 
     # select columns to keep as features
     keep = ['team_id', 'season', 'adjtempo', 'adjoe', 'rankadjoe', 'adjde', 
@@ -78,7 +79,7 @@ def team_ratings(datdir):
 
     # save team ratings file
     data_out = datdir + 'features/'
-    data.Clean.write_file(df, data_out, 'team_ratings')
+    Clean.write_file(df, data_out, 'team_ratings')
 
 def coach_features(datdir):
     """Create data containing coach features."""
@@ -175,7 +176,7 @@ def coach_features(datdir):
     df = df[df['season'] > 1985]
     
     # save data
-    data.Clean.write_file(df, datdir + 'features/', 'team_coach')
+    Clean.write_file(df, datdir + 'features/', 'team_coach')
 
 def tourney_teams(datdir, df):
     """Use seeds data and left join to restrict data to tourney teams."""
@@ -196,16 +197,16 @@ def merge_features(datdir):
     feat_dir = datdir + '/features/'
     # create list of files
     # exclude 'team_features if exists to avoid duplication
-    files = data.Clean.list_of_files(feat_dir, tag_drop = 'team_features')
+    files = Clean.list_of_files(feat_dir, tag_drop = 'team_features')
     # read in and create list of data objects
     df_list = [pd.read_csv(x) for x in files]
     # use Clean module to merge all data objects in the list
     merge_on = ['team_id', 'season']
-    df = data.Clean.merge_from_list(df_list, merge_on, how='outer')
+    df = Clean.merge_from_list(df_list, merge_on, how='outer')
     # filter to tourney teams
     df = tourney_teams(datdir, df)
     # save file to features directory
-    data.Clean.write_file(df, feat_dir, 'team_features', keep_index=False)
+    Clean.write_file(df, feat_dir, 'team_features', keep_index=False)
 
 def tcp_team_home(df):
     game_id = df.index.values.tolist()
@@ -228,25 +229,25 @@ def tcp_team_home(df):
 def game_home(date=None):
     if date is not None:
         if type(date) == str:
-            results = data.Scrapers.game_scores(date, future=True)
+            results = Scrapers.game_scores(date, future=True)
             df = pd.DataFrame(results[1:], columns=results[0])
         elif type(date) == list:
             scheduled = []
             for date in date:
-                results = data.Scrapers.game_scores(date, future=True)    
+                results = Scrapers.game_scores(date, future=True)    
                 if len(scheduled) == 0:
                     scheduled.extend(results)
                 else:
                     scheduled.extend(results[1:])
             df = pd.DataFrame(scheduled[1:], columns=scheduled[0])
     else:
-        df = data.Transfer.return_data('game_scores')
+        df = Transfer.return_data('game_scores')
         df = df.drop(columns=['home_score', 'away_score'])
     
-    df = data.Match.id_from_name(df, 'team_tcp', 'away_team', drop=False)
-    df = data.Match.id_from_name(df, 'team_tcp', 'home_team', drop=False)
-    df = data.Generate.convert_team_id(df, ['home_team_id', 'away_team_id'], drop=False)
-    df = data.Generate.set_gameid_index(df, date_col='date', full_date=True,
+    df = Match.id_from_name(df, 'team_tcp', 'away_team', drop=False)
+    df = Match.id_from_name(df, 'team_tcp', 'home_team', drop=False)
+    df = Generate.convert_team_id(df, ['home_team_id', 'away_team_id'], drop=False)
+    df = Generate.set_gameid_index(df, date_col='date', full_date=True,
                                    drop_date=False)
     rows = tcp_team_home(df)
     
@@ -256,17 +257,17 @@ def results_home(df):
 
     mat = df[['wteam', 'lteam', 'wloc']].values
 
-    s = data.Transfer.return_data('seasons')
+    s = Transfer.return_data('seasons')
     df = pd.merge(df, s, on='season', how='inner')
 
     # add string date column to games
-    df['date'] = df.apply(data.Clean.game_date, axis=1)
+    df['date'] = df.apply(Clean.game_date, axis=1)
 
-    df = data.Generate.convert_team_id(df, ['wteam', 'lteam'], drop=False)
-    df = data.Generate.set_gameid_index(df, date_col='date', full_date=True,
+    df = Generate.convert_team_id(df, ['wteam', 'lteam'], drop=False)
+    df = Generate.set_gameid_index(df, date_col='date', full_date=True,
                                    drop_date=False)
 
-    df = data.Generate.team_locations(df)
+    df = Generate.team_locations(df)
     
     home_dict = {'H': 1, 'A': 0, 'N': 0}
 
