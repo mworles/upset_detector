@@ -56,6 +56,7 @@ trials =  utils.get_search(grid_id)
 df = utils.trials_data(trials, grid_id)
 df = df.sort_index()
 """
+"""
 def run():
     import Constants
     from models import utils
@@ -157,27 +158,9 @@ y_pred = df['spread_bet'].astype(int)
 
 from sklearn.metrics import accuracy_score
 print accuracy_score(y_true, y_pred)
+"""
+from data import Spreads
+import Constants
 
-"""
-if spread positive:
-    if prediction > spread:
-        t1_cover
-    elif prediction < spread:
-        t2_cover
-    else:
-        push
-elif spread negative:
-    if prediction > spread:
-        t1_cover
-    elif prediction < spread:
-        t2_cover
-    else:
-        push
-else:
-    if prediction > spread:
-        t1_cover
-    elif prediction < spread:
-        t2_cover
-    else:
-        push
-"""
+df = Spreads.spreads_sbro(Constants.DATA)
+print df.describe()
