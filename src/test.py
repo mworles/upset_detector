@@ -148,7 +148,6 @@ new = Spreads.blend_spreads(Constants.DATA)
 new = new.sort_values('game_id')
 new = new.reset_index()
 new = new[~new['game_id'].isin(old['game_id'].values)]
-print new[new['game_id'].isin(old['game_id'].values)]
 
 df = pd.concat([new, old], sort=False)
 df = df.drop_duplicates(subset=['game_id'])
