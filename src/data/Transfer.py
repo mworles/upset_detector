@@ -8,33 +8,12 @@ import json
 import pandas as pd
 import math
 
-def rows_from_file(file):
-    """Extract and return all rows from data file as list of lists."""
-    
-    with open(file) as csvfile:
-        reader = csv.reader(csvfile)
-        rows = [x for x in reader]
-    
-    return rows
-
-def extract_data(name, directory):
-    """Given file name, return data as list of lists."""
-    file = "".join([directory, name, ".csv"])
-    rows = rows_from_file(file)
-    return rows
-
-def transfer_directory(directory, cursor):
-    file_names = data.Clean.list_of_filenames(directory)
-    l_tables = [create_and_insert(x, directory, cursor) for x in file_names]
-    return l_tables
-
 def dataframe_rows(df):
     """Return 2-d df as list of lists, first list is column names."""
     col_names = list(df.columns)
     rows = df.values.tolist()
     rows.insert(0, col_names)
     return rows
-
 
 class DBColumn():
     

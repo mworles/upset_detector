@@ -235,6 +235,10 @@ def blend_spreads(datdir):
     
     df = df.dropna(subset=['t1_spread'])
     
+    df['season'] = map(Clean.season_from_date, df['date'].values)
+    
+    df = df.drop_duplicates()
+    
     return df
 
 def spreads_vi(date=None):
