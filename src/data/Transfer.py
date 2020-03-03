@@ -182,20 +182,17 @@ class DBAssist():
         self.cursor.execute(query)
         result = self.cursor.fetchall()
         return result
-
-    def return_table(self, table_name, modifier=None):
-        self.cursor = self.conn.cursor(pymysql.cursors.DictCursor) 
+    
+    def table_schema(self, table_name):
+        self.cursor = self.conn.cursor(pymysql.cursors.DictCursor)
         query_cols = """SHOW COLUMNS FROM %s;""" % (table_name)
         result = self.run_query(query_cols)
-        columns = [r['Field'] for r in result]
-        column_types = [r['Type'] for r in result]
-        # list of column indices where type is decimal
-        i_dec = [result.index(r) for r in result if 'decimal' in r['Type']]
-        query_rows = """SELECT * FROM %s""" % (table_name)
-        if modifier is not None:
-            query_rows += ' ' + modifier
-        query_rows += """;"""
-        result = self.run_query(query_rows)
+        return result
+        
+    def table_rows(self, result, schema):
+        columns = [r['Field'] for r in schema]
+        column_types = [r['Type'] for r in schema]
+        i_dec = [schema.index(c) for c in schema if 'decimal' in c['Type']]
         rows_raw = [[r[c] for c in columns] for r in result]
         if len(rows_raw) == 0:
             table = [[]]
@@ -205,6 +202,17 @@ class DBAssist():
                 data_by_cols[i] = [float(x) if x is not None else None for x in data_by_cols[i]]
             rows = map(list, zip(*data_by_cols))
             table = [columns] + rows
+        return table
+        
+    def return_table(self, table_name, modifier=None):
+        schema = self.table_schema(table_name)
+        # list of column indices where type is decimal
+        query_rows = """SELECT * FROM %s""" % (table_name)
+        if modifier is not None:
+            query_rows += ' ' + modifier
+        query_rows += """;"""
+        result = self.run_query(query_rows)
+        table = self.table_rows(result, schema)
         return table
     
     def return_df(self, table_name, modifier=None):
