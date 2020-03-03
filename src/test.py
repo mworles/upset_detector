@@ -3,44 +3,7 @@ import queries
 import pandas as pd
 import numpy as np
 import pickle
-"""
-dba = Transfer.DBAssist()
-dba.connect()
-table_name = "ratings_at_day"
-schema = dba.table_schema(table_name)
-result = dba.run_query(queries.ratings_t1)
-table = dba.table_rows(result, schema)
-#t1 = pd.DataFrame(table[1:], columns=table[0])
 
-result = dba.run_query(queries.ratings_t2)
-t2 = dba.table_rows(result, schema)
-#t2 = pd.DataFrame(table[1:], columns=table[0])
-
-table.extend(t2[1:])
-
-Transfer.insert('ratings_needed', table, at_once=True, create=False,
-                delete=False)
-"""
-# 
-
-"""
-mod = "WHERE season >= 2003"
-mat = Transfer.return_data("game_info", modifier=mod)
-
-rat = Transfer.return_data("ratings_needed")
-rat = rat.drop('season', axis=1)
-
-df = Updater.features_to_matchup(mat, rat, merge_cols=['date'])
-
-mod = "WHERE date > '2002/10/01'"
-home = Transfer.return_data('team_home', modifier=mod)
-home = home.drop('game_id', axis=1)
-df = Updater.features_to_matchup(df, home, merge_cols=['date'])
-
-rows = Transfer.dataframe_rows(df)
-Transfer.insert('matchups', rows, at_once=True, create=True,
-                delete=True)
-"""
 """
 df = Transfer.return_data('matchups')
 feat_i = df.columns.tolist().index('t1_team_off_adj')
@@ -159,8 +122,39 @@ y_pred = df['spread_bet'].astype(int)
 from sklearn.metrics import accuracy_score
 print accuracy_score(y_true, y_pred)
 """
-from data import Spreads
-import Constants
 
-df = Spreads.spreads_sbro(Constants.DATA)
-print df.describe()
+"""
+mat = Transfer.return_data('matchups')
+mat = mat.set_index('game_id')
+mat = mat[mat['season'] >=2015]
+mat.to_pickle('mat.pkl')
+
+s = Transfer.return_data('spreads_clean', "WHERE season >= 2015")
+s = s.dropna(subset=['t1_spread'])
+s = s[['game_id', 't1_spread']]
+s.to_pickle('s.pkl')
+#mrg = pd.merge(mat, s, left_on='game_id', right_on='game_id')
+
+"""
+import Constants
+from data import Spreads, Transfer
+
+old = Transfer.return_data('sccop', modifier=None)
+old = old[old['game_id'] != 'NULL']
+old = old.sort_values('game_id')
+old = old[old['t1_spread'].notnull()]
+
+new = Spreads.blend_spreads(Constants.DATA)
+new = new.sort_values('game_id')
+new = new.reset_index()
+new = new[~new['game_id'].isin(old['game_id'].values)]
+print new[new['game_id'].isin(old['game_id'].values)]
+
+df = pd.concat([new, old], sort=False)
+df = df.drop_duplicates(subset=['game_id'])
+
+
+df = df.sort_values('game_id')
+
+rows = Transfer.dataframe_rows(df)
+Transfer.insert('spreads_clean', rows, at_once=True, delete=True) 
