@@ -1,11 +1,11 @@
 # year to use as test set
-TEST_YEAR = 2018
+TEST_YEAR = 2020
 
 # minimum year to use for data inclusion, due to missing data
 MIN_YEAR = 2003
 
 # list of years to use as validation sets in chronological cross-validation
-SPLIT_YEARS = [2013, 2014, 2015, 2016, 2017]
+SPLIT_YEARS = [2015, 2016, 2017, 2018, 2019]
 
 # empty dict to fill for pre-processing
 # needed for consistency between data files and with existing code
