@@ -233,6 +233,14 @@ def blend_spreads(datdir):
     df['t1_spread'] = map(pick_spread, both_spreads)
     df = df.drop(columns=['t1_spread_sbro', 't1_spread_pt'])
     
+    df['season'] = map(Clean.season_from_date, df['date'].values)
+    
+    df = df.reset_index()
+    
+    df = df.drop_duplicates(subset='game_id')
+    
+    df = df.set_index('game_id')
+    
     df = df.dropna(subset=['t1_spread'])
     
     df['season'] = map(Clean.season_from_date, df['date'].values)
