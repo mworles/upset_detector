@@ -4,6 +4,7 @@ import numpy as np
 import math
 import json
 import datetime
+import queries
 
 def create(schema_file):
     with open(schema_file, 'r') as f:
@@ -64,8 +65,41 @@ def build(datdir, ratings=False):
     df = Generate.convert_past_games()
     df = Generate.make_game_info(df)
     rows = Transfer.dataframe_rows(df)
-    Transfer.insert('game_info', rows, at_once=False)    #
+    Transfer.insert('game_info', rows, at_once=False)
+    
+    # filter ratings to team game dates
+    dba = Transfer.DBAssist()
+    dba.connect()
+    table_name = "ratings_at_day"
+    schema = dba.table_schema(table_name)
+    result = dba.run_query(queries.ratings_t1)
+    table = dba.table_rows(result, schema)
 
+    result = dba.run_query(queries.ratings_t2)
+    t2 = dba.table_rows(result, schema)
+
+    table.extend(t2[1:])
+
+    Transfer.insert('ratings_needed', table, at_once=True, create=False,
+                    delete=False)
+    
+    # create matchups table with game targets and features
+    mod = "WHERE season >= 2003"
+    mat = Transfer.return_data("game_info", modifier=mod)
+
+    rat = Transfer.return_data("ratings_needed")
+    rat = rat.drop('season', axis=1)
+
+    df = Updater.features_to_matchup(mat, rat, merge_cols=['date'])
+
+    mod = "WHERE date > '2002/10/01'"
+    home = Transfer.return_data('team_home', modifier=mod)
+    home = home.drop('game_id', axis=1)
+    df = Updater.features_to_matchup(df, home, merge_cols=['date'])
+
+    rows = Transfer.dataframe_rows(df)
+    Transfer.insert('matchups', rows, at_once=True, create=True,
+                    delete=True)
     
 def update_day(date):
     """Run once daily after all games have ended."""
