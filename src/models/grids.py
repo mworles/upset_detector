@@ -1,24 +1,33 @@
 import numpy as np
 from hyperopt import hp
-from sklearn.metrics import f1_score, accuracy_score
-from sklearn.linear_model import LogisticRegression
+import sklearn.metrics as metrics
+from sklearn.linear_model import LogisticRegression, Ridge, Lasso
 from Constants import RANDOM_SEED
 
 scorer_grid = {}
-scorer_grid['accuracy'] = accuracy_score
-scorer_grid['f1'] = f1_score
-
-scorer_pred = {}
-scorer_pred['accuracy'] = 'labels'
-scorer_pred['f1'] = 'labels'
+scorer_grid['accuracy'] = {'function': metrics.accuracy_score,
+                           'type': 'classification'}
+scorer_grid['f1'] = {'function': metrics.f1_score,
+                     'type': 'classification'}
+scorer_grid['MSE'] = {'function': metrics.mean_squared_error,
+                      'type': 'regression'}
+scorer_grid['MAE'] = {'function': metrics.mean_absolute_error,
+                      'type': 'regression'}
 
 model_grid = {}
 model_grid['logistic'] = LogisticRegression(random_state=RANDOM_SEED,
                                             solver='liblinear')
+model_grid['logistic_l1'] = LogisticRegression(random_state=RANDOM_SEED,
+                                               solver='liblinear',
+                                               penalty='l1')
+model_grid['logistic_l2'] = LogisticRegression(random_state=RANDOM_SEED,
+                                               solver='liblinear',
+                                               penalty='l2')
+model_grid['ridge'] = Ridge(random_state=RANDOM_SEED, solver='auto')
+model_grid['lasso'] = Lasso(random_state=RANDOM_SEED)
 
 
 space_grid = {}
-
 space_grid[0] = {"model": "logistic",
                  "hyperparameters": {"C": {"min": 0.00001,
                                            "max": 1,
@@ -38,5 +47,37 @@ space_grid[1] = {"model": "logistic",
                                      "penalty": {"options": ['l1'],
                                                 "func": "choice"
                                                 }
+                                     }
+                 }
+
+space_grid[2] = {"model": "ridge",
+                 "hyperparameters": {"alpha": {"min": 0.001,
+                                               "max": 10,
+                                               "func": "loguniform"
+                                               },
+                                     }
+                 }
+
+space_grid[3] = {"model": "lasso",
+                 "hyperparameters": {"alpha": {"min": 0.001,
+                                               "max": 20,
+                                               "func": "loguniform"
+                                               },
+                                     }
+                 }
+
+space_grid[4] = {"model": "logistic_l1",
+                 "hyperparameters": {"C": {"min": 0.1,
+                                           "max": 10,
+                                           "func": "loguniform"
+                                           }
+                                     }
+                 }
+
+space_grid[5] = {"model": "logistic_l2",
+                 "hyperparameters": {"C": {"min": 0.0001,
+                                           "max": 10,
+                                           "func": "loguniform"
+                                           }
                                      }
                  }
