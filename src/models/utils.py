@@ -15,9 +15,9 @@ import json
 import pickle
 from sklearn.preprocessing import StandardScaler
 from hyperopt import fmin, tpe, Trials, space_eval, hp, STATUS_OK
-from models.grids import model_grid, space_grid, scorer_grid, scorer_pred
-from sklearn.linear_model import LogisticRegression
-from imblearn.over_sampling import RandomOverSampler
+from grids import model_grid, space_grid, scorer_grid
+from sklearn.linear_model import LogisticRegression, Ridge
+#from imblearn.over_sampling import RandomOverSampler
 from Constants import RANDOM_SEED
 
 def fold_split(df, split_on, split_value):
@@ -85,7 +85,8 @@ def scale_fold(df, target, fold, scaler):
           'x_test': xvs,
           'y_train': yt,
           'y_test': yv}
-    return fd
+    fold.update(fd)
+    return fold
 
 def scale_folds(df, target, folds, scaler):
     tf = lambda x: scale_fold(df, target, x, scaler)
@@ -100,7 +101,7 @@ def split_scale(df, target, split_on, split_values, drop=True):
     folds_scaled = scale_folds(df, target, folds, scaler)
     return folds_scaled
 
-def fold_preds(fold, model, type='probs', imbal=False):
+def fold_preds(fold, model, type, imbal=False):
     
     x = fold['x_train']
     y = fold['y_train']
@@ -111,24 +112,17 @@ def fold_preds(fold, model, type='probs', imbal=False):
         x, y = sampler.fit_resample(x, y)
     
     model.fit(x, y)
+            
+    if type == 'classification':
+        preds =  model.predict_proba(fold['x_test'])[:, 1]
+    else:
+        preds =  model.predict(fold['x_test'])
     
-    preds =  model.predict_proba(fold['x_test'])[:, 1]
+    preds = [round(x, 4) for x in preds]
+    fold['p_test'] = preds
     
-    if type == 'labels':
-        preds = np.where(preds > 0.50, 1, 0)
+    return fold
 
-    return preds
-    
-def fold_score(fold, model, score_func):
-    
-    model.fit(fold['x_train'], fold['y_train'])
-    
-    pv =  model.predict_proba(fold['x_test'])[:, 1]
-    lv = np.where(pv > 0.50, 1, 0)
-
-    score_val = score_func(fold['y_test'], lv)
-
-    return score_val
 
 def convert_grid(id, space_grid):
     trial_params = space_grid[id]
@@ -147,27 +141,44 @@ def convert_grid(id, space_grid):
 
     return search_space
 
-def hyper_search(grid_id, folds, n_trials, score_type, imbal=False):
+def hyper_search(grid_id, folds, n_trials, scoring, imbal=False):
     
-    score_func = scorer_grid[score_type]
-    pred_type = scorer_pred[score_type]
+    score_func = scorer_grid[scoring]['function']
+    pred_type = scorer_grid[scoring]['type']
+    
+    target_vals = len(set(folds[0]['y_test']))
+    
+    if target_vals > 2:
+        type = 'regression'
+    else:
+        type = 'classification'
     
     def objective_min(params):
         
         model.set_params(**params)
         
-        preds_list = map(lambda x: fold_preds(x, model, type=pred_type,
-                                              imbal=imbal), folds)
+        predict_fold = lambda x: fold_preds(x, model, type, imbal=False)
+        folds = map(predict_fold, folds)
+        preds_list = [x['p_test'] for f in folds]
         preds = np.concatenate(preds_list).ravel().tolist()
         
-        labels_list = [x['y_test'] for x in folds]
-        labels = [i for sub in labels_list for i in sub]
-                
-        cv_score = score_func(labels, preds)
+        targets_list = [x['y_test'] for x in folds]
+        # flatten list of lists to single list of targets
+        targets = [i for sub in targets_list for i in sub]
+
+        if type == 'classification':
+            preds = np.where(preds > 0.50, 1, 0)
+
+        cv_score = score_func(targets, preds)
         
         print "Trial: %r" % (len(trials.trials))
         
-        return {'loss': 1 - cv_score,
+        loss = cv_score
+        
+        if pred_type == 'classification':
+            loss = 1 - loss
+        
+        return {'loss':  loss,
                 'score': cv_score,
                 'status': STATUS_OK,
                 'params': params,
@@ -201,7 +212,7 @@ def write_results(grid_id, trials):
     top = trials.results[imin]
     
     # to include model identifier
-    top['model'] = space_grid[0]['model']
+    top['model'] = space_grid[grid_id]['model']
     
     # file to store scores and model metadata
     datdir_results = "../data/results/"
@@ -231,21 +242,22 @@ def get_search(grid_id):
         trials = pickle.load(f)
     return trials
 
-def trials_data(trials, search_space):
-    param_values = [x['misc']['vals'] for x in trials.trials]
-    param_values = [{key: value for key in x for value in x[key]}
-                    for x in param_values]
-    param_values = [space_eval(search_space, x) for x in param_values]
-    losses = [x['result']['loss'] for x in trials.trials]
-    score_type = trials.trials[0]['result']['scorer']
-    
-    trials_data = param_values
-    [x.update({'loss': y}) for x, y in zip(trials_data, losses)]
-    [x.update({'loss': y}) for x, y in zip(trials_data, losses)]
-    
-    df = pd.DataFrame(param_values)
-    df['score_type'] = score_type
-    
+
+def extract_trial(trial):
+    keys_keep = ['tid']
+    result = trial['result']
+    trial_d = {your_key: trial[your_key] for your_key in keys_keep }
+    trial_d.update(result['params'])
+    del result['params']
+    trial_d.update(result)
+    return trial_d
+
+def trials_data(trials, grid_id):
+    trial_list = trials.trials
+    trial_results = [extract_trial(x) for x in trial_list]
+    df = pd.DataFrame(trial_results)
+    df['model'] = space_grid[grid_id]['model']
+    df = df.sort_values("loss", ascending=True)
     return df
 
 def get_grid_result(grid_id):
@@ -262,6 +274,7 @@ def get_grid_result(grid_id):
 def model_set(grid_result):
     model_name = grid_result['model']
     model_params = grid_result['params']
+
     if model_name == 'logistic':
         params = {'C': 1.0, 'penalty': 'l2'}
         for p in model_params:
@@ -271,4 +284,13 @@ def model_set(grid_result):
                                    solver='liblinear',
                                    penalty=params['penalty'],
                                    C=params['C'])
+    elif model_name == 'ridge':
+        params = {'alpha': 1.0}
+        for p in model_params:
+            params[p] = model_params[p]
+        
+        model = Ridge(random_state=RANDOM_SEED,
+                      solver='auto', alpha=params['alpha'])
+    else:
+        model = None
     return model
