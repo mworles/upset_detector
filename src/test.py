@@ -122,6 +122,9 @@ y_pred = df['spread_bet'].astype(int)
 from sklearn.metrics import accuracy_score
 print accuracy_score(y_true, y_pred)
 """
+from data import Transfer
+import pandas as pd
+import Constants
 """
 mat = Transfer.return_data('matchups')
 mat = mat.set_index('game_id')
@@ -135,10 +138,9 @@ s.to_pickle('s.pkl')
 
 mrg = pd.merge(mat, s, how='left', left_on='game_id', right_on='game_id')
 mrg.to_pickle('mrg.pkl')
-"""
-from data import Transfer
-import pandas as pd
-"""
+
+
+
 df = pd.read_pickle('mrg.pkl')
 ns = df[df['t1_spread'].isnull()]
 ns1 = ns[['game_id', 'date', 't1_team_id', 'season']]
@@ -159,10 +161,47 @@ tk['team_id'] = tk['team_id'].astype(int)
 
 mrg = pd.merge(df, tk, left_on='team_id', right_on='team_id')
 mrg.to_pickle('df2.pkl')
+
+ns = pd.read_pickle('mrg.pkl')
+ns1 = ns[['game_id', 'date', 't1_team_id', 'season']]
+ns1 = ns1.rename(columns={'t1_team_id': 'team_id'})
+
+ns2 = ns[['game_id', 'date', 't2_team_id', 'season']]
+ns2 = ns2.rename(columns={'t2_team_id': 'team_id'})
+
+all = pd.concat([ns1, ns2], sort=False)
+all['team_id'] = all['team_id'].astype(int)
+
+tk = Transfer.return_data('team_key')
+tk = tk[['team_id', 'team_name']]
+tk = tk.drop_duplicates()
+tk['team_id'] = tk['team_id'].astype(int)
+
+all = pd.merge(all, tk, left_on='team_id', right_on='team_id')
+
+all.to_pickle('all.pkl')
 """
-mrg = pd.read_pickle('df2.pkl')
-gb = mrg.groupby(['season', 'team_name'])['date'].count()
-gb = gb.reset_index()
-gb = gb.sort_values(['date'], ascending=False)
-for season in range(2003, 2020):
-    print gb[gb['season'] == season].head(10)
+# gid merge of matchups and spreads
+ns = pd.read_pickle('df2.pkl')
+all = pd.read_pickle('all.pkl')
+# remove 2003, no spreads for any teams
+ns = ns[ns['season'] > 2003]
+
+
+gb = ns.groupby(['team_name', 'team_id', 'season'])['date'].count()
+gb = gb.reset_index().rename(columns={'date': 'n_miss'})
+#gb = gb.set_index('team_id')
+
+gba = all.groupby(['team_name', 'team_id', 'season'])['date'].count()
+gba = gba.reset_index().rename(columns={'date': 'n_games'})
+#gba = gba.set_index('team_id')
+gbm = pd.merge(gba, gb, how='left',
+               left_on=['team_id', 'team_name', 'season'],
+               right_on=['team_id', 'team_name', 'season'])
+gbm['n_miss'] = gbm['n_miss'].fillna(0)
+gbm = gbm.sort_values('season', ascending=True)
+
+gbt = gbm.groupby(['team_id', 'team_name'])['n_miss'].sum()
+gbt = gbt.reset_index()
+gbt= gbt.sort_values('n_miss', ascending=False)
+print gbt.head(50)
