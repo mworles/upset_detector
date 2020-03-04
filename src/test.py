@@ -122,38 +122,47 @@ y_pred = df['spread_bet'].astype(int)
 from sklearn.metrics import accuracy_score
 print accuracy_score(y_true, y_pred)
 """
-
 """
 mat = Transfer.return_data('matchups')
 mat = mat.set_index('game_id')
-mat = mat[mat['season'] >=2015]
 mat.to_pickle('mat.pkl')
 
-s = Transfer.return_data('spreads_clean', "WHERE season >= 2015")
+s = Transfer.return_data('spreads_clean')
 s = s.dropna(subset=['t1_spread'])
 s = s[['game_id', 't1_spread']]
 s.to_pickle('s.pkl')
-#mrg = pd.merge(mat, s, left_on='game_id', right_on='game_id')
 
+
+mrg = pd.merge(mat, s, how='left', left_on='game_id', right_on='game_id')
+mrg.to_pickle('mrg.pkl')
 """
-import Constants
-from data import Spreads, Transfer
+from data import Transfer
+import pandas as pd
+"""
+df = pd.read_pickle('mrg.pkl')
+ns = df[df['t1_spread'].isnull()]
+ns1 = ns[['game_id', 'date', 't1_team_id', 'season']]
+ns1 = ns1.rename(columns={'t1_team_id': 'team_id'})
 
-old = Transfer.return_data('sccop', modifier=None)
-old = old[old['game_id'] != 'NULL']
-old = old.sort_values('game_id')
-old = old[old['t1_spread'].notnull()]
+ns2 = ns[['game_id', 'date', 't2_team_id', 'season']]
+ns2 = ns2.rename(columns={'t2_team_id': 'team_id'})
 
-new = Spreads.blend_spreads(Constants.DATA)
-new = new.sort_values('game_id')
-new = new.reset_index()
-new = new[~new['game_id'].isin(old['game_id'].values)]
+df = pd.concat([ns1, ns2], sort=False)
+df['team_id'] = df['team_id'].astype(int)
+df.to_pickle('df1.pkl')
 
-df = pd.concat([new, old], sort=False)
-df = df.drop_duplicates(subset=['game_id'])
+df = pd.read_pickle('df1.pkl')
+tk = Transfer.return_data('team_key')
+tk = tk[['team_id', 'team_name']]
+tk = tk.drop_duplicates()
+tk['team_id'] = tk['team_id'].astype(int)
 
-
-df = df.sort_values('game_id')
-
-rows = Transfer.dataframe_rows(df)
-Transfer.insert('spreads_clean', rows, at_once=True, delete=True) 
+mrg = pd.merge(df, tk, left_on='team_id', right_on='team_id')
+mrg.to_pickle('df2.pkl')
+"""
+mrg = pd.read_pickle('df2.pkl')
+gb = mrg.groupby(['season', 'team_name'])['date'].count()
+gb = gb.reset_index()
+gb = gb.sort_values(['date'], ascending=False)
+for season in range(2003, 2020):
+    print gb[gb['season'] == season].head(10)
