@@ -3,6 +3,8 @@ from data import queries
 import pandas as pd
 import numpy as np
 import pickle
+import Constants
+datdir = Constants.DATA
 
 """
 df = Transfer.return_data('matchups')
@@ -138,49 +140,31 @@ s.to_pickle('s.pkl')
 mrg1 = pd.merge(mat, s, how='left', left_on='game_id', right_on='game_id')
 mrg1.to_pickle('mrg1.pkl')
 
-mrg1 = pd.read_pickle('mrg1.pkl')
-o = Transfer.return_data('odds_clean')
-o = o.dropna(subset=['t1_odds', 't2_odds'], how='all')
-o = o[['game_id', 't1_odds', 't2_odds']]
-o.to_pickle('o.pkl')
+from data import Odds
+df = Odds.clean_oddsportal(datdir)
+rows = Transfer.dataframe_rows(df)
+Transfer.create_from_schema('odds_clean', 'data/schema.json')
+Transfer.insert('odds_clean', rows, at_once=True) 
 
-mrg2 = pd.merge(mrg1, o, how='left', left_on='game_id', right_on='game_id')
-mrg2.to_pickle('mrg2.pkl')
+df = df.dropna(subset=['t1_odds', 't2_odds'], how='all')
+df.to_pickle('odds.pkl')
 
-rows = Transfer.dataframe_rows(mrg2)
-Transfer.insert('matchups_bet', rows, create=True, at_once=True)
 
 """
+o = pd.read_pickle('odds.pkl')
 
 """
 o = Transfer.return_data('odds_clean')
 o = o.dropna(subset=['t1_odds', 't2_odds'], how='all')
 o = o[['game_id', 'date', 't1_odds', 't2_odds']]
 o.to_pickle('o.pkl')
-"""
-from data import Clean
+
 o = pd.read_pickle('o.pkl')
 mat = pd.read_pickle('mat.pkl')
 o['season'] = map(Clean.season_from_date, o['date'])
 
 mrg = pd.merge(o, mat, how='outer', left_on=['game_id', 'date', 'season'],
                right_on=['game_id', 'date', 'season'])
-
-oo = mrg[mrg['t1_score'].isnull()]
-
-seasons = list(pd.unique(oo['season'].values))
-seasons.sort()
-for season in seasons:
-    os = oo[oo['season'] == season]
-    os = os.sort_values('date')
-    gb = os.groupby(['date'])['game_id'].count()
-    gb = gb.reset_index()
-    gb = gb.rename(columns={'game_id': 'n_miss'})
-    os = pd.merge(os, gb, left_on=['date'], right_on=['date'])
-    os = os.sort_values('n_miss', ascending=False)
-    print os[['game_id', 'date', 'n_miss']].head(10)
-
-
 
 """
 
