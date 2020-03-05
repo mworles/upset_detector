@@ -8,13 +8,6 @@ import json
 import pandas as pd
 import math
 
-def dataframe_rows(df):
-    """Return 2-d df as list of lists, first list is column names."""
-    col_names = list(df.columns)
-    rows = df.values.tolist()
-    rows.insert(0, col_names)
-    return rows
-
 class DBColumn():
     
     def __init__(self, data):
@@ -202,6 +195,13 @@ class DBAssist():
     def close(self):
         self.conn.close()
 
+def dataframe_rows(df):
+    """Return 2-d df as list of lists, first list is column names."""
+    col_names = list(df.columns)
+    rows = df.values.tolist()
+    rows.insert(0, col_names)
+    return rows
+
 def insert(name, rows, at_once=True, create=False, delete=False):
     dbt = DBTable(name, rows)
     dbt.setup_table()
@@ -217,6 +217,10 @@ def insert(name, rows, at_once=True, create=False, delete=False):
         dba.run_query(query)
     dba.insert_rows(dbt, at_once=at_once)
     dba.close()
+    
+def insert_df(name, df, at_once=True, create=False, delete=False):
+    rows = dataframe_rows(df)
+    insert(name, rows, at_once=at_once, create=create, delete=delete)
 
 def query_from_schema(table_name, schema_file):
     with open(schema_file, 'r') as f:
