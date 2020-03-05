@@ -216,6 +216,7 @@ def blend_spreads(datdir):
     sbro = sbro.rename(columns={'t1_spread': 't1_spread_sbro'})
     
     pt = spreads_pt(datdir)
+
     pt = pt.rename(columns={'t1_spread': 't1_spread_pt'})
     
     merge_on= ['t1_team_id', 't2_team_id', 'game_id', 'date']
@@ -236,7 +237,7 @@ def blend_spreads(datdir):
     df['season'] = map(Clean.season_from_date, df['date'].values)
     
     df = df.reset_index()
-    
+            
     df = df.drop_duplicates(subset='game_id')
     df = df.sort_values('game_id')
     
@@ -245,7 +246,7 @@ def blend_spreads(datdir):
     df['season'] = map(Clean.season_from_date, df['date'].values)
     
     df = df.drop_duplicates()
-    
+
     return df
 
 def spreads_vi(date=None):

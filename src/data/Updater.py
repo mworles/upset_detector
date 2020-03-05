@@ -44,6 +44,8 @@ def build(datdir, ratings=False):
 
     # create blended clean spreads table
     df = Spreads.blend_spreads(datdir)
+    # move game_id to column
+    df = df.reset_index()
     rows = Transfer.dataframe_rows(df)
     Transfer.insert('spreads_clean', rows, at_once=False) 
 
