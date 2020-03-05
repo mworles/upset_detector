@@ -47,6 +47,16 @@ def build(datdir, ratings=False):
     rows = Transfer.dataframe_rows(df)
     Transfer.insert('spreads_clean', rows, at_once=False) 
 
+    # create table of odds by game_id and team
+    df = Transfer.return_data('odds_clean')
+    both = Odds.odds_by_team(df)
+    rows = Transfer.insert_df('odds_by_team', both, create=True, at_once=True)
+
+    # create table of spreads by game_id and team
+    df = Transfer.return_data('spreads_clean')
+    both = Spreads.spreads_by_team(df)
+    Transfer.insert_df('spreads_by_team', both, create=True, at_once=True)
+    
     # get team home indicators
     # stored results
     for table in ['reg_results', 'ncaa_results', 'nit_results']:
@@ -100,6 +110,24 @@ def build(datdir, ratings=False):
     rows = Transfer.dataframe_rows(df)
     Transfer.insert('matchups', rows, at_once=True, create=True,
                     delete=True)
+    
+    # merge spreads and odds with matchups, create table
+    mat = Transfer.return_data('matchups')
+    s = Transfer.return_data('spreads_clean')
+    s = s.dropna(subset=['t1_spread'])
+    s = s[['game_id', 't1_spread']]
+    
+    mrg1 = pd.merge(mat, s, how='left', left_on='game_id', right_on='game_id')
+    
+    o = Transfer.return_data('odds_clean')
+    o = o.dropna(subset=['t1_odds', 't2_odds'], how='all')
+    o = o[['game_id', 't1_odds', 't2_odds']]
+    
+    mrg2 = pd.merge(mrg1, o, how='left', left_on='game_id', right_on='game_id')
+    
+    rows = Transfer.dataframe_rows(mrg2)
+    
+    Transfer.insert('matchups_bet', rows, create=True, at_once=True)
     
 def update_day(date):
     """Run once daily after all games have ended."""
