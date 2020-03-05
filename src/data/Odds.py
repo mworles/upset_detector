@@ -123,6 +123,8 @@ def clean_oddsportal(datdir):
     # drop rows with no odds
     df = df.dropna(subset=['t1_odds', 't2_odds'], how='all')
     
+    df['season'] = map(Clean.season_from_date, df['date'].values)
+    
     return df
 
 def odds_vi(date=None):
