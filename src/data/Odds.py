@@ -157,3 +157,21 @@ def odds_vi(date=None):
     df = df[keep_cols].sort_values('date').reset_index()
     
     return df
+    
+def odds_to_decimal(x):
+    if x < 0:
+        decimal = (100/abs(x)) + 1
+    else:
+        decimal =  (x/100) +1
+    return decimal
+
+def odds_by_team(df):
+    t1 = df[['game_id', 'date', 't1_team_id', 't1_odds']].copy()
+    t1 = t1.rename(columns={'t1_team_id': 'team_id', 't1_odds': 'odds'})
+    t2 = df[['game_id', 'date', 't2_team_id', 't2_odds']].copy()
+    t2 = t2.rename(columns={'t2_team_id': 'team_id', 't2_odds': 'odds'})
+    both = pd.concat([t1, t2], sort=False)
+    both['odds_dec'] = map(odds_to_decimal, both['odds'].values)
+    both['odds_dec'] = both['odds_dec'].round(3)
+    both = both.sort_values('game_id')
+    return both
