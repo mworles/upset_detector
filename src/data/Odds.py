@@ -177,3 +177,30 @@ def odds_by_team(df):
     both['odds_dec'] = both['odds_dec'].round(3)
     both = both.sort_values('game_id')
     return both
+
+# only have odds starting in season 2009
+mat_get= matchups[matchups['season'] >= 2009]
+
+def matchup_odds_dates(mat, odds):
+    # create temp game id using season instead of date year
+    # to find similar matchups using only year and teams, not specific date 
+    gid_sub = mat['game_id'].apply(lambda x: x[-10:])
+    gid_sub = mat['season'].astype(int).astype(str) + mat_need['gid_sub']
+    
+    # get first matchup date for each season
+    min_date = mat.groupby('season')['date'].min().reset_index()
+    min_date = min_date.rename(columns={'date': 'min_date'})
+    
+    # restrict odds to search to game ids not in matchups
+    odds = odds[~odds['game_id'].isin(mat['game_id'].values)].copy()
+    
+    # merge minimum matchups date and keep odds dates after it, each season
+    odds = pd.merge(onot, min_date, how='inner', left_on='season',
+                    right_on='season')
+    odds = odds[odds['date'] >= odds['min_date']]
+        
+    # create temp game id similar to match 
+    odds['gid_sub'] = odds['game_id'].apply(lambda x: x[-10:])
+    odds['gid_sub'] = odds['season'].astype(int).astype(str) + odds['gid_sub']
+    
+    
