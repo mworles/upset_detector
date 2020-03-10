@@ -13,3 +13,8 @@ def get_table_rows(url):
 def current_timestamp():
     date = str(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
     return date
+
+def get_soup(url):
+    f = requests.get(url)
+    soup = BeautifulSoup(f.text, features='lxml')
+    return soup
