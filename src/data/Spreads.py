@@ -289,13 +289,3 @@ def spreads_vi(date=None):
     keep_cols = ['date', 't1_team_id', 't2_team_id', 't1_spread', 'over_under']
     df = df[keep_cols].sort_values('date').reset_index()
     return df
-
-def spreads_by_team(df):
-    t1 = df[['game_id', 'date', 't1_team_id', 't1_spread']].copy()
-    t1 = t1.rename(columns={'t1_team_id': 'team_id', 't1_spread': 'spread'})
-    t2 = df[['game_id', 'date', 't2_team_id', 't1_spread']].copy()
-    t2 = t2.rename(columns={'t2_team_id': 'team_id', 't1_spread': 'spread'})
-    t2['spread'] = - t2['spread']
-    both = pd.concat([t1, t2], sort=False)
-    both = both.sort_values('game_id')
-    return both
