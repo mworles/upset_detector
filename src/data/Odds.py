@@ -2,7 +2,11 @@ import json
 import pandas as pd
 import numpy as np
 import calendar
-import Clean, Generate, Match, Transfer
+import Clean
+import Generate
+import Match
+import Transfer
+import datetime
 
 def oddsportal_games(year_file):
     
@@ -160,42 +164,59 @@ def odds_vi(date=None):
     
     return df
     
-def odds_to_decimal(x):
+def decimal_odds(x):
     if x < 0:
         decimal = (100/abs(x)) + 1
     else:
         decimal =  (x/100) +1
-    return decimal
+    return round(decimal, 3)
 
-def odds_by_team(df):
-    t1 = df[['game_id', 'date', 't1_team_id', 't1_odds']].copy()
-    t1 = t1.rename(columns={'t1_team_id': 'team_id', 't1_odds': 'odds'})
-    t2 = df[['game_id', 'date', 't2_team_id', 't2_odds']].copy()
-    t2 = t2.rename(columns={'t2_team_id': 'team_id', 't2_odds': 'odds'})
-    both = pd.concat([t1, t2], sort=False)
-    both['odds_dec'] = map(odds_to_decimal, both['odds'].values)
-    both['odds_dec'] = both['odds_dec'].round(3)
-    both = both.sort_values('game_id')
-    return both
+def to_datetime(x):
+    dt = datetime.datetime.strptime(x, "%Y/%m/%d")
+    return dt
 
-# only have odds starting in season 2009
-mat_get= matchups[matchups['season'] >= 2009]
+def from_datetime(x):
+    date = x.strftime("%Y/%m/%d")
+    return date
+    
+def proximal_date(date_gid, odds_dict):
+    # get datetime from game string date
+    game_date = to_datetime(date_gid[0])
+    after = from_datetime(game_date + datetime.timedelta(days=1))
+    before = from_datetime(game_date - datetime.timedelta(days=1))
+    # string dates before and after game string date
+    valid = [before, after]
+    
+    # dates in odds matching the game's year-teams 
+    odds_dates = odds_dict[date_gid[1]]
+    
+    # list of common dates
+    overlap = list(set(odds_dates) & set(valid))
+    
+    if len(overlap) == 0:
+        result = ''
+        
+    elif len(overlap) == 1:
+        result = overlap[0]
+    
+    else:
+        result = ''
+  
+    return result
+
 
 def matchup_odds_dates(mat, odds):
     # create temp game id using season instead of date year
     # to find similar matchups using only year and teams, not specific date 
-    gid_sub = mat['game_id'].apply(lambda x: x[-10:])
-    gid_sub = mat['season'].astype(int).astype(str) + mat_need['gid_sub']
+    mat['team_string'] = mat['game_id'].apply(lambda x: x[-10:])
+    mat['gid_sub'] = mat['season'].astype(int).astype(str) + mat['team_string']
     
     # get first matchup date for each season
     min_date = mat.groupby('season')['date'].min().reset_index()
     min_date = min_date.rename(columns={'date': 'min_date'})
-    
-    # restrict odds to search to game ids not in matchups
-    odds = odds[~odds['game_id'].isin(mat['game_id'].values)].copy()
-    
+
     # merge minimum matchups date and keep odds dates after it, each season
-    odds = pd.merge(onot, min_date, how='inner', left_on='season',
+    odds = pd.merge(odds, min_date, how='inner', left_on='season',
                     right_on='season')
     odds = odds[odds['date'] >= odds['min_date']]
         
@@ -203,4 +224,82 @@ def matchup_odds_dates(mat, odds):
     odds['gid_sub'] = odds['game_id'].apply(lambda x: x[-10:])
     odds['gid_sub'] = odds['season'].astype(int).astype(str) + odds['gid_sub']
     
+    # dict with key for each unique gid_sub, val is empty list
+    odds_dict = {k : [] for k in pd.unique(odds['gid_sub'].values) }
     
+    # array of gid_sub, date pairs
+    odds_pairs = odds[['gid_sub', 'date']].values
+    
+    # update each gid value list with date
+    # so dict contains all dates for each unique gid_sub
+    for row in odds_pairs:
+        odds_dict[row[0]].append(row[1])
+    
+    # restrict games to match where game has 'gid_sub' in the dict to search
+    mat_find = mat[mat['gid_sub'].isin(odds_dict.keys())].copy()
+    drop_index = mat_find.index
+    mat_not = mat.drop(drop_index).copy()
+    
+    # array of year-teams string and dates to search
+    mat_pairs = zip(mat_find['date'].values, mat_find['gid_sub'].values)
+    odds_dates = map(lambda x: proximal_date(x, odds_dict), mat_pairs)
+    
+    # creating matching game id using proximal date
+    proxdate = map(lambda x: x.replace('/', '_'), odds_dates)
+    mat_find['odds_gid'] = proxdate + mat_find['team_string']
+    
+    # select odds columns needed to merge
+    odds_merge = odds[['game_id', 't1_odds', 't2_odds']].copy()
+    odds_merge = odds_merge.rename(columns={'game_id': 'odds_gid'})
+    
+    mrg = pd.merge(mat_find, odds_merge, how='left', left_on='odds_gid', 
+                   right_on='odds_gid')
+        
+    # remove temp columns used for matching
+    mrg = mrg.drop(columns=['team_string', 'gid_sub', 'odds_gid'])
+    
+    
+    # combined games matched and games not
+    df = pd.concat([mrg, mat_not], sort=False)
+    
+    df = df.sort_values('game_id')
+    
+    return df
+
+
+def odds_table():
+    mat = Transfer.return_data('game_info')
+    
+    odds = Odds.clean_oddsportal(datdir)
+
+    # only have odds starting in season 2009
+    mat_get = mat[mat['season'] >= 2009].copy()
+
+    # first try inner merge
+    odds_merge = odds[['game_id', 't1_odds', 't2_odds']].copy()
+    mrg = pd.merge(mat_get, odds_merge, how='inner', left_on='game_id',
+                   right_on='game_id')
+
+    # remove merged games from odds and games
+    merged_gid = mrg['game_id'].values
+    odds_prox = odds[~odds['game_id'].isin(merged_gid)].copy()
+    mat_get = mat_get[~mat_get['game_id'].isin(merged_gid)].copy()
+
+    # use function to match on proximal dates
+    mat_get = Odds.matchup_odds_dates(mat_get, odds_prox)
+
+    # combine merged, proximal date-matched games, and pre-odds games
+    df = pd.concat([mrg, mat_get, mat[mat['season'] < 2009]], sort=False)
+    
+    # keep data unique to odds or for merging with other tables
+    df = df[['game_id', 'date', 'season', 't1_team_id', 't2_team_id', 't1_odds',
+             't2_odds']]
+    
+    # compute decimal odds format
+    df['t1_odds_dec'] = map(Odds.decimal_odds, df['t1_odds'].values)
+    df['t2_odds_dec'] = map(Odds.decimal_odds, df['t2_odds'].values)
+
+    # only keep rows with odds data
+    df = df.dropna(subset=['t1_odds', 't2_odds'], how='all')
+
+    return df
