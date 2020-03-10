@@ -233,3 +233,32 @@ def game_gym(url):
     except Exception as e:
         print e
         return [['gid'], [gid]]
+
+def get_gyms(season):
+    mod = 'WHERE season = %s' % (season)
+    games = Transfer.return_data('game_info', mod)
+    dates = list(set(games['date']))
+    if season == 2010:
+        dates = [x for x in dates if x > '2009/12/15']
+    dates.sort()
+    for date in dates:
+        print date
+        timestamp = str(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+        links = Scrapers.box_links(date)
+        if len(links) > 1:
+            for url in links:
+                # small delay for repeated website requests
+                time.sleep(1)
+                try:
+                    gym = Scrapers.game_gym(url)
+                    gym[0].extend(['season', 'date', 'timestamp'])
+                    gym[1].extend([season, date, timestamp])
+                    Transfer.insert('game_gym', gym, at_once=True)
+                except:
+                    print url
+                    gid = re.findall(r'\d+', url.split('/')[-1])[0]
+                    gym = [['gid', 'season', 'date'], [gid, season, date]]
+                    Transfer.insert('game_gym_error', gym, at_once=True)
+        else:
+            gym = [['season', 'date'], [season, date]]
+            Transfer.insert('game_gym_error', gym, at_once=True)
