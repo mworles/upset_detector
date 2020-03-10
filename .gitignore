@@ -4,3 +4,5 @@
 .config
 /venv
 /src/data/driver/
+*.pkl
+/upset_detector.egg-info
