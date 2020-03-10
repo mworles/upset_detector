@@ -385,18 +385,18 @@ def scrub_files(file_map, out='mysql'):
     files = file_map.keys()
     # scrub and write each file
     for f in files:
-            # obtain data with columns reformatted
-            df = scrub_file(f, file_map)
-            # get table name
-            table_name = file_map[f]['new_name']
-            # insert into mysql or save csv files
-            if out == 'mysql':
-                rows = Transfer.dataframe_rows(df)
-                Transfer.insert(table_name, rows, at_once=False, create=True,
-                            delete=True)
-            else:
-                data_out = '../data/scrub/'
-                write_file(df, data_out, table_name, keep_index=False)
+        # obtain data with columns reformatted
+        df = scrub_file(f, file_map)
+        # get table name
+        table_name = file_map[f]['new_name']
+        # insert into mysql or save csv files
+        if out == 'mysql':
+            rows = Transfer.dataframe_rows(df)
+            Transfer.insert(table_name, rows, at_once=False, create=True,
+                        delete=True)
+        else:
+            data_out = '../data/scrub/'
+            write_file(df, data_out, table_name, keep_index=False)
 
 def date_range(start_date, end_date="today"):
     sds = start_date.split('/')
