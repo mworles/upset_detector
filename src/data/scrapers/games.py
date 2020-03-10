@@ -86,8 +86,6 @@ def process_team(div):
 def game_box(url):
     gid = re.findall(r'\d+', url.split('/')[-1])[0]
     try:
-        #r = requests.get(url)
-        #soup = BeautifulSoup(r.content, 'html.parser')
         soup = utils.get_soup(url)
         gid = re.findall(r'\d+', url.split('/')[-1])[0]
         divs = soup.findAll('div', {'class': 'sdi-so'})
@@ -118,8 +116,6 @@ def game_scores(date, future=False):
     time.sleep(1)
     timestamp = utils.current_timestamp()
     url = tcpalm_url(date)
-    #r = requests.get(url)
-    #soup = BeautifulSoup(r.content, 'html.parser')
     soup = utils.get_soup(url)
 
     try:
@@ -151,8 +147,6 @@ def game_schedule(date):
     time.sleep(1)
     timestamp = utils.current_timestamp()
     url = tcpalm_url(date)
-    #r = requests.get(url)
-    #soup = BeautifulSoup(r.content, 'html.parser')
     soup = utils.get_soup(url)
 
     try:
@@ -179,8 +173,6 @@ def game_schedule(date):
 
 def box_links(date):
     url = tcpalm_url(date)
-    #r = requests.get(url)
-    #soup = BeautifulSoup(r.content, 'html.parser')
     soup = utils.get_soup(url)
     divs = soup.findAll('div', {'class': 'onoff'})
 
@@ -213,8 +205,6 @@ def box_scores(date):
 def game_gym(url):
     gid = re.findall(r'\d+', url.split('/')[-1])[0]
     try:
-        #r = requests.get(url)
-        #soup = BeautifulSoup(r.content, 'html.parser')
         soup = utils.get_soup(url)
         div = soup.find('div', {'class': 'sdi-quickhits'})
         strongs = div.find_all('strong')
