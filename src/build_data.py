@@ -13,7 +13,6 @@ features: package used to create features
 # import custom modules/packages
 import Constants
 import data
-import features
 
 # location of data directory from constants module
 datdir = Constants.DATA
