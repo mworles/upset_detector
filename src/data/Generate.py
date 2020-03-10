@@ -15,7 +15,7 @@ import numpy as np
 import Clean
 import Match
 import Ratings
-import Scrapers
+import scrapers
 import Transfer
 
 
