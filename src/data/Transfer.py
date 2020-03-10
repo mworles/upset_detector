@@ -55,11 +55,17 @@ class DBColumn():
                 x = 'NULL'
 
         if "VARCHAR" in col_type:
-            x = str(x)
-            x = x.replace("'", r"\'")
-            xf = r"""'%s'""" % (x)
+            if x != 'NULL':
+                x = str(x)
+                x = x.replace("'", r"\'")
+                xf = r"""'%s'""" % (x)
+            else:
+                xf = r"""NULL"""
         elif "DECIMAL" in col_type:
-            xf = """%s""" % (x)
+            if x == 'NULL':
+                xf = """NULL"""
+            else:
+                xf = """%s""" % (x)
         return xf
         
 class DBTable():
@@ -208,10 +214,7 @@ def insert(name, rows, at_once=True, create=False, delete=False):
     dba = DBAssist()
     dba.connect()
     if create == True:
-        try:
-            dba.create_table(dbt)
-        except Exception as e:
-            print e
+        dba.create_table(dbt)
     if delete == True:
         query = "DELETE FROM %s" % (name)
         dba.run_query(query)
