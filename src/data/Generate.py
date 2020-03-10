@@ -12,7 +12,12 @@ This script requires `pandas` and `numpy`. It imports the custom Clean module.
 
 import pandas as pd
 import numpy as np
-import Clean, Match, Ratings
+import Clean
+import Match
+import Ratings
+import Scrapers
+import Transfer
+
 
 def set_gameid_index(df, date_col='date_id', full_date=False, drop_date=True):
     """
@@ -51,43 +56,6 @@ def set_gameid_index(df, date_col='date_id', full_date=False, drop_date=True):
     # return data with new index
     return df
 
-def tourney_outcomes(datdir):
-    """Uses game results to create team performance indicators for each 
-    tournament year.""" 
-    # read in prior tournament results
-    data_in = datdir + 'scrub/'
-    tgames = pd.read_csv(data_in + 'ncaa_results.csv')
-
-    # data is one row per game
-    # separate winners and losers, to create a team-specific win indicator
-    # winners
-    wteams = tgames[['season', 'wteam']]
-    wteams = wteams.rename(columns={'wteam': 'team_id'})
-    wteams['win'] = 1
-    
-    # losers
-    lteams = tgames[['season', 'lteam']]
-    lteams = lteams.rename(columns={'lteam': 'team_id'})
-    lteams['win'] = 0
-
-    # combine data to create one row per team per game
-    df = pd.concat([wteams, lteams], ignore_index=True)
-
-    # columns to group by
-    gcols = ['season', 'team_id']
-
-    # count and sum number of rows per "group"
-    df = df.groupby(gcols)['win'].aggregate(['count', 'sum']).reset_index()
-
-    # count is the number of games, sum is the number of wins
-    df = df.rename(columns={'count': 'games', 'sum': 'wins'})
-    
-    # add 1 to season so indicators represent past performance
-    df['season'] = df['season'] + 1
-    
-    # write file
-    Clean.write_file(df, datdir + 'interim/', 'tourney_outcomes')
-
 def convert_team_id(df, id_cols, drop=True):
     """Return data with neutral team identifiers 't1_team_id' and 't2_team_id' 
     where 't1_team_id' is the numerically-lower id.
@@ -113,85 +81,6 @@ def convert_team_id(df, id_cols, drop=True):
         df = df.drop(columns=id_cols)
     
     return df
-
-def set_games(datdir):
-    """Establish neutral team ids and date for each game."""
-    r = pd.read_csv(datdir + 'scrub/ncaa_results.csv')
-    s = pd.read_csv(datdir + 'scrub/seasons.csv')
-    df = pd.merge(r, s, on='season', how='inner')
-    
-    # add string date column to games
-    df['date_id'] = df.apply(Clean.game_date, axis=1)
-    
-    # create outcome-neutral team identifiers
-    team_cols = ['wteam', 'lteam']
-    df = convert_team_id(df, team_cols, drop=True)
-    
-    # keep only necessary info to add features
-    keep = ['season', 't1_team_id', 't2_team_id', 'date_id']
-    df = df[keep]
-    
-    return df
-    
-def matchup_features(datdir, df):
-    """Add features for both teams in a matchup.
-    
-    Arguments
-    ----------
-    datdir: string
-        Project data directory. 
-    df: pandas dataframe
-        Requires columns 'season', 't1_team_id', 't2_team_id'.
-    """
-    def add_team_features(df_game, df_features, team_id):
-        """Nested function to add features for one team."""
-        merge_on=['season', 'team_id']
-        df = pd.merge(df_game, df_features, left_on=['season', team_id],
-                      right_on=merge_on, how='inner')
-        df = df.drop('team_id', axis=1)
-        return df
-        
-    # import features data
-    file_feat = datdir + 'features/team_features.csv'
-    feat = pd.read_csv(file_feat)
-    
-    # cols to exclude when renaming features
-    exc = ['team_id', 'season']
-    # get list of feature columns to rename
-    tcols = [x for x in list(feat.columns) if x not in exc]
-    
-    # empty dicts for creating map to rename columns
-    t1dict = {}
-    t2dict = {}
-    
-    # create separate maps for t1 and t2 teams
-    for t in tcols:
-        t1dict[t] = 't1_' + t
-        t2dict[t] = 't2_' + t
-    
-    # create data for both teams with t1 and t2 prefix
-    t1 = feat.copy().rename(columns=t1dict)
-    t2 = feat.copy().rename(columns=t2dict)
-    
-    # add features for both teams in matchup
-    df = add_team_features(df, t1, 't1_team_id')
-    df = add_team_features(df, t2, 't2_team_id')
-    
-    return df
-
-def make_matchups(datdir):
-    """Convenience function to set up games, add features, and save file."""
-    # identifies outcome-neutral team identifers and game date
-    matchups = set_games(datdir)
-    
-    # add features to both teams in matchup
-    df = matchup_features(datdir, matchups)
-    
-    # set unique game index
-    df = set_gameid_index(df, full_date=True, drop_date=False)
-        
-    # save data
-    Clean.write_file(df, datdir + 'processed/', 'matchups', keep_index=True)
 
 
 def team_scores(df):
@@ -286,97 +175,6 @@ def get_upsets(datdir, df):
     mrg = mrg.drop(['t1_seed', 't2_seed', 't1_seed_dif', 'seed_abs'], axis=1)
     
     return mrg
-
-def score_targets(datdir, df):
-    """Get targets from team scores.
-    
-    Arguments
-    ----------
-    datdir: string
-        Project data directory. 
-    df: pandas dataframe
-        Requires unique game id index and columns 't1_score' and 't2_score'.
-    """
-    # binary indicator of 1 if t1_team won
-    df['t1_win'] = np.where(df['t1_score'] > df['t2_score'], 1, 0)
-
-    # score margin as t1_team score minus t2_team score
-    df['t1_marg'] = df['t1_score'] - df['t2_score']
-    
-    # add upset labels
-    df = get_upsets(datdir, df)
-    
-    return df
-    
-def make_targets(datdir):
-    """Create dataset of targets for prediction.
-    
-    Arguments
-    ----------
-    datdir: string
-        Project data directory.
-    """
-    # read in data file with game results
-    file = datdir + '/scrub/ncaa_results.csv'
-    df = pd.read_csv(file)
-    # import and merge seasons for dates
-    s = pd.read_csv(datdir + 'scrub/seasons.csv')
-    df = pd.merge(df, s, on='season', how='inner')
-
-    # add string date column to games
-    df['date_id'] = df.apply(Clean.game_date, axis=1)
-
-    # create outcome-neutral team identifier
-    df = convert_team_id(df, ['wteam', 'lteam'], drop=False)
-    # create unique game identifier and set as index
-    df = set_gameid_index(df, full_date=True, drop_date=False)
-
-    # add column indicating score for each team
-    scores = team_scores(df)
-    # create targets data
-    df = score_targets(datdir, scores)
-    
-    # spreads
-    file_spreads = datdir + '/interim/spreads.csv'
-    spreads = pd.read_csv(file_spreads, index_col=0)
-    spreads = spreads.drop(['t1_team_id', 't2_team_id'], axis=1)
-    
-    # merge spreads with targets
-    df = pd.merge(df, spreads, how='left', left_index=True, right_index=True)
-    
-    # keep target columns
-    df = df.loc[:, ['t1_win', 't1_marg', 'upset', 't1_spread']]
-    
-    t1_smarg = - df['t1_spread']
-    
-    def cover_spread(x):
-        margin = x[0]
-        spread = x[1]
-        if spread < 0:
-            if margin >= -spread:
-                result = 1
-            else:
-                result = 0
-        elif spread > 0:
-            if margin < 0:
-                if -margin < spread:
-                    result = 1
-                else:
-                    result = 0
-            else:
-                result = 1
-        else:
-            if margin >= 0:
-                result = 1
-            else:
-                result = 0
-        return result
-    
-    margins_spreads = df[['t1_marg', 't1_spread']].values
-    df['t1_cover'] = map(cover_spread, margins_spreads)    
-    
-    # save data file
-    Clean.write_file(df, datdir + '/processed/', 'targets', keep_index=True)
 
 
 def get_location(row):
@@ -483,3 +281,123 @@ def convert_game_scores(df):
     # convert columns to apply neutral id function
     df = game_box_convert(df)
     return df
+
+def tcp_team_home(df):
+    game_id = df.index.values.tolist()
+    date = df['date'].values.tolist()
+
+    home_id = df['home_team_id'].values
+    home = zip(df['neutral'].values, home_id)
+    home_loc = [1 if x[0] == 0 else 0 for x in home]
+    away_loc = [0 for x in range(0, len(home))]
+
+    home_comb = zip(game_id, date, home_id, home_loc)
+    away_comb = zip(game_id, date, df['away_team_id'].values, away_loc)
+    rows = [[a, b, c, d] for a, b, c, d in home_comb]
+    rows.extend([[a, b, c, d] for a, b, c, d in away_comb])
+
+    rows.sort(key=lambda x: x[0])
+    rows.insert(0, ['game_id', 'date', 'team_id', 'home'])
+    return rows
+
+def game_home(date=None):
+    if date is not None:
+        if type(date) == str:
+            results = Scrapers.game_scores(date, future=True)
+            df = pd.DataFrame(results[1:], columns=results[0])
+        elif type(date) == list:
+            scheduled = []
+            for date in date:
+                results = Scrapers.game_scores(date, future=True)    
+                if len(scheduled) == 0:
+                    scheduled.extend(results)
+                else:
+                    scheduled.extend(results[1:])
+            df = pd.DataFrame(scheduled[1:], columns=scheduled[0])
+    else:
+        df = Transfer.return_data('game_scores')
+        df = df.drop(columns=['home_score', 'away_score'])
+    
+    df = Match.id_from_name(df, 'team_tcp', 'away_team', drop=False)
+    df = Match.id_from_name(df, 'team_tcp', 'home_team', drop=False)
+    df = convert_team_id(df, ['home_team_id', 'away_team_id'], drop=False)
+    df = set_gameid_index(df, date_col='date', full_date=True,
+                                   drop_date=False)
+    rows = tcp_team_home(df)
+    
+    return rows
+
+def results_home(df):
+
+    mat = df[['wteam', 'lteam', 'wloc']].values
+
+    s = Transfer.return_data('seasons')
+    df = pd.merge(df, s, on='season', how='inner')
+
+    # add string date column to games
+    df['date'] = df.apply(Clean.game_date, axis=1)
+    df = convert_team_id(df, ['wteam', 'lteam'], drop=False)
+    df = set_gameid_index(df, date_col='date', full_date=True,
+                                   drop_date=False)
+    df = team_locations(df)
+    
+    home_dict = {'H': 1, 'A': 0, 'N': 0}
+
+    t1 = df[['date', 't1_team_id', 't1_loc']].copy()
+    t1['home'] = t1['t1_loc'].map(home_dict)
+    t1 = t1.drop(columns='t1_loc').rename(columns={'t1_team_id': 'team_id'})
+
+    t2 = df[['date', 't2_team_id', 't2_loc']].copy()
+    t2['home'] = t2['t2_loc'].map(home_dict)
+    t2 = t2.drop(columns='t2_loc').rename(columns={'t2_team_id': 'team_id'})
+
+    df = pd.concat([t1, t2], sort=False)
+    df = df.sort_index().reset_index()    
+    return df
+
+def games_by_team(df):
+    
+    def parse_game(x, col_map, winner=True):
+        gen = x[col_map['gen']].tolist()
+        wdata = x[col_map['win']].tolist() 
+        ldata = x[col_map['lose']].tolist()
+        
+        if winner==True:
+            data = gen + wdata + ldata
+        else:
+            data = gen + ldata + wdata
+    
+        return data
+
+    # remove columns not needed
+    df = df.drop(['wloc', 'numot'], axis=1)
+    wcols = [x for x in df.columns if x[0] == 'w']
+    lcols = [x for x in df.columns if x[0] == 'l']
+
+    team_cols = ['team_' + c[1:] for c in wcols]
+    opp_cols = ['opp_' + c[1:] for c in lcols]
+
+    new_cols = ['season', 'daynum']
+    new_cols.extend(team_cols + opp_cols)
+
+    gcoli = [list(df.columns).index(x) for x in ['season', 'daynum']]
+    wcoli = [list(df.columns).index(x) for x in wcols]
+    lcoli = [list(df.columns).index(x) for x in lcols]
+
+    col_map = {'gen': gcoli,
+               'win': wcoli,
+               'lose': lcoli}
+
+    df_array = df.values
+    # all games parsed twice to create row for winners and row for losers
+    winners = map(lambda x: parse_game(x, col_map, winner=True), df_array)
+    losers = map(lambda x: parse_game(x, col_map, winner=False), df_array)
+    games = winners + losers
+
+    df = pd.DataFrame(games, columns=new_cols)
+    df = df.rename(columns={'team_team': 'team_id', 'opp_team': 'opp_id'})
+
+    df = df.sort_values(['season', 'daynum', 'team_id'])
+    
+    return df
+    
