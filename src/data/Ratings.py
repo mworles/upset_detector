@@ -145,7 +145,7 @@ def game_box_games(df):
     df = Match.id_from_name(df, 'team_tcp', 'home_team', drop=False)
     
     # convert columns to apply neutral id function
-    df = Generate.game_box_convert(df)
+    df = Generate.game_score_convert(df)
     # create team_1 and team_2 id identifer columns
     df = Generate.convert_team_id(df, ['wteam', 'lteam'], drop=False)
     # add column indicating scores and locations for each team
