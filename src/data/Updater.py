@@ -13,6 +13,7 @@ import queries
 
 
 def update_day(date):
+    """
     """Run once daily after all games have ended."""
     # add games for ratings for date
     df = Ratings.game_box_for_ratings(date)
@@ -49,14 +50,15 @@ def update_day(date):
     df = Generate.make_game_info(df)
     rows = Transfer.dataframe_rows(df)
     Transfer.insert('game_info', rows, at_once=False)
-    
+    """
     # get team location for day's games, insert rows to team_home
     rows = Generate.game_home(date)
     Transfer.insert('team_home', rows, at_once=False)
-    
+    """
     # get team location for next week's scheduled games
     rows = Generate.game_home()
     Transfer.insert("team_home_scheduled", rows, at_once=False, delete=True)
+    """
     
 def update_current():
     """Run as frequently as desired to update current matchups."""
