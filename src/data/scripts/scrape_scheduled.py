@@ -6,7 +6,6 @@ import pandas as pd
 
 date = datetime.datetime.now()
 start = date.strftime('%Y/%m/%d')
-start = '2020/02/29'
 
 # get team location for upcoming games
 end = Clean.date_plus(start, 5)
