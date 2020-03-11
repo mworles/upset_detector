@@ -263,12 +263,11 @@ def get_scheduled(dates):
     scheduled = []
 
     for date in dates:
-        results = game_scheduled(date)    
-        if len(scheduled) == 0:
-            scheduled.extend(results)
-        else:
-            scheduled.extend(results[1:])
-
-    scheduled = [x for x in scheduled if x is not None]
+        results = game_scheduled(date)
+        if results is not None:   
+            if len(scheduled) == 0:
+                scheduled.extend(results)
+            else:
+                scheduled.extend(results[1:])
 
     return scheduled
