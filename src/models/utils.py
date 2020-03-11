@@ -17,8 +17,72 @@ from sklearn.preprocessing import StandardScaler
 from hyperopt import fmin, tpe, Trials, space_eval, hp, STATUS_OK
 from grids import model_grid, space_grid, scorer_grid
 from sklearn.linear_model import LogisticRegression, Ridge
-#from imblearn.over_sampling import RandomOverSampler
+from imblearn.over_sampling import RandomOverSampler
 from Constants import RANDOM_SEED
+
+def score_to_class(x):
+    if x[0] == float("nan"):
+        return float("nan")
+    if x[1] >= x[0]:
+        return 1
+    else:
+        return 0
+        
+def target_from_prob(x, threshold=0.50):
+    if x >= threshold:
+        return 1
+    else:
+        return 0
+
+def beta_calibrate(x, a, c):
+    prob_calib = 1/(1 + 1/(np.exp(c)*(x**a/(1-x)**a) ))
+    return prob_calib
+
+def apply_beta_calibration(target_train, probs_train, probs_test):
+
+    lr = LogisticRegression(C=10000)
+    sprm = np.log(probs_train/(1 - probs_train))
+    lr.fit(sprm.reshape(-1, 1), target_train)
+    c = lr.intercept_[0]
+    a = lr.coef_[0][0]
+
+    probs_calib = np.array(map(lambda x: beta_calibrate(x, a, c), probs_test))
+    return probs_calib
+
+        
+def roi(targets, preds, bet=100):
+    def return_on_bet(x, bet=100):
+        if x[0]==x[1]:
+            return bet * 1.90
+        else:
+            return 0
+    bet = 100
+    returns = map(lambda x: return_on_bet(x, bet), zip(targets, preds))
+    return_total = sum(returns)
+    bet_total = bet * len(preds)
+    net_total = return_total - bet_total
+    roi = net_total / bet_total
+    return roi
+            
+
+def score_spreads(folds):
+    preds_all = [x for fold in folds for x in fold['p_test']]
+    targets_all = [x for fold in folds for x in fold['y_test']]
+    spreads_all = [-x if x !=0 else x for fold in folds for x in fold['spreads_test']]
+    
+    spreads_targets = zip(spreads_all, targets_all)
+    spreads_preds = zip(spreads_all, preds_all)
+
+    covers_true = map(score_to_class, spreads_targets)
+    covers_pred = map(score_to_class, spreads_preds)
+    
+    true_pred =  zip(covers_true, covers_pred)
+    true_pred_use = [x for x in true_pred if x[0] != float('nan')]
+    
+    y_true = [x[0] for x in true_pred_use]
+    y_pred = [x[1] for x in true_pred_use]
+
+    return y_true, y_pred
 
 def fold_split(df, split_on, split_value):
     """Returns a dictionary containing indices to identify training set and
@@ -76,7 +140,7 @@ def scale_fold(df, target, fold, scaler):
 
     yt = target.loc[fold['i_train']].values
     yv = target.loc[fold['i_test']].values
-
+    
     xts = scaler.transform(xt.astype(float))
     xvs = scaler.transform(xv.astype(float))
     
@@ -85,6 +149,7 @@ def scale_fold(df, target, fold, scaler):
           'x_test': xvs,
           'y_train': yt,
           'y_test': yv}
+
     fold.update(fd)
     return fold
 
@@ -93,15 +158,21 @@ def scale_folds(df, target, folds, scaler):
     folds_scaled = map(tf, folds)
     return folds_scaled
     
-def split_scale(df, target, split_on, split_values, drop=True):
+def split_scale(df, split_on, split_values, drop=True):
+    # create list of dicts with index values
+    target = df['target']
+    df = df.drop(['target'], axis=1)
     folds = custom_folds(df, split_on, split_values)
+    # fit scaler to uniform data for all folds
     scaler = fit_scaler(df, split_on, split_values, drop=drop)
     if drop == True:
         df = df.drop(split_on, axis=1)
+
+    # list of k dicts with scaled train and test data 
     folds_scaled = scale_folds(df, target, folds, scaler)
     return folds_scaled
 
-def fold_preds(fold, model, type, imbal=False):
+def fold_preds(fold, model, type, calibrate=True, imbal=False):
     
     x = fold['x_train']
     y = fold['y_train']
@@ -112,16 +183,18 @@ def fold_preds(fold, model, type, imbal=False):
         x, y = sampler.fit_resample(x, y)
     
     model.fit(x, y)
-            
+        
     if type == 'classification':
         preds =  model.predict_proba(fold['x_test'])[:, 1]
+        if calibrate==True:
+            preds_train = model.predict_proba(x)[:, 1]
+            preds = apply_beta_calibration(y, preds_train, preds)
     else:
         preds =  model.predict(fold['x_test'])
     
     preds = [round(x, 4) for x in preds]
-    fold['p_test'] = preds
-    
-    return fold
+        
+    return preds
 
 
 def convert_grid(id, space_grid):
@@ -141,71 +214,70 @@ def convert_grid(id, space_grid):
 
     return search_space
 
-def hyper_search(grid_id, folds, n_trials, scoring, imbal=False):
+def hyper_search(grid_id, folds, n_trials, score_type, convert=None,
+                 imbal=False):
     
-    score_func = scorer_grid[scoring]['function']
-    pred_type = scorer_grid[scoring]['type']
-    
-    target_vals = len(set(folds[0]['y_test']))
-    
-    if target_vals > 2:
-        type = 'regression'
-    else:
-        type = 'classification'
-    
+    score_func = scorer_grid[score_type]['function']
+
     def objective_min(params):
         
+        target_vals = len(set(folds[0]['y_test']))
+    
+        if target_vals > 2:
+            type = 'regression'
+        else:
+            type = 'classification'
+
         model.set_params(**params)
         
-        predict_fold = lambda x: fold_preds(x, model, type, imbal=False)
-        folds = map(predict_fold, folds)
-        preds_list = [x['p_test'] for f in folds]
-        preds = np.concatenate(preds_list).ravel().tolist()
+        for f in folds:
+            f['p_test'] = fold_preds(f, model, type=type, imbal=imbal)
         
-        targets_list = [x['y_test'] for x in folds]
-        # flatten list of lists to single list of targets
-        targets = [i for sub in targets_list for i in sub]
+        targets = [x for fold in folds for x in fold['y_test']]
+        preds = [x for fold in folds for x in fold['p_test']]
+
+        if convert == 'spreads':
+            targets, preds = score_spreads(folds)
+            type = 'classification'
+        else:
+            pass
+        
+        if type == 'classification' and convert == None:
+            preds = map(lambda x: target_from_prob(x), preds)
+        
+        cv_score = score_func(targets, preds)
 
         if type == 'classification':
-            preds = np.where(preds > 0.50, 1, 0)
-
-        cv_score = score_func(targets, preds)
+            loss = 1 - cv_score
         
         print "Trial: %r" % (len(trials.trials))
-        
-        loss = cv_score
-        
-        if pred_type == 'classification':
-            loss = 1 - loss
-        
-        return {'loss':  loss,
+
+        return {'loss': loss,
                 'score': cv_score,
                 'status': STATUS_OK,
                 'params': params,
                 'grid_id': grid_id,
                 'scorer': score_func.__name__}
-    
+
     trials = Trials()
     
     model = model_grid[space_grid[grid_id]['model']]
     
     search_space = convert_grid(grid_id, space_grid)
-
     best = fmin(objective_min,
                 search_space,
                 algo=tpe.suggest,
                 max_evals=n_trials,
                 trials=trials)
-
+    
     return trials
-
 
 def dump_search(grid_id, trials):
     datdir_search = "../data/results/searches/"
     p_file = "".join([datdir_search, "search_", str(grid_id), ".p"])
     pickle.dump(trials, open(p_file, "wb"))
 
-def write_results(grid_id, trials):
+def write_results(exp_id, grid_id, trials):
     
     # get result dict of trial with minimum loss
     imin = trials.losses().index(min(trials.losses()))
@@ -226,7 +298,7 @@ def write_results(grid_id, trials):
         scores = {}
     
     # update scores dict with results of current run
-    scores[str(grid_id)] = top
+    scores[str(exp_id)] = top
 
     # save results file as json
     with open(s_file, 'w') as f:
