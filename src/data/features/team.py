@@ -1,4 +1,5 @@
 from src.data import Transfer
+from src.data import Match
 import pandas as pd
 import numpy as np
 
@@ -108,79 +109,86 @@ def compute_game_stats(df):
     return df
 
 
-"""
-for d in days:
-# create a groupby object for teams and seasons
-df.sort_values(['t1_teamid', 'season', 'daynum'], inplace=True)
-tsgroup = df.sort_values('daynum').groupby(['t1_teamid', 'season'])
+def split_teams(df):
+    df['winner'] = np.where(df['home_PTS'] > df['away_PTS'], 'H', 'A')
+    keep_cols = ['gid', 'date', 'winner']
+    home_cols = keep_cols + [x for x in df.columns if 'home_' in x]
+    away_cols = keep_cols + [x for x in df.columns if 'away_' in x]
+    
+    home = df[home_cols].copy()
+    away = df[away_cols].copy()
+    
+    home.columns = [x.replace('home_', '') for x in home.columns]
+    away.columns = [x.replace('away_', '') for x in home.columns]
+    
+    home['loc'] = 'H'
+    away['loc'] = 'A'
+    
+    all = pd.concat([home, away], sort=False)
+    
+    return all
 
-# list of columns for sum aggregation
-cols_to_sum = ['t1_win', 't1_loss']
-tsgroup_sum = tsgroup[cols_to_sum].sum()
-tsgroup_sum.columns = ['wins', 'losses']
+def clean_box(df):
+    col_map = {'OFF': 'or',
+               'DEF': 'dr',
+               'A': 'ast',
+               'PF': 'pf',
+               'STL': 'stl',
+               'BLK': 'blk',
+               'TO': 'to',
+               'PTS': 'score'}
 
-# make list of columns for mean aggregation
-aggmean = ['pos', 't1_score', 't2_score', 'scrmarg', 'scrmargpct', 'scrrat',
-           'ftpct', 'ftrat', 'ftmpos', 'ftrat_d', 'efgpct', 'trshpct',
-           'fg3pct', 'fg3pct_d', 'fga3pct', 'fga3pct_d', 'fg3pctrat', 'fgpct',
-           'fgpct_d', 'fgpctrat', 'asttorat', 'drbpct', 'orbpct', 'orbtomarg',
-           'rbtomarg', 'rbmarg', 'tomarg', 'topct', 'topct_d', 'astpct']
+    fg = map(lambda x: x.split('-'), df['FGMA'].values)
+    fg3 = map(lambda x: x.split('-'), df['3PMA'].values)
+    ft = map(lambda x: x.split('-'), df['FTMA'].values)
+    
+    df['fgm'] = [x[0] for x in fg]
+    df['fga'] = [x[1] for x in fg]
+    df['fgm3'] = [x[0] for x in fg3]
+    df['fga3'] = [x[1] for x in fg3]
+    df['ftm'] = [x[0] for x in ft]
+    df['fta'] = [x[1] for x in ft]
+    df['numot'] = (df['MIN'].astype(int) - 200) / 25
+    
+    df = df.rename(columns=col_map)
+    winner = (df['winner'] == df['loc'])
 
-tsgroup_mean = tsgroup[aggmean].mean()
-tsgroup_mean = tsgroup_mean.round(4)
-tsgroup_mean = tsgroup_mean.rename(columns={'t1_score': 'ppg',
-                                            't2_score': 'ppg_d'})
+    df = df.drop(columns=['FGMA', '3PMA', 'FTMA', 'MIN', 'TOT', 'winner', 'loc'])
+    
+    
+    
+    
+    dfw = df[winner]
+    dfl = df[~winner]
+    
+    change_cols = list(df.columns)
+    not_change = ['gid', 'date', 'team', 'numot']
+    change_cols = [x for x in change_cols if x not in not_change]
+    win_cols = ['w' + x for x in change_cols]
+    win_map= {k:v for k,v in zip(change_cols, win_cols)}
+    dfw = dfw.rename(columns=win_map)
+    
+    dfw = Match.id_from_name(df, 'team_tcp', 'team', drop=False)
+    dfw = dfw.rename(columns={'team_id': 'wteam'})
+    
+    lose_cols = ['l' + x for x in change_cols]
+    lose_map = {k:v for k,v in zip(change_cols, lose_cols)}
+    dfl = dfl.rename(columns=lose_map)
+    dfl = Match.id_from_name(df, 'team_tcp', 'team', drop=False)
+    dfl = dfw.rename(columns={'team_id': 'lteam'})
 
-# scoring margin standard deviation aggregation`
-tsgroup_std = tsgroup['scrmarg'].std()
-tsgroup_std.rename('scrmargsd', inplace=True)
-tsgroup_std = tsgroup_std.round(2)
-tsgroup_mean['scrmargsd'] = tsgroup_std
+    return dfw
 
-
-
-def last5(group):
-    #Count the number of wins in last 5 games.
-    wins = group.iloc[-5:].sum()
-    return wins
-
-def last10(group):
-    #Count the number of wins in last 10 games.
-    wins = group.iloc[-10:].sum()
-    return wins
-
-def streak(y):
-    #Compute number of consecutive events.
-    streak = y * (y.groupby((y != y.shift()).cumsum()).cumcount() + 1)
-    return int(streak[-1:])
-
-def pctlast10(group):
-    #Compute win percentage in last 10 games.
-    wins = group.iloc[-10:].sum()
-    return wins / 10.0
-
-recent_list = []
-
-print 'summing wins last 5'
-recent_list.append(tsgroup['t1_win'].apply(last10).rename('wlast5'))
-print 'summing wins last 10'
-recent_list.append(tsgroup['t1_win'].apply(last10).rename('wlast10'))
-print 'computing winning streak'
-recent_list.append(tsgroup['t1_win'].apply(streak).rename('wstreak'))
-print 'computing win pct last 10'
-recent_list.append(tsgroup['t1_win'].apply(pctlast10).rename('wpctlast10'))
-print 'computing losing streak'
-recent_list.append(tsgroup['t1_loss'].apply(streak).rename('lstreak'))
-
-tsgroup_rec = pd.concat(recent_list, axis=1)
-
-mrg1 = pd.merge(tsgroup_sum, tsgroup_rec, how='outer',
-                left_index=True, right_index=True)
-mrg2 = pd.merge(mrg1, tsgroup_mean, how='outer',
-                left_index=True, right_index=True)
-mrg2 = mrg2.reset_index()
-
-mrg2['winpct'] = mrg2.wins / (mrg2.wins + mrg2.losses)
-
-mrg2 = mrg2.rename(columns={'t1_teamid': 'team_id'})
-"""
+def convert(df):
+    home_won = df['home_score'] > df['away_score']
+    
+    col_map = {'FGMA'}
+    
+    df['wteam'] = np.where(home_won, df['home_team_id'], df['away_team_id'])
+    df['lteam'] = np.where(home_won, df['away_team_id'], df['home_team_id'])
+    df['wscore'] = np.where(home_won, df['home_score'], df['away_score'])
+    df['lscore'] = np.where(home_won, df['away_score'], df['home_score'])
+    df['wloc'] = np.where(home_won, 'H', 'A')
+    df['wloc'] = np.where(df['neutral'] == 1, 'N', df['wloc'])
+    
+    return df
