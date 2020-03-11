@@ -111,7 +111,7 @@ def game_box(url):
     except Exception as e:
         return [['gid'], [gid]]
 
-def game_scores(date, future=False):
+def game_scores(date):
     time.sleep(1)
     timestamp = utils.current_timestamp()
     url = tcpalm_url(date)
@@ -131,17 +131,15 @@ def game_scores(date, future=False):
         
         col_names = ['gid', 'away_team', 'home_team', 'neutral', 'away_score',
                      'home_score', 'date', 'timestamp']
-        if future == True:
-            col_names = [x for x in col_names if '_score' not in x]
 
         games.insert(0, col_names)
         
     except Exception as e:
         games = [['date', 'timestamp'], [date, timestamp]]
-
+    
     return games
     
-def game_schedule(date):
+def game_scheduled(date):
     time.sleep(1)
     timestamp = utils.current_timestamp()
     url = tcpalm_url(date)
@@ -156,7 +154,7 @@ def game_schedule(date):
             games.extend(div2_games)
         except:
             pass
-
+        
         games = [g + [date] + [timestamp] for g in games]
         
         col_names = ['gid', 'away_team', 'home_team', 'neutral', 'date', 'timestamp']
@@ -164,8 +162,7 @@ def game_schedule(date):
         games.insert(0, col_names)
         
     except Exception as e:
-        print e
-        games = [['date', 'timestamp'], [date, timestamp]]
+        games = None
 
     return games
 
@@ -262,13 +259,16 @@ def get_gyms(season):
             Transfer.insert('game_gym_error', gym, at_once=True)
 
 def get_scheduled(dates):
+    
     scheduled = []
 
     for date in dates:
-        results = game_scores(date, future=True)    
+        results = game_scheduled(date)    
         if len(scheduled) == 0:
             scheduled.extend(results)
         else:
             scheduled.extend(results[1:])
-    
+
+    scheduled = [x for x in scheduled if x is not None]
+
     return scheduled
