@@ -1,189 +1,146 @@
-from data import Transfer, Updater, Clean
+from data import Transfer
+from data import Updater
 from data import queries
+from data import Generate
 import pandas as pd
 import numpy as np
 import pickle
 import Constants
-datdir = Constants.DATA
-
-"""
-df = Transfer.return_data('matchups')
-feat_i = df.columns.tolist().index('t1_team_off_adj')
-feat = df.iloc[:, feat_i:]
-target = df['t1_marg'].values
-feat['season'] = df['season']
-"""
-"""
 from models import utils
-grid_id = 2
-# restore trials object from grid id
-trials =  utils.get_search(grid_id)
-df = utils.trials_data(trials, grid_id)
-df = df.sort_index()
 """
-"""
-def run():
-    import Constants
-    from models import utils
-    mat = Transfer.return_data('matchups')
-    mat = mat.set_index('game_id')
-    feat_i = mat.columns.tolist().index('t1_team_off_adj')
-    df = mat.iloc[:, feat_i:]
-    target = mat['t1_marg']
-    # add season back in for cross-validation split
-    df['season'] = mat['season']
+def make_features(df, tables):
+    if 'ratings_needed' in tables:
+        ratings = Transfer.return_data('ratings_needed')
+        ratings = ratings.drop('season', axis=1)
+        df = Updater.assign_features(df, ratings, merge_on=['date'])
     
-    # input variable values
-    split_values = Constants.SPLIT_YEARS
-    split_on = 'season'
-    score_type = 'MAE'
-    grid_id = 2
-
-    # split dataset into cross-validation folds and scale data
-    folds = utils.split_scale(df, target, split_on, split_values)
-
-    # set up model from grid search result
-    grid_result = utils.get_grid_result(grid_id)
-    model_name = grid_result['model']
-    model = utils.model_set(grid_result)
-
-    predict_fold = lambda x: utils.fold_preds(x, model, type, imbal=False)
-    folds = map(predict_fold, folds)
-    preds_list = [f['p_test'] for f in folds]
-    targets_list = [f['y_test'] for f in folds]
-
-    mod = "WHERE date > '2014/10/01'"
-    spreads = Transfer.return_data('spreads_clean', mod)
-    # drop missing
-    spreads = spreads.dropna(subset=['t1_spread'])
-    spreads = spreads.sort_values('game_id')
-    get_season = lambda x: Clean.season_from_date(x)
-    spreads['season'] = spreads['date'].apply(get_season)
+    if 'team_home' in tables:
+        home = Transfer.return_data('team_home')
+        home = home.drop('game_id', axis=1)
+        df = Updater.assign_features(df, home, merge_on=['date'])
     
-    for f in folds:
-        # limit spreads to fold year
-        fs = spreads[spreads['season'] == f['fold']]
-        # list of game ids in both spreads and test fold
-        gid = list(set(f['i_test']) & set(fs['game_id'].values))
-        gid.sort()
-        
-        # add ids to the fold
-        f['i_spread'] = gid
-        
-        # limit spread data to games with predictions
-        fs = fs[fs['game_id'].isin(gid)]
-        
-        # use zipped list to create lookup dict of spreads
-        fgs = zip(fs['game_id'].values, fs['t1_spread'].values)
-        fsd = {k:v for k, v in fgs}
-        
-        # lookup dict of the actual score
-        fsy = {k:v for k, v in zip(f['i_test'], f['y_test'])}
-        
-        # lookup dict of the predicted score
-        fsp = {k:v for k, v in zip(f['i_test'], f['p_test'])}
-        
-        f['spread'] = [[g, fsd[g], fsy[g], fsp[g]] for g in gid]
+    if 'spread' in tables:
+        spread = Transfer.return_data('spreads_by_team')
+        spread = spread.drop('game_id', axis=1)
+        spread['spread'] = - spread['spread']
+        spread = spread.rename(columns={'spread': 'spread_rev'})
+        df = Updater.assign_features(df, spread, team='t1', merge_on=['date'])
+    return df
 
-    spread_data = [['game_id', 'spread', 't1_marg', 'prediction']]
-    
-    for fold in folds:
-        spread_data.extend(fold['spread'])
+def add_result(df, target):
+    results = Transfer.return_data('results_by_team')
+    game_cols = ['game_id', 'team_id', 'date']
+    target_drop = [x for x in results.columns if x not in game_cols]
+    target_drop.remove(target)
+    results = results.drop(['game_id'], axis=1)
+    results = results.drop(target_drop, axis=1)
+    results = results.rename(columns={'team_id': 't1_team_id'})
+    df = pd.merge(df, results, left_on=['t1_team_id', 'date'],
+                  right_on=['t1_team_id', 'date'], how='inner')
+    return df
 
-    with open('spread_data.pkl', 'wb') as f:
-        pickle.dump(spread_data, f)
+def add_spreads(df):
+    # merge spreads
+    spreads = Transfer.return_data('spreads_by_team')
+    spreads = spreads.rename(columns={'team_id': 't1_team_id'})
+    spreads = spreads.drop(['game_id'], axis=1)
+    df = pd.merge(df, spreads, how='left',
+                  left_on=['t1_team_id', 'date'],
+                  right_on=['t1_team_id', 'date'])
+    return df
 
-#run()
-
-with open('spread_data.pkl', 'r') as f:
-    spread_data = pickle.load(f)
-
-df = pd.DataFrame(spread_data[1:], columns=spread_data[0])
-
-df['spread'] = - df['spread']
-df['prediction'] = df['prediction'].round(0)
-for col in ['spread', 't1_marg', 'prediction']:
-    df[col] = df[col].astype(float)
+def add_target(df, target):
+    if target == 'ats':
+        df = add_result(df, 'marg')
+        df = add_spreads(df)
+        spread_rev = - df['spread']
+        df['target'] = (df['marg'] >= spread_rev).astype(int)
+        df = df.drop(['marg', 'spread'], axis=1)
+    if target == 'win':
+        df = add_result(df, 'win')
+        df = df.rename(columns={'win': 'target'})
+    df = df[df['target'].notnull()]
+    return df
 
 
-df['spread_bet'] = None
-df['spread_bet'] = np.where(df['spread'] == df['prediction'], 0, None)
-df = df[df['spread_bet'] !=0]
+def clean_set(df):
+    df = df.drop_duplicates()
+    df = df.set_index('game_id')
+    df = df.drop(['date', 't1_team_id', 't2_team_id'], axis=1)
+    df = df.dropna(how='any')
+    return df
 
-df['spread_bet'] = np.where(df['prediction'] > df['spread'] + 3, 1, df['spread_bet'])
-df['spread_bet'] = np.where(df['prediction'] < df['spread'] - 3, 0, df['spread_bet'])
+def get_examples(arrange='neutral'):
+    if arrange == 'neutral':
+        df = Transfer.return_data('game_info')
+    else:
+        df = Transfer.return_data('fav_dog')
+        if arrange == 'favorite':
+            col_map = {'t_favor': 't1_team_id', 't_under': 't2_team_id'}
+        elif arrange == 'underdog':
+            col_map = {'t_under': 't1_team_id', 't_favor': 't2_team_id'}
+        else:
+            exit()
+        df = df.rename(columns=col_map)
+    df = df[['game_id', 'season', 'date', 't1_team_id', 't2_team_id']]
+    return df
 
-df['result'] = np.where(df['t1_marg'] == df['spread'], 1, None)
-df['result'] = np.where(df['t1_marg'] > df['spread'], 1, df['result'])
-df['result'] = np.where(df['t1_marg'] < df['spread'], 0, df['result'])
+# import matchups with ordered favorites and underdogs
+df = get_examples(arrange='underdog')
+tables = ['ratings_needed', 'team_home', 'spread']
+df = make_features(df, tables)
+df = add_target(df, 'win')
+df = clean_set(df)
+df.to_pickle('df2.pkl')
+"""
+df = pd.read_pickle('df2.pkl')
+df = df.reset_index()
+df = df.drop_duplicates(subset=['game_id'])
+df = df.set_index('game_id')
 
-df = df.dropna(subset=['spread_bet', 'result'])
-y_true = df['result'].astype(int)
-y_pred = df['spread_bet'].astype(int)
+split_on = 'season'
+split_values = Constants.SPLIT_YEARS
+folds_scaled = utils.split_scale(df, split_on, split_values)
 
-from sklearn.metrics import accuracy_score
-print accuracy_score(y_true, y_pred)
+score_type = 'f1'
+n_trials = 100
+grid_id = 5
+exp_id = 8
+
+trials =  utils.hyper_search(grid_id, folds_scaled, n_trials, score_type,
+                             imbal=True)
+# store the trials object
+utils.dump_search(grid_id, trials)
+# update scores with results of search
+scores = utils.write_results(exp_id, grid_id, trials)
+
+
+
 
 """
+from models.grids import scorer_grid
 
-"""
-# merge matchups with spreads and odds, create table
-mat = Transfer.return_data('matchups')
-mat.to_pickle('mat.pkl')
+class SearchExp():
 
-s = Transfer.return_data('spreads_clean')
-s.to_pickle('s.pkl')
-s = s.dropna(subset=['t1_spread'])
-s = s[['game_id', 't1_spread']]
-s.to_pickle('s.pkl')
+    def __init__(self, id, trials, features, targets):
+        self.id = id
+        self.trials = trials
+        self.features = features
+        self.targets = targets
+        self.grid_id = grid_id
 
-mrg1 = pd.merge(mat, s, how='left', left_on='game_id', right_on='game_id')
-mrg1.to_pickle('mrg1.pkl')
+    def use_score(self, score):
+        self.score_type = score
+        self.scorer = scorer_grid[self.score_type]['function']
+        
+    def split_scale(self, split_on, split_values):
+        
 
-from data import Odds
-df = Odds.clean_oddsportal(datdir)
-rows = Transfer.dataframe_rows(df)
-Transfer.create_from_schema('odds_clean', 'data/schema.json')
-Transfer.insert('odds_clean', rows, at_once=True) 
+ratings = pd.DataFrame([[1, 2], [1, 2]], index=[0, 1], columns=['col0', 'col1'])
+targets = pd.Series([0, 1], index=[0, 1])
+grid_id = 5
 
-df = df.dropna(subset=['t1_odds', 't2_odds'], how='all')
-df.to_pickle('odds.pkl')
-
-
-"""
-o = pd.read_pickle('odds.pkl')
-
-"""
-o = Transfer.return_data('odds_clean')
-o = o.dropna(subset=['t1_odds', 't2_odds'], how='all')
-o = o[['game_id', 'date', 't1_odds', 't2_odds']]
-o.to_pickle('o.pkl')
-
-o = pd.read_pickle('o.pkl')
-mat = pd.read_pickle('mat.pkl')
-o['season'] = map(Clean.season_from_date, o['date'])
-
-mrg = pd.merge(o, mat, how='outer', left_on=['game_id', 'date', 'season'],
-               right_on=['game_id', 'date', 'season'])
-
-"""
-
-mb = Transfer.return_data('matchups_bet')
-cols_keep = ['game_id', 'season', 'date', 'game_cat', 't1_team_id',
-             't2_team_id', 't1_eff_marg', 't2_eff_marg', 't1_spread', 't1_odds',
-             't2_odds']
-df = mb[cols_keep].copy()
-df.to_pickle('df.pkl')
-
-# covert odds to decimal
-
-
-
-df['t1_eff_diff'] = df['t1_eff_marg'] - df['t2_eff_marg']
-
-cols_for_dict = ['t1_team_id', 't2_team_id', 't1_spread', 't1_odds', 't2_odds',
-                 't1_eff_diff']
-dr = df[cols_for_dict].to_dict('records')
-
-def favun_from_dict(game_dict):
+exp = SearchExp(1, 100, ratings, targets, grid_id)
+exp.use_score('f1')
+exp.split_scale()
 """
