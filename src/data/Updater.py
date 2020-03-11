@@ -78,7 +78,7 @@ def update_current():
     rows = Transfer.dataframe_rows(mrg)
     Transfer.insert('matchups_current', rows, at_once=False, delete=True)
 
-def assign_features(df_mat, df_feat, merge_on=[], how='inner'):
+def assign_features(df_mat, df_feat, team='both', merge_on=[], how='inner'):
     # copy team features and merge for each team in matchup
     # df_feat must have 'team_id' column as team identifer
     t1_merge = ['t1_team_id'] + merge_on
@@ -88,10 +88,14 @@ def assign_features(df_mat, df_feat, merge_on=[], how='inner'):
     t1.columns = ['t1_' + x if x not in merge_on else x for x in t1.columns]
     t2 = df_feat.copy()
     t2.columns = ['t2_' + x if x not in merge_on else x for x in t2.columns]
-
-    mrg = pd.merge(df_mat, t1, left_on=t1_merge, right_on=t1_merge, how=how)
-    mrg = pd.merge(mrg, t2, left_on=t2_merge, right_on=t2_merge, how=how)
     
+    if team == 'both':
+        mrg = pd.merge(df_mat, t1, left_on=t1_merge, right_on=t1_merge, how=how)
+        mrg = pd.merge(mrg, t2, left_on=t2_merge, right_on=t2_merge, how=how)
+    elif team == 't1':
+        mrg = pd.merge(df_mat, t1, left_on=t1_merge, right_on=t1_merge, how=how)
+    else:
+        mrg = pd.merge(df_mat, t1, left_on=t2_merge, right_on=t2_merge, how=how)
     return mrg
 
 
