@@ -14,7 +14,7 @@ import queries
 
 def update_day(date):
     """
-    """Run once daily after all games have ended."""
+    "Run once daily after all games have ended."
     # add games for ratings for date
     df = Ratings.game_box_for_ratings(date)
     rows = Transfer.dataframe_rows(df)
