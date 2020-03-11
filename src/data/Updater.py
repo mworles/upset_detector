@@ -43,7 +43,7 @@ def update_day(date):
     Transfer.insert('spreads_clean', rows, at_once=False)
     
     # insert rows to game_info table for day's games
-    mod = """where date = '%s'""" % (date)
+    mod = "where date = '%s'" % (date)
     df = Transfer.return_data('game_scores', modifier=mod)
     df = Generate.convert_game_scores(df)
     df = Generate.make_game_info(df)
@@ -53,14 +53,11 @@ def update_day(date):
     # get team location for day's games, insert rows to team_home
     rows = Generate.game_home(date)
     Transfer.insert('team_home', rows, at_once=False)
-
+    
     # get team location for next week's scheduled games
-    start = Clean.date_plus(date, 1)
-    end = Clean.date_plus(start, 5)
-    dates = Clean.date_range(start, end)
-    rows = Generate.game_home(dates)
-    Transfer.insert("team_home_current", rows, at_once=True, delete=True)
-
+    rows = Generate.game_home()
+    Transfer.insert("team_home_scheduled", rows, at_once=False, delete=True)
+    
 def update_current():
     """Run as frequently as desired to update current matchups."""
     odds = Odds.odds_vi()

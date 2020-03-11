@@ -109,7 +109,6 @@ def game_box(url):
         return [cols_all, game_data]
     
     except Exception as e:
-        print e
         return [['gid'], [gid]]
 
 def game_scores(date, future=False):
@@ -138,7 +137,6 @@ def game_scores(date, future=False):
         games.insert(0, col_names)
         
     except Exception as e:
-        print e
         games = [['date', 'timestamp'], [date, timestamp]]
 
     return games
@@ -262,3 +260,15 @@ def get_gyms(season):
         else:
             gym = [['season', 'date'], [season, date]]
             Transfer.insert('game_gym_error', gym, at_once=True)
+
+def get_scheduled(dates):
+    scheduled = []
+
+    for date in dates:
+        results = game_scores(date, future=True)    
+        if len(scheduled) == 0:
+            scheduled.extend(results)
+        else:
+            scheduled.extend(results[1:])
+    
+    return scheduled

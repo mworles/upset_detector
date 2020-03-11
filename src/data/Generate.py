@@ -302,27 +302,16 @@ def tcp_team_home(df):
 
 def game_home(date=None):
     if date is not None:
-        if type(date) == str:
-            results = Scrapers.game_scores(date, future=True)
-            df = pd.DataFrame(results[1:], columns=results[0])
-        elif type(date) == list:
-            scheduled = []
-            for date in date:
-                results = Scrapers.game_scores(date, future=True)    
-                if len(scheduled) == 0:
-                    scheduled.extend(results)
-                else:
-                    scheduled.extend(results[1:])
-            df = pd.DataFrame(scheduled[1:], columns=scheduled[0])
-    else:
-        df = Transfer.return_data('game_scores')
+        mod = """WHERE date = '%s'""" % (date)
+        df = Transfer.return_data('game_scores', modifier=mod)
         df = df.drop(columns=['home_score', 'away_score'])
+    else:
+        df = Transfer.return_data('game_scheduled')
     
     df = Match.id_from_name(df, 'team_tcp', 'away_team', drop=False)
     df = Match.id_from_name(df, 'team_tcp', 'home_team', drop=False)
     df = convert_team_id(df, ['home_team_id', 'away_team_id'], drop=False)
-    df = set_gameid_index(df, date_col='date', full_date=True,
-                                   drop_date=False)
+    df = set_gameid_index(df, date_col='date', full_date=True, drop_date=False)
     rows = tcp_team_home(df)
     
     return rows
