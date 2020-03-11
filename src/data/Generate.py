@@ -262,7 +262,7 @@ def make_game_info(df):
     return df
 
 
-def game_box_convert(df):
+def game_score_convert(df):
     home_won = df['home_score'] > df['away_score']
     df['wteam'] = np.where(home_won, df['home_team_id'], df['away_team_id'])
     df['lteam'] = np.where(home_won, df['away_team_id'], df['home_team_id'])
@@ -279,7 +279,7 @@ def convert_game_scores(df):
     df['game_cat'] = "NA"
     df['season'] = map(Clean.season_from_date, df['date'].values)
     # convert columns to apply neutral id function
-    df = game_box_convert(df)
+    df = game_score_convert(df)
     return df
 
 def tcp_team_home(df):
