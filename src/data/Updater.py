@@ -49,6 +49,7 @@ def update_day(date):
     df = Generate.make_game_info(df)
     rows = Transfer.dataframe_rows(df)
     Transfer.insert('game_info', rows, at_once=False)
+    
     # get team location for day's games, insert rows to team_home
     rows = Generate.game_home(date)
     Transfer.insert('team_home', rows, at_once=False)
