@@ -9,6 +9,10 @@ scorer_grid['accuracy'] = {'function': metrics.accuracy_score,
                            'type': 'classification'}
 scorer_grid['f1'] = {'function': metrics.f1_score,
                      'type': 'classification'}
+scorer_grid['precision'] = {'function': metrics.precision_score,
+                            'type': 'classification'}
+scorer_grid['recall'] = {'function': metrics.recall_score,
+                            'type': 'classification'}
 scorer_grid['MSE'] = {'function': metrics.mean_squared_error,
                       'type': 'regression'}
 scorer_grid['MAE'] = {'function': metrics.mean_absolute_error,
