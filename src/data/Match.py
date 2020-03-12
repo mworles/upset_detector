@@ -348,7 +348,7 @@ def create_key(datdir):
     rows = Transfer.dataframe_rows(key)
     Transfer.insert('team_key', rows, at_once=True) 
 
-def id_from_name(df, key_col, name_col, drop=True):
+def id_from_name(df, key_col, name_col, drop=True, how='inner'):
     """From input data containing team name column specified in 'name_col', 
     returns dataframe containing team numeric identifiers.
 
@@ -368,10 +368,13 @@ def id_from_name(df, key_col, name_col, drop=True):
     # from id key data, only need numeric identifer and key_col to merge on
     id = id[['team_id', key_col]]
     id['team_id'] = id['team_id'].astype(int)
+    id_name = name_col + '_id'
+    id = id.rename(columns={'team_id': id_name})
+    
     # remove duplicates
     id = id[~id.duplicated()]
     # join data the id key file using specified inputs
-    mrg = pd.merge(df, id, left_on=name_col, right_on=key_col, how='inner')
+    mrg = pd.merge(df, id, left_on=name_col, right_on=key_col, how=how)
 
     # list of cols to drop, key_col is redundant with name_col
     drop_cols = [key_col]
@@ -382,7 +385,7 @@ def id_from_name(df, key_col, name_col, drop=True):
     mrg = mrg.drop(drop_cols, axis=1)
     
     # create unique column name for added id
-    id_name = name_col + '_id'
-    mrg = mrg.rename(columns={'team_id': id_name})
+    #id_name = name_col + '_id'
+    #mrg = mrg.rename(columns={'team_id': id_name})
     
     return mrg
