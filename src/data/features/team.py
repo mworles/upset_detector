@@ -1,8 +1,9 @@
 from src.data import Transfer
 from src.data import Match
+from src.data import Clean
 import pandas as pd
 import numpy as np
-
+import datetime
 
 # code to use on team game row data
 def compute_game_stats(df):
@@ -155,9 +156,6 @@ def clean_box(df):
 
     df = df.drop(columns=['FGMA', '3PMA', 'FTMA', 'MIN', 'TOT', 'winner', 'loc'])
     
-    
-    
-    
     dfw = df[winner]
     dfl = df[~winner]
     
@@ -167,28 +165,31 @@ def clean_box(df):
     win_cols = ['w' + x for x in change_cols]
     win_map= {k:v for k,v in zip(change_cols, win_cols)}
     dfw = dfw.rename(columns=win_map)
-    
-    dfw = Match.id_from_name(df, 'team_tcp', 'team', drop=False)
-    dfw = dfw.rename(columns={'team_id': 'wteam'})
+    dfw = dfw.rename(columns={'team': 'wteam'})
     
     lose_cols = ['l' + x for x in change_cols]
     lose_map = {k:v for k,v in zip(change_cols, lose_cols)}
     dfl = dfl.rename(columns=lose_map)
-    dfl = Match.id_from_name(df, 'team_tcp', 'team', drop=False)
-    dfl = dfw.rename(columns={'team_id': 'lteam'})
-
-    return dfw
-
-def convert(df):
-    home_won = df['home_score'] > df['away_score']
+    #dfl = Match.id_from_name(dfl, 'team_tcp', 'team')
+    dfl = dfl.rename(columns={'team': 'lteam'})
+    dfl = dfl.drop(columns=['numot'])
     
-    col_map = {'FGMA'}
+    merge_on = ['gid', 'date']
+    mrg = pd.merge(dfw, dfl, how='inner', left_on=merge_on, right_on=merge_on)
     
-    df['wteam'] = np.where(home_won, df['home_team_id'], df['away_team_id'])
-    df['lteam'] = np.where(home_won, df['away_team_id'], df['home_team_id'])
-    df['wscore'] = np.where(home_won, df['home_score'], df['away_score'])
-    df['lscore'] = np.where(home_won, df['away_score'], df['home_score'])
-    df['wloc'] = np.where(home_won, 'H', 'A')
-    df['wloc'] = np.where(df['neutral'] == 1, 'N', df['wloc'])
+    mrg['season'] = map(Clean.season_from_date, mrg['date'].values)
     
-    return df
+    # add dayzero date to create daynum
+    seasons = Transfer.return_data('seasons', modifier="WHERE season = 2020")
+    seasons = seasons[['season', 'dayzero']]
+    
+    mrg['dayzero'] = seasons['dayzero'].values[0]
+    make_dt = lambda x: datetime.datetime.strptime(x, "%m/%d/%Y")
+    mrg['dayzero'] = mrg['dayzero'].apply(make_dt)
+    make_dt = lambda x: datetime.datetime.strptime(x, "%Y/%m/%d")
+    mrg['date_dt'] = mrg['date'].apply(make_dt)
+    mrg['daynum'] = (mrg['date_dt'] - mrg['dayzero']).apply(lambda x: x.days)
+    
+    mrg = mrg.drop(columns=['dayzero', 'date_dt', 'gid', 'date'])
+    
+    return mrg
