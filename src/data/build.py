@@ -225,6 +225,29 @@ def transform():
     sbt = Generate.games_by_team(df)
     Transfer.insert_df('stats_by_team', sbt, at_once=True) 
 
+    # convert stats_by_team to stats_by_date
+    # stats only exist after 2002
+    mod = """WHERE season >= 2003"""
+    dfs = Transfer.return_data('seasons', mod)
+    dfs = dfs[['season', 'dayzero']]
+    seasons = list(set(dfs['season'].values))
+    seasons.sort()
+    
+    for season in seasons:
+        mod = "WHERE season = %s" % (season)
+        df = Transfer.return_data('stats_by_team', mod)
+        df = features.team.prep_stats_by_team(df)
+        dates = list(set(df['date']))
+        dates.sort()
+        
+        for date in dates:
+        
+            df_date = compute_summaries(df, max_date=date)
+            df_date['date'] = date
+            df_date['season'] = season
+            Transfer.insert_df('stats_by_date', df_date, at_once=True)
+
+
 def modify():
     dba = Transfer.DBAssist()
     dba.connect()
