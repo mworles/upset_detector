@@ -221,6 +221,7 @@ def transform():
     com = Transfer.return_data('ncaa_results')
     com_keep = com[com['season'] < dtl['season'].min()]
     df = pd.concat([dtl, com_keep], sort=False)
+    df = df.drop(['wloc', 'numot'], axis=1)
     sbt = Generate.games_by_team(df)
     Transfer.insert_df('stats_by_team', sbt, at_once=True) 
 
