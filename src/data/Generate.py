@@ -359,7 +359,6 @@ def games_by_team(df):
         return data
 
     # remove columns not needed
-    df = df.drop(['wloc', 'numot'], axis=1)
     wcols = [x for x in df.columns if x[0] == 'w']
     lcols = [x for x in df.columns if x[0] == 'l']
 
