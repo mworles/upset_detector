@@ -10,7 +10,8 @@ import math
 import json
 import datetime
 import queries
-
+import features
+import Clean
 
 def update_day(date):
     "Run once daily after all games have ended."
@@ -18,6 +19,19 @@ def update_day(date):
     df = Ratings.game_box_for_ratings(date)
     rows = Transfer.dataframe_rows(df)
     Transfer.insert('games_for_ratings', rows, at_once=False) 
+    
+    # add stats by team
+    mod = "WHERE DATE = '%s'" % (date)
+    df = features.team.box_stats_by_team(mod=mod)
+    Transfer.insert_df('stats_by_team', df, at_once=True)
+    
+    # convert stats_by_team to stats_by_date
+    season = Clean.season_from_date(date)
+    mod = 'WHERE season = %s' % (season)
+    df = Transfer.return_data('stats_by_team', modifier=mod)
+    df = features.team.prep_stats_by_team(df)
+    df = features.team.compute_summaries(df)
+    Transfer.insert_df('stats_by_date', df, at_once=True)
     
     # pull all existing games for ratings from current season
     year = float(date.split('/')[0])
