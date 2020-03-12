@@ -6,5 +6,4 @@ date = datetime.datetime.now()
 date = date - datetime.timedelta(days=1)
 date = date.strftime('%Y/%m/%d')
 
-date = '2020/03/10'
 Updater.update_day(date)
