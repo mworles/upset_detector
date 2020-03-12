@@ -1,6 +1,7 @@
 from src.data import Transfer
 from src.data import Match
 from src.data import Clean
+from src.data import Generate
 import pandas as pd
 import numpy as np
 import datetime
@@ -193,3 +194,128 @@ def clean_box(df):
     mrg = mrg.drop(columns=['dayzero', 'date_dt', 'gid', 'date'])
     
     return mrg
+
+def box_stats_by_team(mod=None):
+    df = Transfer.return_data('game_box', modifier=mod)
+    st = split_teams(df)
+    cb = clean_box(st)
+    sbt = Generate.games_by_team(cb)
+    sbt = sbt.rename(columns={'team_id': 'team'})
+    sbt = Match.id_from_name(sbt, 'team_tcp', 'team')
+    sbt = sbt.rename(columns={'opp_id': 'opp'})
+    sbt = Match.id_from_name(sbt, 'team_tcp', 'opp', how='left')
+    return sbt
+
+def sum_stats(gb):
+    cols_to_sum = ['team_win', 'team_loss']
+    tgb_sum = gb[cols_to_sum].sum()
+    tgb_sum.columns = ['wins', 'losses']
+    tgb_sum = tgb_sum.reset_index()
+    return tgb_sum
+
+def mean_stats(df):
+    gb = df.groupby('team_id')
+    # make list of columns for mean aggregation
+    aggmean = df.columns
+    not_mean = ['team_win', 'team_loss', 'team_id', 'opp_id', 'date']
+    aggmean = [x for x in aggmean if x not in not_mean]
+
+    tgb = df.groupby('team_id')
+    ts_mean = tgb[aggmean].mean()
+    ts_mean = ts_mean.round(4)
+    ts_mean = ts_mean.rename(columns={'team_score': 'ppg',
+                                      'opp_score': 'ppg_d'})
+    ts_mean = ts_mean.reset_index()
+    return ts_mean
+
+def pct_last(group, n=5):
+    #Compute win percentage in last n games.
+    wins = group.iloc[-n:].sum()
+    return wins / float(n)
+
+def streak(y):
+    #Compute number of consecutive events.
+    streak = y * (y.groupby((y != y.shift()).cumsum()).cumcount() + 1)
+    return int(streak[-1:])
+
+def prep_stats_by_team(df):
+    start_cols = df.columns.tolist()
+    
+    # add computed stats to data
+    df = compute_game_stats(df)
+    
+    # keep computed stats and select columns
+    new_cols = [x for x in list(df.columns) if x not in start_cols]
+    new_cols.remove('pos')
+    keep_cols = ['season', 'daynum', 'team_id', 'team_score', 'opp_id',
+                 'opp_score']
+    keep_cols.extend(new_cols)
+    df = df[keep_cols]
+    
+    # add date to each game
+    dfs = Transfer.return_data('seasons')
+    dfs = dfs[['season', 'dayzero']]
+    df = pd.merge(df, dfs, how='inner', left_on='season', right_on='season')
+    df['date'] = df.apply(Clean.game_date, axis=1)
+    
+    # remove cols not needed
+    df = df.drop(['season', 'daynum', 'dayzero'], axis=1)
+    
+    return df
+
+
+def compute_summaries(df, max_date=None):
+    if max_date is not None:
+        df = df[df['date'] < max_date]
+    else:
+        max_date = df['date'].max()
+    
+    df = df.sort_values(['team_id', 'date'])
+    
+    tgb_mean = mean_stats(df)
+    
+    gb = df.groupby('team_id')
+    tgb_sum = sum_stats(gb)
+
+    tgb_std = gb['scrmarg'].std()
+    tgb_std = tgb_std.rename('scrmargsd').round(2)
+    tgb_std = tgb_std.reset_index()
+    
+    recent_list = []
+    
+    recent_list.append(gb['team_win'].apply(streak).rename('wstreak'))
+    recent_list.append(gb['team_loss'].apply(streak).rename('lstreak'))
+
+    # need to remove teams with < 5/10 games
+    # on merge below these teams will be assigned missing values
+    game_count = gb['team_win'].count().reset_index()
+    have_five = game_count[game_count['team_win'] >=5]['team_id'].values
+    have_ten = game_count[game_count['team_win'] >=10]['team_id'].values
+    df5 = df[df['team_id'].isin(have_five)]
+    df10 = df[df['team_id'].isin(have_ten)]
+
+    gb5 = df5.groupby('team_id')
+    gb10 = df10.groupby('team_id')
+    
+    last_5 = lambda x: pct_last(x, n=5)
+    pct_last_5 = gb5['team_win'].apply(last_5).rename('wpctlast5')
+    
+    last_10 = lambda x: pct_last(x, n=10)
+    pct_last_10 = gb10['team_win'].apply(last_10).rename('wpctlast10')
+
+    tgb_rec = pd.merge(pct_last_5, pct_last_10, left_on='team_id',
+                      right_on='team_id', how='outer')
+
+    mrg1 = pd.merge(tgb_sum, tgb_mean, how='outer',
+                    left_on='team_id', right_on='team_id')
+    mrg2 = pd.merge(mrg1, tgb_std, how='outer', left_on='team_id',
+                    right_on='team_id')
+    mrg3 = pd.merge(mrg2, tgb_rec, how='outer',
+                    left_on='team_id', right_on='team_id')
+
+    mrg3['winpct'] = mrg3.wins / (mrg3.wins + mrg3.losses)
+    
+    mrg3['date'] = max_date
+    mrg3['season'] = Clean.season_from_date(max_date)
+    
+    return mrg3
