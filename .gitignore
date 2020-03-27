@@ -3,6 +3,6 @@
 /plots/
 .config
 /venv
-/src/data/driver/
+/src/data/scrapers/driver
 *.pkl
 /upset_detector.egg-info
