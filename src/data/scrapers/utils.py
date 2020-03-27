@@ -1,6 +1,7 @@
 from bs4 import BeautifulSoup
 import requests
 import datetime
+from selenium import webdriver
 
 def get_table_rows(url):
     r = requests.get(url)
@@ -18,3 +19,7 @@ def get_soup(url):
     f = requests.get(url)
     soup = BeautifulSoup(f.text, features='lxml')
     return soup
+
+def set_browser(driver_path = 'driver/chromedriver.exe'):
+    browser = webdriver.Chrome(driver_path)
+    return browser
