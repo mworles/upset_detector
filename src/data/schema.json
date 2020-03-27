@@ -240,5 +240,11 @@
                             {"name": "timestamp", "type": "VARCHAR (64)"}],
     "game_gym_error":       [{"name": "gid", "type": "INTEGER"},
                             {"name": "season", "type": "INTEGER"},
-                            {"name": "date", "type": "VARCHAR (64)"}]
+                            {"name": "date", "type": "VARCHAR (64)"}],
+    "recruit_ranks":        [{"name": "season", "type": "INTEGER"},
+                            {"name": "ranking", "type": "INTEGER"},
+                            {"name": "name", "type": "VARCHAR (64)"},
+                            {"name": "star", "type": "INTEGER"},
+                            {"name": "rating", "type": "FLOAT"},
+                            {"name": "school", "type": "VARCHAR (64)"}]
                     }
