@@ -246,5 +246,19 @@
                             {"name": "name", "type": "VARCHAR (64)"},
                             {"name": "star", "type": "INTEGER"},
                             {"name": "rating", "type": "FLOAT"},
-                            {"name": "school", "type": "VARCHAR (64)"}]
+                            {"name": "school", "type": "VARCHAR (64)"}],
+    "espn_pergame":         [{"name": "season", "type": "INTEGER"},
+                            {"name": "team", "type": "VARCHAR (64)"},
+                            {"name": "name", "type": "VARCHAR (64)"},
+                            {"name": "gp", "type": "FLOAT"},
+                            {"name": "min", "type": "FLOAT"},
+                            {"name": "pts", "type": "FLOAT"},
+                            {"name": "reb", "type": "FLOAT"},
+                            {"name": "ast", "type": "FLOAT"},
+                            {"name": "stl", "type": "FLOAT"},
+                            {"name": "blk", "type": "FLOAT"},
+                            {"name": "tov", "type": "FLOAT"},
+                            {"name": "fg", "type": "FLOAT"},
+                            {"name": "ft", "type": "FLOAT"},
+                            {"name": "3p", "type": "FLOAT"}]
                     }
