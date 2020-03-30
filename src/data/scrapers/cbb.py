@@ -137,7 +137,6 @@ def srcbb_team(season):
             per_game = add_season_team(per_game, season, team)
             Transfer.insert('player_pergame', per_game, at_once=True)
         except:
-            print url
             fail = [['season', 'team'], [season, team]]
             Transfer.insert('player_pergame_error', fail, at_once=True)
 
