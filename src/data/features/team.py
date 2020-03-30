@@ -46,8 +46,18 @@ def compute_game_stats(df):
     df['fg3pt_pct'] = (df.team_fgm3 * 3) / df.team_score
     # free throw scoring percentage
     df['ftpt_pct'] = df.team_ftm / df.team_score
+    # 2-point scoring percentage
+    df['fg2pt_pct'] = ((df.team_fgm - df.team_fgm3) * 2) / df.team_score
     # 3-point + free throw scoring percentage
     df['fg3ftpt_pct'] = ((df.team_fgm3 * 3) + df.team_ftm ) / df.team_score
+    # defensive 3-point scoring percentage
+    df['fg3pt_pct'] = (df.opp_fgm3 * 3) / df.opp_score
+    # defensive free throw scoring percentage
+    df['ftpt_pct'] = df.opp_ftm / df.opp_score
+    # defensive 2-point scoring percentage
+    df['fg2pt_pct'] = ((df.opp_fgm - df.opp_fgm3) * 2) / df.opp_score
+    # defensive 3-point + free throw scoring percentage
+    df['fg3ftpt_pct'] = ((df.opp_fgm3 * 3) + df.opp_ftm ) / df.opp_score
     # defensive 3-point attempt percentage
     df['fga3pct_d'] = df.opp_fga3 / df.opp_fga
     # field goal percentage
