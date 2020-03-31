@@ -3,7 +3,32 @@ import pandas as pd
 import numpy as np
 import math
 
+def get_minutes(row, ref_dict):
+    name = row['name']
+    team = row['team']
+    season = row['season']
+    min = row['min_pg']
+    if (season, team) in ref_dict.keys():
+        ref = ref_dict[(season, team)]
+        if name in ref['name']:
+            i = ref['name'].index(name)
+            min = ref['min'][i]
+        else:
+            min = None
+    else:
+        min = None
+    
+    return min
 
+def split_and_fill(df, ref_dict):
+    has = df[df['min_pg'].notnull()].copy()
+    tf = df[df['min_pg'].isnull()].copy()
+    fill_minutes = lambda x: get_minutes(x, ref_dict)
+    tf['min_pg'] = tf.apply(fill_minutes, axis=1).astype(float)
+    all = pd.concat([has, tf])
+    all = all.sort_values(['season', 'team'])
+    return all
+    
 def height_inches(x):
     '''Returns inches from string height.'''
     try:
@@ -118,17 +143,34 @@ pg = Transfer.return_data('player_pergame')
 
 # merge rows for season, team, and player
 merge_on = ['season', 'team', 'name']
-df = pd.merge(ros, ppg, how='inner', left_on=merge_on, right_on=merge_on)
+df = pd.merge(tr, pg, how='inner', left_on=merge_on, right_on=merge_on)
 
 # exclude seasons before 2002, b/c of missing data
 df = df[df['season'] >= 2002]
+
+# fill minutes from espn data if missing
+ep = Transfer.return_data('espn_pergame')
+
+ref_dict = {}
+for name, group in ep.groupby(['season', 'team']):
+    ref_dict[name] = group[['name', 'min']].to_dict('list')
+
+# fill minutes for subset of rows missing it
+df = split_and_fill(df, ref_dict)
+
+# by team, count players missing minutes and players total
+df['mp_null'] = df['min_pg'].isnull().astype(int)
+df['one'] = 1
+df['team_mp_null'] = df.groupby(['season', 'team'])['mp_null'].transform(sum)
+df['team_count'] = df.groupby(['season', 'team'])['one'].transform(sum)
+
 
 # calculate height to numeric inches, for computing team features
 df['height_num'] = map(height_inches, df['height'].values)
 
 convert_cols = ['min_pg', 'ast_pg', 'to_pg', 'g', 'pts_pg', 'g_start', 'fgm_pg',
                 'fga_pg', 'fta_pg', 'ftm_pg', 'rbo_pg', 'rbd_pg', 'rb_pg',
-                'stl_pg', 'ast_pg', 'blk_pg', 'pf_pg', 'to_pg', 'fg3m_pg']
+                'stl_pg', 'ast_pg', 'blk_pg', 'pf_pg', 'fg3m_pg']
 df = convert_to_numeric(df, convert_cols)
 
 # clean positon categories
