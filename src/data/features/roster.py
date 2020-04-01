@@ -510,7 +510,3 @@ def run():
 
     mrg = mrg.sort_values(['season', 'team'])
     return mrg
-
-df = run()
-#df = pd.read_pickle('mrg.pkl')
-Transfer.insert_df('roster_features', df, create=True, at_once=True)
