@@ -1,6 +1,7 @@
 from src.data import Transfer
 import tourney
 import coach
+import roster
 import pandas as pd
 
 # outcomes from previous tourneys
@@ -17,3 +18,6 @@ df = pd.merge(coaches, ts, how='outer', on=['season', 'team_id'])
 
 cs = coach.tourney_success(df)
 Transfer.insert_df('coach_success', cs, at_once=True, create=True)
+
+df = roster.run()
+Transfer.insert_df('roster_features', df at_once=True, create=True)

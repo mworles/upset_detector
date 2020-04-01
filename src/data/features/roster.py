@@ -418,8 +418,7 @@ def experience_adjusted(df, group_on):
     return gb
 
 def run():
-    #df = clean_roster(min_season=2002)
-    df = pd.read_pickle('df.pkl')
+    df = clean_roster(min_season=2002)
     group_on = ['season', 'team']
     
     # create a baseline dataset of team and season to merge team statistics
