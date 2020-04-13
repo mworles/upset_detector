@@ -131,6 +131,22 @@ def build(datdir, ratings=False):
     # pre-process raw data
     Clean.scrub_files(Constants.RAW_MAP, out='mysql')
     
+    # lattitude & longitude of teams
+    df = pd.read_csv(datdir + 'external/kaggle/TeamGeog.csv')
+    Transfer.insert_df('team_geog', df, at_once=True)
+    
+    # lattitude and longitude of tourney games '85-'17
+    df = pd.read_csv(datdir + 'external/kaggle/TourneyGeog.csv')
+    Transfer.insert_df('tourney_geog', df, at_once=True)
+    
+    # manually obtained lattitude and longitude of some gyms
+    df = pd.read_csv(datdir + 'external/locations/gym_manual.csv')
+    Transfer.insert_df('gym_manual', gl, at_once=True, create=True)    
+    
+    # manually obtained lattitude and longitude of some cities
+    df = pd.read_csv(datadir + 'data/external/locations/cities_manual.csv')
+    Transfer.insert_df('cities_manual', df, at_once=True, create=True)
+
     df = Ratings.games_ratings(datdir)
     rows = Transfer.dataframe_rows(df)
     Transfer.insert('games_for_ratings', rows, at_once=False)
