@@ -141,18 +141,15 @@ def fuzzy_match(x, options, cutoff=85, with_score=False):
     """
     # return the matched string and the match score
     best_match, match_score = process.extractOne(x, options)
-    
+
     if with_score == True:
         return (best_match, match_score)
     else:
     # if matched string is at or above cutoff, return
         if match_score >= cutoff:
             return best_match
-        # otherwise print message and return None
+        # otherwise return None
         else:
-            print 'team not matched'
-            # show the original string, the best match, and the score
-            print x, best_match, match_score
             return None
 
 def year4_from_string(s):
@@ -371,7 +368,7 @@ def scrub_file(name, file_map):
     return df
 
 
-def scrub_files(file_map, out='mysql'):
+def scrub_files(file_map, out='mysql', subset=[]):
     """Scrubs and writes all files identified in Constants file map.
 
     Arguments
@@ -383,6 +380,11 @@ def scrub_files(file_map, out='mysql'):
     """
     # collect list of all files to process
     files = file_map.keys()
+    
+    # use subset to restrict file list
+    if len(subset) != 0:
+        files = [f for f in files if f in subset]
+
     # scrub and write each file
     for f in files:
         # obtain data with columns reformatted
@@ -392,7 +394,7 @@ def scrub_files(file_map, out='mysql'):
         # insert into mysql or save csv files
         if out == 'mysql':
             rows = Transfer.dataframe_rows(df)
-            Transfer.insert(table_name, rows, at_once=False, create=True,
+            Transfer.insert(table_name, rows, at_once=True, create=True,
                         delete=True)
         else:
             data_out = '../data/scrub/'
