@@ -2,6 +2,7 @@ from bs4 import BeautifulSoup
 import requests
 import unicodedata
 import time
+from src.data import Transfer
 
 def season_table(season):
     data_out = '../data/external/sportsref_schoolstats/'
@@ -97,7 +98,6 @@ def add_season_team(table, season, team):
     return new_table
 
 def team_page(url):
-    time.sleep(2)
     r = requests.get(url)
     soup = BeautifulSoup(r.content, 'html.parser')
     return soup
@@ -118,6 +118,7 @@ def srcbb_team(season):
             pass
     
     for url in links:
+        time.sleep(1)
         url_split = url.split('/')
         season = int(url_split[-1].split('.')[0])
         team = remove_unicode(url_split[-2])
@@ -203,6 +204,7 @@ def srcbb_schedule_links(season):
     
     return links
 
+
 def srcbb_schedule(url):
     soup = team_page(url)
     sched = parse_schedule(soup)
@@ -213,20 +215,48 @@ def team_from_url(url):
     team = remove_unicode(url_split[-2])
     return team
 
-def get_schedules(season):
-    links = Scrapers.srcbb_schedule_links(season)
-    links_got = []
+def get_team_schedule(url, season):
+    team = team_from_url(url)
+    try:
+        sched = srcbb_schedule(url)
+        #sched = add_season_team(sched, season, team)
+    except:
+        sched = [[]]
+        #sched = [['season', 'team'], [season, team]]
+    
+    sched = add_season_team(sched, season, team)
+    return sched
+
+    
+def get_insert_schedules(season):
+    links = srcbb_schedule_links(season)
     
     for url in links:
-        team = Scrapers.team_from_url(url)
-        try:
-            sched = Scrapers.srcbb_schedule(url)
-            sched = Scrapers.add_season_team(sched, season, team)
+        time.sleep(1)
+        sched = get_team_schedule(url, season)
+        
+        if len(sched) > 2:
             Transfer.insert('cbb_schedule', sched, at_once=True)
-            links_got.append(url)
-        except:
-            print url
-            sched = [['season', 'team'], [season, team]]
+        else:
             Transfer.insert('cbb_schedule_error', sched, at_once=True)
-    
-    print 'inserted %s rows season %s' % (len(links_got), season)
+
+def team_from_row(row):
+    try:
+        a = row.find('a')
+        href = a['href']
+        team_cbb = str(href.split('/')[-2])
+        team_prop = row.find('td').getText()
+        team_prop = remove_unicode(team_prop)
+        team_prop = team_prop.replace('NCAA', '').rstrip()
+        td = {'team_ss': team_prop, 'team_sched': team_cbb}
+        return td
+    except:
+        return None
+
+def srcbb_team_names(season):
+    table = season_table(season)
+    rows = table.findAll('tr')
+
+    teams = map(team_from_row, rows)
+    teams = [t for t in teams if t is not None]
+    return teams
