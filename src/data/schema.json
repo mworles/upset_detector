@@ -260,5 +260,19 @@
                             {"name": "tov", "type": "FLOAT"},
                             {"name": "fg", "type": "FLOAT"},
                             {"name": "ft", "type": "FLOAT"},
-                            {"name": "3p", "type": "FLOAT"}]
+                            {"name": "3p", "type": "FLOAT"}],
+    "team_geog":            [{"name": "team_id", "type": "INTEGER"},
+                            {"name": "lat", "type": "FLOAT"},
+                            {"name": "lng", "type": "FLOAT"}],
+    "tourney_geog":         [{"name": "season", "type": "INTEGER"},
+                            {"name": "daynum", "type": "INTEGER"},
+                            {"name": "wteam", "type": "INTEGER"},
+                            {"name": "lteam", "type": "INTEGER"},
+                            {"name": "slot", "type": "VARCHAR (64)"},
+                            {"name": "host", "type": "VARCHAR (64)"},
+                            {"name": "lat", "type": "FLOAT"},
+                            {"name": "lng", "type": "FLOAT"}],
+    "game_location":        [{"name": "game_id", "type": "VARCHAR (64)"},
+                            {"name": "latitude", "type": "FLOAT"},
+                            {"name": "longitude", "type": "FLOAT"}]
                     }
