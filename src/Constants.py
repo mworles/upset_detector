@@ -64,6 +64,17 @@ RAW_MAP['MNCAATourneySeeds'] = {'new_name': 'seeds',
 
 RAW_MAP['MSeasons'] = {'new_name': 'seasons'}
 
+RAW_MAP['MGameCities'] = {'new_name': 'game_cities',
+                          'columns': {'WTeamID': 'WTeam',
+                                      'LTeamID': 'LTeam',
+                                      'CRType': 'game_cat',
+                                      'CityID': 'city_id'}
+                               }
+
+RAW_MAP['Cities'] = {'new_name': 'cities',
+                     'columns': { 'CityID': 'city_id'}
+                     }
+
 # seed number to use for random data processses
 RANDOM_SEED = 40195
 
