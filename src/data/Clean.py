@@ -19,15 +19,15 @@ import Transfer
 def write_file(df, data_out, file_name, keep_index=False):
     """Specify location and save .csv data file in one line.
     
-    Arguments
+    Parameters
     ----------
-    df: pandas dataframe
+    df: DataFrame
         Data to save to file.
-    data_out: string
+    data_out: str
         The relative path of location to save file.
-    file_name: string
+    file_name: str
         Name of the file to save.
-    keep_index: boolean
+    keep_index: bool
         Whether to keep or drop the dataframe index. 
     """
     # combine the relative path and file name
