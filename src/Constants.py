@@ -75,8 +75,21 @@ RAW_MAP['Cities'] = {'new_name': 'cities',
                      'columns': { 'CityID': 'city_id'}
                      }
 
+RAW_MAP['TeamGeog'] = {'new_name': 'team_geog',
+                       'columns': { 'lat': 'latitude',
+                                   'lng': 'longitude'}
+                       }
+RAW_MAP['TourneyGeog'] = {'new_name': 'tourney_geog',
+                          'columns': {'lat': 'latitude',
+                                      'lng': 'longitude'}
+                       }
+
 # seed number to use for random data processses
 RANDOM_SEED = 40195
 
 # relative path to data directory
 DATA = '../data/'
+
+TEAM_CITY_UPDATE =  [[1465, ('Riverside', 'California')],
+                     [1466, ('Florence', 'Alabama')]
+                     ]
