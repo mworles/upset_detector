@@ -394,8 +394,8 @@ def scrub_files(file_map, out='mysql', subset=[]):
         # insert into mysql or save csv files
         if out == 'mysql':
             rows = Transfer.dataframe_rows(df)
-            Transfer.insert(table_name, rows, at_once=True, create=True,
-                        delete=True)
+            Transfer.insert(table_name, rows, at_once=True, create=False,
+                            delete=True)
         else:
             data_out = '../data/scrub/'
             write_file(df, data_out, table_name, keep_index=False)
