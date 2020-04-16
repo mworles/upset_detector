@@ -25,7 +25,7 @@ neutral_locations
 
 transform_schedule
     Return game identifiers and gym names from scraped team schedule data.
-    
+
 gym_locations
     Return dict with locations for the gyms in team schedule data.
 
@@ -37,7 +37,7 @@ match_gyms
 
 convert_schedule_date
     Returns date converted to the project standard format.
-    
+
 schedule_team_ids
     Returns dataframe with team numeric identifers added to raw schedule data.
 
