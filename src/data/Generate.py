@@ -82,6 +82,24 @@ def convert_team_id(df, id_cols, drop=True):
     
     return df
 
+def date_from_daynum(df):
+    seas = Transfer.return_data('seasons')
+    seas = seas.loc[:, ['season', 'dayzero']]
+    df = pd.merge(df, seas, how='inner', left_on='season', right_on='season')
+    df['date'] = df.apply(Clean.game_date, axis=1)
+    df = df.drop(['dayzero'], axis=1)
+    return df
+
+
+def make_game_id(df, id_cols, convert_date=True):
+    if convert_date is True:
+        df = date_from_daynum(df)
+    df = convert_team_id(df, id_cols, drop=True)
+    df = set_gameid_index(df, date_col='date', full_date=True,
+                                   drop_date=True)
+    df = df.reset_index()
+    return df
+
 
 def team_scores(df):
     """Return data with neutral team scores 't1_score' and 't2_score' 
