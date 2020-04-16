@@ -11,7 +11,7 @@ import json
 import datetime
 import queries
 
-def create(schema_file):
+def create_database(schema_file):
     with open(schema_file, 'r') as f:
         schema = json.load(f)
     for k in schema.keys():
@@ -127,6 +127,8 @@ def columns_by_team(df, col_names):
     return both
 
 def build(datdir, ratings=False):
+    create_database('schema.json')
+    
     """Run once to insert data gathered from flat files."""
     # pre-process raw data
     Clean.scrub_files(Constants.RAW_MAP, out='mysql')
