@@ -23,27 +23,37 @@ team_locations
 neutral_locations
     Return dataframe with game identifier and location of neutral games.
 
-clean_schedule
-
+transform_schedule
+    Return game identifiers and gym names from scraped team schedule data.
+    
 gym_locations
+    Return dict with locations for the gyms in team schedule data.
 
 gym_coordinates
+    Return dict with location of gyms collected from gym, city, state data.
 
 match_gyms
+    Returns a fuzzy string match for a given gym name. 
 
 convert_schedule_date
-
+    Returns date converted to the project standard format.
+    
 schedule_team_ids
+    Returns dataframe with team numeric identifers added to raw schedule data.
 
 schedule_team_key
+    Returns a dataframe with unique keys for linking schedule teams to numeric
+    identifiers.
 
 game_distances
+    Returns dataframe with distances to game for both teams in the matchup.
 
 travel_distance
+    Returns integer distance (in miles) between two locations.
 
-update_teams : 
-
-
+update_teams
+    Inserts geographical location for new teams not present in the raw team
+    geographical location file.
 
 """
 from src import Constants
@@ -260,7 +270,7 @@ def neutral_locations(neutral):
     # import and clean games with gyms from scraped schedule
     mod = 'WHERE season >= 2003 AND season <= 2009'
     sg = Transfer.return_data('cbb_schedule', modifier=mod)
-    sg = clean_schedule(sg)
+    sg = transform_schedule(sg)
 
     # remove tourney games already obtained above
     sg = sg[~sg['game_id'].isin(tg['game_id'].values)]
@@ -277,7 +287,7 @@ def neutral_locations(neutral):
     return all
 
 
-def clean_schedule(df):
+def transform_schedule(df):
     # only use neutral site games with gym values
     df = df[df['location'] == 'N']
     df = df[df['gym'].notnull()]
@@ -323,7 +333,7 @@ def gym_locations(df):
     # use match_gyms to add fuzzy-matched gym names
     options = gym_map.keys()    
     names = df_out['gym'].values
-    df_out['fuzz'] = map(lambda x: match_gyms(x, options), names)
+    df_out['fuzz'] = map(lambda x: match_gym(x, options), names)
 
     # combine merged and fuzzy matched gym location data
     gyms = pd.concat([df_in, df_out], sort=False)
@@ -368,7 +378,7 @@ def gym_coordinates(modifier=None):
 
 
 # function for fuzzy matching gym names
-def match_gyms(name, options):
+def match_gym(name, options):
     try:
         result = Clean.fuzzy_match(name, options, cutoff=90)
     except TypeError:
