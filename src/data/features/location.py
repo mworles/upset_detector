@@ -1,62 +1,63 @@
 """ location
 
-A module for handling and transforming data pertaining to the physical location
-of events, places, or teams.
+A module for transforming, linking, and calcuating data pertaining to the 
+physical location of events, places, or teams. Uses 2-dimensional latittude and
+longitude for geographical coordinates.
 
 Functions
 ---------
 run
-    Return data with game identifer, latitude, and longitude.
+    Returns dataframe with game identifer and geographical coordinates.
 
-city_locations
-    Return dict mapping cities to lattitude and longitude.
+home_games
+    Returns dataframe with identifiers and coordinates for games with a
+    home team.
 
-home_locations
-    Return dataframe with game identifer, home team, and location.
+neutral_games
+    Returns dataframe with identifiers and coordinates for games played at a
+    neutral site.
 
 locate_item
-    Return item location tuple from a given dict.
+    Returns the geographical coordinates of an item from a dictionary.
 
-team_locations
-    Return dict mapping teams to location.
+city_coordinates
+    Returns dict mapping cities to geographical coordinates.
 
-neutral_locations
-    Return dataframe with game identifier and location of neutral games.
+team_coordinates
+    Returns dict mapping teams to geographical coordinates.
 
-transform_schedule
-    Return game identifiers and gym names from scraped team schedule data.
+gym_schedule_coordinates
+    Returns dict with locations for the gyms in team schedule data.
 
-gym_locations
-    Return dict with locations for the gyms in team schedule data.
-
-gym_coordinates
-    Return dict with location of gyms collected from gym, city, state data.
-
-match_gyms
+match_gym
     Returns a fuzzy string match for a given gym name.
 
+gym_city_coordinates
+    Returns dict mapping gym names from external source of gym cities
+    to geographical coordinates.
+
+transform_schedule
+    Returns dataframe with unique game identifier and gym name for games 
+    scraped from team schedules.
+
 convert_schedule_date
-    Returns date converted to the project standard format.
+    Returns date from scraped team schedule converted to the project standard 
+    date format.
 
 schedule_team_ids
     Returns dataframe with team numeric identifers added to raw schedule data.
 
-schedule_team_key
-    Returns a dataframe with unique keys for linking schedule teams to numeric
-    identifiers.
-
 game_distances
-    Returns dataframe with distances to game for both teams in the matchup.
+    Returns dataframe with distance to game computed for both teams.
 
 travel_distance
-    Returns integer distance (in miles) between two locations.
+    Returns integer distance between a pair of geographical coordinates.
 
 update_teams
-    Inserts geographical location for new teams not present in the raw team
-    geographical location file.
+    Returns dataframe with geographical coordinates of new teams to add to
+    original team location data.
 
 """
-
 from src.data import Transfer
 from src.data import Clean
 from src.data import Generate
@@ -68,13 +69,12 @@ from geopy.distance import great_circle
 
 
 def run(modifier=None):
-    """Return data with game identifer, latitude, and longitude."""
-    # import games data with host team and site details
+    """Returns data with game identifer, latitude, and longitude."""
+    # import games data, contains game and team identifiers
     df = Transfer.return_data('game_info', modifier=modifier)
-    df = df.drop(['t1_score', 't2_score', 't1_win', 't1_marg'], axis=1)
-
+    
     # to add data on where game was hosted
-    th = home_locations(df['game_id'].values)
+    th = home_games(df['game_id'].values)
     df = pd.merge(df, th, left_on='game_id', right_on='game_id', how='left')
 
     # add column indicating host is neutral or not
@@ -89,7 +89,7 @@ def run(modifier=None):
 
     # import available locations for neutral games
     # contains game_id and location coordinates
-    games = neutral_locations(neutral)
+    games = neutral_games(neutral)
 
     # right merge to neutral games
     dfn = pd.merge(dfn, games, how='right', left_on='game_id',
@@ -106,8 +106,126 @@ def run(modifier=None):
     return df
 
 
-def city_locations(full_state=True):
-    """Obtain dict mapping cities to their geographical coordinates.
+def home_games(game_id):
+    """Returns dataframe with identifiers and coordinates for games with a 
+    home team.
+
+    Parameters
+    ----------
+    game_id : list or array
+        List of game identifiers to select home games from.
+
+    Returns
+    -------
+    df : DataFrame
+        Contains game id, home team id, and coordinate location of game.
+
+    """
+    # import team_home data
+    df = Transfer.return_data('team_home')
+    df = df[df['game_id'].isin(game_id)]
+
+    # identify home team for game locations
+    df = df[df['home'] == 1]
+    df = df.drop(['date', 'home'], axis=1)
+    df = df.rename(columns={'team_id': 'home_id'})
+
+    team_map = team_coordinates(df['home_id'].values)
+    home = df['home_id'].values
+    df['game_loc'] = map(lambda x: locate_item(x, team_map), home)
+    df = df[['game_id', 'home_id', 'game_loc']]
+
+    return df
+
+
+def neutral_games(neutral):
+    """Returns dataframe with identifiers and coordinates for games played at
+    a neutral site.
+    
+    Imports game locations from different sources and contains sequence of 
+    steps to transform and link games to locations. 
+    
+    Parameters
+    ----------
+    neutral : list or array
+        List of game identifiers to select games from.
+
+    Returns
+    -------
+    all : DataFrame
+        Contains game id and coordinate location of game.
+
+    """
+    # import and merge game cities and cities data, available after 2010
+    games = Transfer.return_data('game_cities')
+    cities = Transfer.return_data('cities')
+    df = pd.merge(games, cities, how='inner', left_on='city_id',
+                  right_on='city_id')
+
+    # create game id and keep relevant games
+    df = Generate.make_game_id(df, ['wteam', 'lteam'])
+    df = df[df['game_id'].isin(neutral)]
+
+    # import map of city coordinates,
+    city_map = city_coordinates(full_state=False)
+
+    # create array of (city,state) tuples, locate coordinates
+    city_state = zip(df['city'].values, df['state'].values)
+    df['game_loc'] = map(lambda x: locate_item(x, city_map), city_state)
+
+    # import and combine tourney games prior to 2010
+    tg = Transfer.return_data('tourney_geog', modifier='WHERE season < 2010')
+
+    # add unique game id from teams and date
+    tg = Generate.make_game_id(tg, ['wteam', 'lteam'])
+    tg['game_loc'] = zip(tg['latitude'].values, tg['longitude'].values)
+
+    # import and clean games with gyms from scraped schedule
+    mod = 'WHERE season >= 2003 AND season <= 2009'
+    sg = Transfer.return_data('cbb_schedule', modifier=mod)
+    sg = transform_schedule(sg)
+
+    # remove tourney games already obtained above
+    sg = sg[~sg['game_id'].isin(tg['game_id'].values)]
+
+    # create gym location map and set game locations
+    gym_map = gym_schedule_coordinates(sg)
+    sg['game_loc'] = map(lambda x: locate_item(x, gym_map), sg['gym'].values)
+
+    # combine all games, keep games with valid locations
+    all = pd.concat([df, tg, sg], sort=False)
+    all = all[all['game_loc'].notnull()]
+    all = all[['game_id', 'game_loc']]
+
+    return all
+
+
+def locate_item(item, item_map):
+    """Returns the geographical coordinates of an item from a dictionary.
+
+    Parameters
+    ----------
+    item : str or tuple of str
+        The item for which to find the geographical coordinates.
+    item_map : dict
+        Contains items as keys, coordinates as values.
+
+    Returns
+    -------
+    result : tuple
+        Tuple of floats contining lattitude and longitude.
+
+    """
+    try:
+        result = item_map[item]
+    except KeyError:
+        result = None
+
+    return result
+
+
+def city_coordinates(full_state=True):
+    """Returns dict mapping cities to lattitude and longitude.
 
     Parameters
     ----------
@@ -117,40 +235,26 @@ def city_locations(full_state=True):
     Returns
     -------
     city_dict : dict
-        Keys as (city, state) tuples, values as dict with coordinate keys.
+        Keys are tuples (city, state), values are tuples (lattitude,longitude).
 
     """
     # import and combine city and state data
     usc = Transfer.return_data('us_cities')
     uss = Transfer.return_data('us_states')
     uss = uss.rename(columns={'ID': 'ID_STATE'})
-    ct = pd.merge(usc, uss, left_on='ID_STATE', right_on='ID_STATE',
+    df = pd.merge(usc, uss, left_on='ID_STATE', right_on='ID_STATE',
                   how='inner')
 
-    # add supplemental cities
-    sc = Transfer.return_data('cities_manual')
-    sc = sc.rename(columns={'city': 'CITY',
-                            'state': 'STATE_CODE',
-                            'lat': 'LATITUDE',
-                            'lng': 'LONGITUDE'})
-
-    # create dict for full state name from state code
-    state_map = ct[['STATE_CODE', 'STATE_NAME']].drop_duplicates().copy()
+    # create state_map for supplemental cities
+    state_map = df[['STATE_CODE', 'STATE_NAME']].drop_duplicates().copy()
     state_map = state_map.set_index('STATE_CODE')
     state_map = state_map['STATE_NAME'].to_dict()
-
-    # assign "state" values for foreign countries
-    map_update = {'VI': 'Virgin Islands',
-                  'BA': 'Bahamas',
-                  'MX': 'Mexico',
-                  'CI': 'Cayman Islands',
-                  'JA': 'Jamaica',
-                  'IR': 'Ireland'}
-    state_map.update(map_update)
-    sc['STATE_NAME'] = sc['STATE_CODE'].map(state_map)
+    
+    # import and transform supplemental cities
+    sc = manual_cities(state_map)
 
     # combine all cities into one set
-    ct = pd.concat([ct, sc], sort=False)
+    ct = pd.concat([df, sc], sort=False)
 
     # replace strings for consistency across data sources
     ct['CITY'] = ct['CITY'].str.replace('Saint', 'St.')
@@ -174,163 +278,96 @@ def city_locations(full_state=True):
     return city_dict
 
 
-def home_locations(game_id):
-    """Import home team identifier data.
+def manual_cities(state_map):
+    """Returns dataframe containing data for supplemental cities to add to
+    original US cities table.
 
     Parameters
     ----------
-    modifier : str, optional, default None
-        MYSQL string to specify subsets of rows (e.g., 'WHERE year > 2000')
+    state_map : dict
+        Dict mapping state codes to full state names.
 
     Returns
     -------
     df : DataFrame
-        Contains game id and home team id.
+        Contains city, state/country, and location for supplemental cities.
 
     """
-    # import team_home data
-    df = Transfer.return_data('team_home')
-    df = df[df['game_id'].isin(game_id)]
+    # import data for supplemental cities
+    df = Transfer.return_data('cities_manual')
+    df = df.rename(columns={'city': 'CITY',
+                            'state': 'STATE_CODE',
+                            'lat': 'LATITUDE',
+                            'lng': 'LONGITUDE'})
 
-    # identify home team for game locations
-    df = df[df['home'] == 1]
-    df = df.drop(['date', 'home'], axis=1)
-    df = df.rename(columns={'team_id': 'home_id'})
-
-    team_map = team_locations()
-    home = df['home_id'].values
-    df['game_loc'] = map(lambda x: locate_item(x, team_map), home)
-    df = df[['game_id', 'home_id', 'game_loc']]
+    # assign "state" values for foreign countries
+    map_update = {'VI': 'Virgin Islands',
+                  'BA': 'Bahamas',
+                  'MX': 'Mexico',
+                  'CI': 'Cayman Islands',
+                  'JA': 'Jamaica',
+                  'IR': 'Ireland'}
+    state_map.update(map_update)
+    df['STATE_NAME'] = df['STATE_CODE'].map(state_map)
 
     return df
 
 
-def locate_item(item, item_map):
-    """Return the geographical coordinates of an item.
-
+def team_coordinates(team_id):
+    """Returns dict mapping teams to geographical coordinates.
+    
     Parameters
     ----------
-    item : str or tuple of str
-        The item for which to find the geographical coordinates.
-    item_map : dict
-        Contains items as keys, coordinates as values.
+    team_id : list or array
+        List of team identifiers to select home games from.
 
     Returns
     -------
-    result : tuple
-        Tuple of numbers contining lattitude and longitude.
+    team_map : dict
+        Keys are integer team ids, values are tuples (lattitude,longitude).
 
     """
-    try:
-        result = item_map[item]
-    except KeyError:
-        result = None
-
-    return result
-
-
-def team_locations():
-    """Return dictionary map of locations for team numeric identifiers."""
-    # import team geography data
+    # import team geography data, select teams
     df = Transfer.return_data('team_geog')
-
+    df = df[df['team_id'].isin(team_id)]
+    
     # create map with (lattitude, longitude) tuples as values
     df['lat_lng'] = zip(df['latitude'].values, df['longitude'].values)
     df = df.set_index('team_id')
-    tm = df['lat_lng'].to_dict()
+    team_map = df['lat_lng'].to_dict()
 
-    return tm
-
-
-def neutral_locations(neutral):
-    # import and merge game cities and cities data, available after 2010
-    games = Transfer.return_data('game_cities')
-    cities = Transfer.return_data('cities')
-    df = pd.merge(games, cities, how='inner', left_on='city_id',
-                  right_on='city_id')
-
-    # create game id and keep relevant games
-    df = Generate.make_game_id(df, ['wteam', 'lteam'])
-    df = df[df['game_id'].isin(neutral)]
-
-    # import map of city coordinates,
-    city_map = city_locations(full_state=False)
-
-    # create array of (city,state) tuples, locate coordinates
-    city_state = zip(df['city'].values, df['state'].values)
-    df['game_loc'] = map(lambda x: locate_item(x, city_map), city_state)
-
-    # import and combine tourney games prior to 2010
-    tg = Transfer.return_data('tourney_geog', modifier='WHERE season < 2010')
-
-    # add unique game id from teams and date
-    tg = Generate.make_game_id(tg, ['wteam', 'lteam'])
-    tg['game_loc'] = zip(tg['latitude'].values, tg['longitude'].values)
-
-    # import and clean games with gyms from scraped schedule
-    mod = 'WHERE season >= 2003 AND season <= 2009'
-    sg = Transfer.return_data('cbb_schedule', modifier=mod)
-    sg = transform_schedule(sg)
-
-    # remove tourney games already obtained above
-    sg = sg[~sg['game_id'].isin(tg['game_id'].values)]
-
-    # create gym location map and set game locations
-    gym_map = gym_locations(sg)
-    sg['game_loc'] = map(lambda x: locate_item(x, gym_map), sg['gym'].values)
-
-    # combine all games, keep games with valid locations
-    all = pd.concat([df, tg, sg], sort=False)
-    all = all[all['game_loc'].notnull()]
-    all = all[['game_id', 'game_loc']]
-
-    return all
+    return team_dict
 
 
-def transform_schedule(df):
-    # only use neutral site games with gym values
-    df = df[df['location'] == 'N']
-    df = df[df['gym'].notnull()]
+def gym_schedule_coordinates(df):
+    """Returns dict mapping gyms from the input schedule data to geographical
+    coordinates of gyms from a separate external source. Gym names are linked
+    using combination of direct merging and fuzzy string matching. 
 
-    # clean gym values for bettter alignment with gym city data
-    def clean_gym(name):
-        new_name = name.lower()
-        new_name = re.sub(r"\(.*\)", "", new_name).rstrip()
-        return new_name
+    Parameters
+    ----------
+    df : DataFrame
+        Contains games from team schedules with gym names.
 
-    df['gym'] = map(clean_gym, df['gym'].values)
-    # convert date to the project's standard date format
-    df['date'] = map(convert_schedule_date, df.date.values)
-    # clean up opponent names by removing team ranks
-    df['opponent'] = map(lambda x: re.sub(r"\(\d*\)", "", x).rstrip(),
-                         df['opponent'].values)
+    Returns
+    -------
+    gym_dict : dict
+        Keys are string gym names, values are tuples (lattitude,longitude).
 
-    # obtain team numeric ids and game id for each game
-    df = schedule_team_ids(df)
-    df = Generate.make_game_id(df, ['team_id', 'opp_id'], convert_date=False)
-
-    # isolate unique gym names for matching to gym locations
-    df = df[['game_id', 'gym']]
-
-    # each game has 2 rows (1 for each team), keep one
-    df = df.drop_duplicates(subset='game_id')
-
-    return df
-
-
-def gym_locations(df):
-
+    """
+    # isolate the unique gym names, only need one row per unique gym
     df = df.drop_duplicates(subset=['gym'])
 
-    # dict with keys as gym names and values as (city_state) locations
-    gym_map = gym_coordinates()
+    # get dict with keys as gym names and values as (city_state) locations
+    gg = Transfer.return_data('game_gym', modifier=modifier)
+    gym_map = gym_city_coordinates(gg)
 
     # isolate gyms with and without a match in gym_dict
     in_dict = df['gym'].isin(gym_map.keys())
     df_in = df[in_dict].copy()
     df_out = df[~in_dict].copy()
-
-    # use match_gyms to add fuzzy-matched gym names
+    
+    #  add fuzzy-matched gym names
     options = gym_map.keys()
     names = df_out['gym'].values
     df_out['fuzz'] = map(lambda x: match_gym(x, options), names)
@@ -338,34 +375,88 @@ def gym_locations(df):
     # combine merged and fuzzy matched gym location data
     gyms = pd.concat([df_in, df_out], sort=False)
 
-    # comment
-    g, f = gyms['gym'].values, gyms['fuzz'].values
+    # create array of exact match or fuzzy match if no exact exists
+    gym_orig, gym_fuzz = gyms['gym'].values, gyms['fuzz'].values
     locate = np.where(gyms['fuzz'].isnull(), g, f)
+    
+    # get coordinates for each gym in locate
     gyms['gym_loc'] = map(lambda x: locate_item(x, gym_map), locate)
-
+    
+    # create and return gym: location map
     gyms = gyms.set_index('gym')
     gym_dict = gyms['gym_loc'].to_dict()
 
     return gym_dict
 
 
-def gym_coordinates(modifier=None):
-    df = Transfer.return_data('game_gym', modifier=modifier)
+def match_gym(name, options):
+    """Returns the closest match to a gym name from a list of options using a
+    fuzzy string matching algorithm.
+
+    Parameters
+    ----------
+    name : str
+        The name of the gym to find a fuzzy match for.
+    options: list
+        List of strings with options to search over.
+
+    Returns
+    -------
+    result : str
+        The string with the highest match score.
+
+    """
+    try:
+        result = Clean.fuzzy_match(name, options, cutoff=90)
+    # to catch strings with remaining unicode
+    except TypeError:
+        result = None
+    
+    return result
+
+
+def gym_city_coordinates(df):
+    """Returns dict mapping gym names from external source of gym cities
+    to geographical coordinates.
+    
+    A sequence of steps cleans the gym and city values prior to creating the 
+    gym map.
+
+    Parameters
+    ----------
+    df : DataFrame
+        Data containing web-scraped gym names, cities, and states.
+
+    Returns
+    -------
+    gym_map : dict
+        Keys are string gym names, values are tuples (lattitude,longitude).
+
+    """
+    # only need one row per unique gym location
     df = df[['gym', 'city', 'state']].drop_duplicates()
     df['city'] = df['city'].str.replace('-', ' ')
     df['city'] = df['city'].str.replace('Saint', 'St.')
     df['gym'] = df['gym'].str.lower()
     df = df.apply(lambda x: x.str.strip())
+    
+    # remove specific irrelevant duplicates
+    na1 = ((df['gym'] == 'wells fargo arena') & (df['city'] == 'Anchorage'))
+    na2 = ((df['gym'] == 'toyota center') & (df['city'] == 'Kennewick'))
+    df = df[~na1]
+    df = df[~na2]
+
+    # after cleaning some duplicates remain, remove them
     df = df[~df['gym'].duplicated()]
     df = df.set_index('gym')
     df['city_state'] = zip(df['city'].values, df['state'].values)
 
     # dict of coordinates for cities
-    city_map = city_locations(full_state=True)
-
+    city_map = city_coordinates(full_state=True)
+    
+    # create dict mapping gyms to city coordinates
     city_state = df['city_state'].values
     df['game_loc'] = map(lambda x: locate_item(x, city_map), city_state)
-
     gym_dict = df['game_loc'].to_dict()
 
     # update dict with manual gym locations
@@ -376,21 +467,71 @@ def gym_coordinates(modifier=None):
 
     return gym_dict
 
+def transform_schedule(df):
+    """Returns dataframe with unique game identifier and gym name for games 
+    scraped from team schedules.
+    
+    Sequence of data transformations create the project game
+    identifier and prepare gym names for merging with gym city/state data.
 
-# function for fuzzy matching gym names
-def match_gym(name, options):
-    try:
-        result = Clean.fuzzy_match(name, options, cutoff=90)
-    except TypeError:
-        if 'agrelot' in name.split(' '):
-            result = 'josa miguel agrelot coliseum'
-        else:
-            result = None
-    return result
+    Parameters
+    ----------
+    df : DataFrame
+        Contains scraped team schedule data in 'cbb_schedule' table.
+
+    Returns
+    -------
+    dft : DataFrame
+        Transformed data with game identifier and gym name.
+
+    """    
+    # only use neutral site games with gym values
+    dft = df[df['location'] == 'N']
+    dft = dft[dft['gym'].notnull()]
+
+    # clean gym values for better alignment with gym city data
+    def clean_gym(name):
+        new_name = name.lower()
+        new_name = re.sub(r"\(.*\)", "", new_name).rstrip()
+        if 'agrelot' in new_name.split(' '):
+            new_name = 'josa miguel agrelot coliseum'
+        return new_name
+    
+    dft['gym'] = map(clean_gym, dft['gym'].values)
+    # need standard date to create game id
+    dft['date'] = map(convert_schedule_date, dft.date.values)
+    # clean up opponent names by removing team ranks
+    dft['opponent'] = map(lambda x: re.sub(r"\(\d*\)", "", x).rstrip(),
+                         dft['opponent'].values)
+
+    # obtain team numeric ids and game id for each game
+    dft = schedule_team_ids(dft)
+    dft = Generate.make_game_id(dft, ['team_id', 'opp_id'], convert_date=False)
+
+    # isolate unique gym names for matching to gym locations
+    dft = dft[['game_id', 'gym']]
+
+    # each game has 2 rows (1 for each team), keep one
+    dft = dft.drop_duplicates(subset='game_id')
+
+    return dft
 
 
 def convert_schedule_date(raw_date):
-    """Converts raw team schedule date to standard format for the project."""
+    """Returns date in scraped team schedule converted to the project 
+    standard date format.
+
+    Parameters
+    ----------
+    raw_date : str
+        The original date string scraped from team schedule.
+
+    Returns
+    -------
+    date : str
+        Date converted to the project standard string format.
+
+    """
     # remove irrelevant day of week from string
     datestr = ' '.join([x.strip() for x in raw_date.split(',')[1:]])
     dt = datetime.strptime(datestr, "%b %d %Y")
@@ -400,26 +541,20 @@ def convert_schedule_date(raw_date):
 
 
 def schedule_team_ids(df):
-    # merge in numeric team ids for teams
-    tk = schedule_team_key()
-    tkm = tk[['team_id', 'team_sched']].copy()
-    tkm = tkm.rename(columns={'team_sched': 'team'})
-    df = pd.merge(df, tkm, left_on='team', right_on='team', how='inner')
+    """Returns schedule dataframe with team numeric identifers added.
+    
+    Parameters
+    ----------
+    df : DataFrame
+        Contains data scraped from team schedule website. Teams are identified
+        by string names in columns 'team' and opponent'.
 
-    # merge numeric ids for opponents
-    tkm = tk[['team_id', 'team_ss']].copy()
-    tkm = tkm.rename(columns={'team_ss': 'opponent', 'team_id': 'opp_id'})
-    df = pd.merge(df, tkm, left_on='opponent', right_on='opponent',
-                  how='inner')
+    Returns
+    -------
+    df : DataFrame
+        Contains team numeric ids for both teams in the game.
 
-    keep_cols = ['season', 'date', 'location', 'gym', 'team_id', 'opp_id']
-    df = df[keep_cols]
-
-    return df
-
-
-def schedule_team_key():
-    # import team key data to link team ids to applicable cbb team names
+    """
     tk = Transfer.return_data('team_key')
     tk = tk[['team_id', 'team_ss']].copy()
     tk = tk.drop_duplicates()
@@ -433,11 +568,38 @@ def schedule_team_key():
     # inner merge because only need ids for teams in team_sched
     tk = pd.merge(ts, tk, left_on='team_ss', right_on='team_ss', how='inner')
     tk['team_id'] = tk['team_id'].astype(int)
+    
+    tkm = tk[['team_id', 'team_sched']].copy()
+    tkm = tkm.rename(columns={'team_sched': 'team'})
+    df = pd.merge(df, tkm, left_on='team', right_on='team', how='inner')
 
-    return tk
+    # merge numeric ids for opponents
+    tkm = tk[['team_id', 'team_ss']].copy()
+    tkm = tkm.rename(columns={'team_ss': 'opponent', 'team_id': 'opp_id'})
+    df = pd.merge(df, tkm, left_on='opponent', right_on='opponent',
+                  how='inner')
+
+    return df
 
 
 def game_distances(df, team_map):
+    """Returns dataframe with distance to game computed for both teams.
+
+    Parameters
+    ----------
+    df : DataFrame
+        Contains 'game_loc' column with coordinates of game location and team
+        numeric identifiers.
+    team_map : dict
+        Dict mapping team numeric identifers to geographical coordinates.
+
+    Returns
+    -------
+    df : DataFrame
+        Contains distance (in miles) to game in separate column for each team.
+
+    """
+
     # get locations for both teams in game
     t1 = map(lambda x: locate_item(x, team_map), df['t1_team_id'].values)
     t2 = map(lambda x: locate_item(x, team_map), df['t2_team_id'].values)
@@ -450,7 +612,7 @@ def game_distances(df, team_map):
 
 
 def travel_distance(point_pair):
-    """Return the distance between a pair of geographical coordinates.
+    """Returns integer distance between a pair of geographical coordinates.
 
     Parameters
     ----------
@@ -468,17 +630,25 @@ def travel_distance(point_pair):
     return distance
 
 
-def update_teams(team_cities):
-    """Update team location table with any new teams.
+def update_teams(df, team_cities):
+    """Returns dataframe with geographical coordinates of new teams to add to
+    original team location data.
 
     Parameters
     ----------
+    df : DataFrame
+        The original raw team location data. Contains team id number and
+        geographical coordinates of team.
     team_cities : list
         Valid list element is 2-item list with team id and (city, state).
 
+    Returns
+    -------
+    df_add : DataFrame
+        Team id number and geographical coordinates of teams to add.
+        
     """
     # obtain list of team ids present in existing table
-    df = Transfer.return_data('team_geog')
     teams_have = df['team_id'].values
 
     # keep teams to add if not in existing list
@@ -486,7 +656,7 @@ def update_teams(team_cities):
 
     if len(teams_add) > 0:
         # import map of cities to get coordinates from
-        cm = city_locations()
+        cm = city_coordinates()
         data_add = []
 
         # obtain id, lattitude, longitude for each team
@@ -497,4 +667,5 @@ def update_teams(team_cities):
 
         # insert new data to table
         df_add = pd.DataFrame(data_add, columns=list(df.columns))
-        Transfer.insert_df('team_geog', df_add)
+
+    return df_add
