@@ -1,5 +1,5 @@
 from src.data import scrapers
-from src.data import Transfer
+from src.data import transfer
 
 rows = scrapers.odds.run()
-Transfer.insert('odds', rows, at_once=False)
+transfer.insert('odds', rows, at_once=False)

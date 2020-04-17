@@ -1,8 +1,8 @@
-import Match
-import Clean
-import Generate
-import Transfer
-import Odds
-import Spreads
+import match
+import clean
+import generate
+import transfer
+import odds
+import spreads
 import scrapers
 import features

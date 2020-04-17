@@ -1,7 +1,7 @@
-from src.data import Transfer
-from src.data import Match
-from src.data import Clean
-from src.data import Generate
+from src.data import transfer
+from src.data import match
+from src.data import clean
+from src.data import generate
 import pandas as pd
 import numpy as np
 import datetime
@@ -181,17 +181,17 @@ def clean_box(df):
     lose_cols = ['l' + x for x in change_cols]
     lose_map = {k:v for k,v in zip(change_cols, lose_cols)}
     dfl = dfl.rename(columns=lose_map)
-    #dfl = Match.id_from_name(dfl, 'team_tcp', 'team')
+    #dfl = match.id_from_name(dfl, 'team_tcp', 'team')
     dfl = dfl.rename(columns={'team': 'lteam'})
     dfl = dfl.drop(columns=['numot'])
     
     merge_on = ['gid', 'date']
     mrg = pd.merge(dfw, dfl, how='inner', left_on=merge_on, right_on=merge_on)
     
-    mrg['season'] = map(Clean.season_from_date, mrg['date'].values)
+    mrg['season'] = map(clean.season_from_date, mrg['date'].values)
     
     # add dayzero date to create daynum
-    seasons = Transfer.return_data('seasons', modifier="WHERE season = 2020")
+    seasons = transfer.return_data('seasons', modifier="WHERE season = 2020")
     seasons = seasons[['season', 'dayzero']]
     
     mrg['dayzero'] = seasons['dayzero'].values[0]
@@ -206,14 +206,14 @@ def clean_box(df):
     return mrg
 
 def box_stats_by_team(mod=None):
-    df = Transfer.return_data('game_box', modifier=mod)
+    df = transfer.return_data('game_box', modifier=mod)
     st = split_teams(df)
     cb = clean_box(st)
-    sbt = Generate.games_by_team(cb)
+    sbt = generate.games_by_team(cb)
     sbt = sbt.rename(columns={'team_id': 'team'})
-    sbt = Match.id_from_name(sbt, 'team_tcp', 'team')
+    sbt = match.id_from_name(sbt, 'team_tcp', 'team')
     sbt = sbt.rename(columns={'opp_id': 'opp'})
-    sbt = Match.id_from_name(sbt, 'team_tcp', 'opp', how='left')
+    sbt = match.id_from_name(sbt, 'team_tcp', 'opp', how='left')
     return sbt
 
 def sum_stats(gb):
@@ -263,10 +263,10 @@ def prep_stats_by_team(df):
     df = df[keep_cols]
     
     # add date to each game
-    dfs = Transfer.return_data('seasons')
+    dfs = transfer.return_data('seasons')
     dfs = dfs[['season', 'dayzero']]
     df = pd.merge(df, dfs, how='inner', left_on='season', right_on='season')
-    df['date'] = df.apply(Clean.game_date, axis=1)
+    df['date'] = df.apply(clean.game_date, axis=1)
     
     # remove cols not needed
     df = df.drop(['season', 'daynum', 'dayzero'], axis=1)
@@ -326,6 +326,6 @@ def compute_summaries(df, max_date=None):
     mrg3['winpct'] = mrg3.wins / (mrg3.wins + mrg3.losses)
     
     mrg3['date'] = max_date
-    mrg3['season'] = Clean.season_from_date(max_date)
+    mrg3['season'] = clean.season_from_date(max_date)
     
     return mrg3

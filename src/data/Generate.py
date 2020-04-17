@@ -6,17 +6,17 @@ will:
 2) add additional data to an object, such as a dataframe.
 3) modify data structure for inputting to other operations
 
-This script requires `pandas` and `numpy`. It imports the custom Clean module.
+This script requires `pandas` and `numpy`. It imports the custom clean module.
 
 """
 
 import pandas as pd
 import numpy as np
-import Clean
-import Match
-import Ratings
+import clean
+import match
+import ratings
 import scrapers
-import Transfer
+import transfer
 
 
 def set_gameid_index(df, date_col='date_id', full_date=False, drop_date=True):
@@ -83,10 +83,10 @@ def convert_team_id(df, id_cols, drop=True):
     return df
 
 def date_from_daynum(df):
-    seas = Transfer.return_data('seasons')
+    seas = transfer.return_data('seasons')
     seas = seas.loc[:, ['season', 'dayzero']]
     df = pd.merge(df, seas, how='inner', left_on='season', right_on='season')
-    df['date'] = df.apply(Clean.game_date, axis=1)
+    df['date'] = df.apply(clean.game_date, axis=1)
     df = df.drop(['dayzero'], axis=1)
     return df
 
@@ -217,7 +217,7 @@ def team_locations(df):
 def neutral_games(datdir):
     """Create dataset of games with neutral team id, scores, and locations."""
     # read in data file with game results
-    files = Clean.list_of_files(datdir + 'scrub/', tag = 'results_dtl')
+    files = clean.list_of_files(datdir + 'scrub/', tag = 'results_dtl')
     df_list = [pd.read_csv(x) for x in files]
 
     # combine df games to one dataset
@@ -228,7 +228,7 @@ def neutral_games(datdir):
     df = pd.merge(df, s, on='season', how='inner')
 
     # add string date column to games
-    df['date_id'] = df.apply(Clean.game_date, axis=1)
+    df['date_id'] = df.apply(clean.game_date, axis=1)
 
     # create outcome-neutral team identifier
     df = convert_team_id(df, ['wteam', 'lteam'], drop=False)
@@ -243,23 +243,23 @@ def neutral_games(datdir):
 
 
 def convert_past_games():
-    df1 = Transfer.return_data('reg_results')
+    df1 = transfer.return_data('reg_results')
     df1['game_cat'] = 'regular'
 
-    df2 = Transfer.return_data('nit_results')
+    df2 = transfer.return_data('nit_results')
     df2 = df2.rename(columns={'secondarytourney': 'game_cat'})
 
-    df3 = Transfer.return_data('ncaa_results')
+    df3 = transfer.return_data('ncaa_results')
     df3['game_cat'] = 'ncaa'
 
     df = pd.concat([df1, df2, df3], sort=True)
 
-    s = Transfer.return_data('seasons')
+    s = transfer.return_data('seasons')
     s = s[['season', 'dayzero']]
 
     df = pd.merge(df, s, on='season', how='inner')
     # add string date column to games
-    df['date'] = df.apply(Clean.game_date, axis=1)
+    df['date'] = df.apply(clean.game_date, axis=1)
     df['season'] = df['season'].astype(int)
     return df
 
@@ -291,11 +291,11 @@ def game_score_convert(df):
     return df
     
 def convert_game_scores(df):
-    df = Match.id_from_name(df, 'team_tcp', 'away_team', drop=False)
-    df = Match.id_from_name(df, 'team_tcp', 'home_team', drop=False)
+    df = match.id_from_name(df, 'team_tcp', 'away_team', drop=False)
+    df = match.id_from_name(df, 'team_tcp', 'home_team', drop=False)
 
     df['game_cat'] = "NA"
-    df['season'] = map(Clean.season_from_date, df['date'].values)
+    df['season'] = map(clean.season_from_date, df['date'].values)
     # convert columns to apply neutral id function
     df = game_score_convert(df)
     return df
@@ -321,13 +321,13 @@ def tcp_team_home(df):
 def game_home(date=None):
     if date is not None:
         mod = """WHERE date = '%s'""" % (date)
-        df = Transfer.return_data('game_scores', modifier=mod)
+        df = transfer.return_data('game_scores', modifier=mod)
         df = df.drop(columns=['home_score', 'away_score'])
     else:
-        df = Transfer.return_data('game_scheduled')
+        df = transfer.return_data('game_scheduled')
     
-    df = Match.id_from_name(df, 'team_tcp', 'away_team', drop=False)
-    df = Match.id_from_name(df, 'team_tcp', 'home_team', drop=False)
+    df = match.id_from_name(df, 'team_tcp', 'away_team', drop=False)
+    df = match.id_from_name(df, 'team_tcp', 'home_team', drop=False)
     df = convert_team_id(df, ['home_team_id', 'away_team_id'], drop=False)
     df = set_gameid_index(df, date_col='date', full_date=True, drop_date=False)
     rows = tcp_team_home(df)
@@ -338,11 +338,11 @@ def results_home(df):
 
     mat = df[['wteam', 'lteam', 'wloc']].values
 
-    s = Transfer.return_data('seasons')
+    s = transfer.return_data('seasons')
     df = pd.merge(df, s, on='season', how='inner')
 
     # add string date column to games
-    df['date'] = df.apply(Clean.game_date, axis=1)
+    df['date'] = df.apply(clean.game_date, axis=1)
     df = convert_team_id(df, ['wteam', 'lteam'], drop=False)
     df = set_gameid_index(df, date_col='date', full_date=True,
                                    drop_date=False)

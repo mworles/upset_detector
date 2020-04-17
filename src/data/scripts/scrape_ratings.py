@@ -1,5 +1,5 @@
 from src.data import scrapers
-from src.data import Transfer
+from src.data import transfer
 
 rows = scrapers.ratings.run()
-Transfer.insert('ratings', rows, at_once=False)
+transfer.insert('ratings', rows, at_once=False)

@@ -14,7 +14,7 @@ import os
 import re
 import datetime
 from fuzzywuzzy import process
-import Transfer
+import transfer
 
 def write_file(df, data_out, file_name, keep_index=False):
     """Specify location and save .csv data file in one line.
@@ -369,7 +369,7 @@ def scrub_file(name, file_map):
 
 
 def scrub_files(file_map, out='mysql', subset=[]):
-    """Scrubs and writes all files identified in Constants file map.
+    """Scrubs and writes all files identified in constants file map.
 
     Arguments
     ----------
@@ -393,8 +393,8 @@ def scrub_files(file_map, out='mysql', subset=[]):
         table_name = file_map[f]['new_name']
         # insert into mysql or save csv files
         if out == 'mysql':
-            rows = Transfer.dataframe_rows(df)
-            Transfer.insert(table_name, rows, at_once=True, create=False,
+            rows = transfer.dataframe_rows(df)
+            transfer.insert(table_name, rows, at_once=True, create=False,
                             delete=True)
         else:
             data_out = '../data/scrub/'

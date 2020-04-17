@@ -1,4 +1,4 @@
-from src.data import Transfer
+from src.data import transfer
 import pandas as pd
 import numpy as np
 import math
@@ -25,7 +25,7 @@ def split_and_fill(df):
     tf = df[df['min_pg'].isnull()].copy()
     
     # import data from espn per_game table
-    ep = Transfer.return_data('espn_pergame')
+    ep = transfer.return_data('espn_pergame')
     
     # create dict to look up by (season, team)
     ref_dict = {}
@@ -219,8 +219,8 @@ def add_continuity(df):
 
 def clean_roster(min_season=2002):
     # read roster info and player per game stats
-    tr = Transfer.return_data('team_roster')
-    pg = Transfer.return_data('player_pergame')
+    tr = transfer.return_data('team_roster')
+    pg = transfer.return_data('player_pergame')
 
     # merge rows for season, team, and player
     merge_on = ['season', 'team', 'name']

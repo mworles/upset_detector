@@ -1,7 +1,7 @@
 import pandas as pd
 from models import utils
-from data import Clean
-from Constants import TEST_YEAR
+from data import clean
+from constants import TEST_YEAR
 
 # define data datdirectory, import features and targets
 datdir = '../data/processed/'
@@ -22,10 +22,10 @@ df = df[df.index.isin(has_target)]
 df = df[df['season'] <= TEST_YEAR]
 
 # array of rows to switch for upset seed order
-toswitch = Clean.upset_switch(df)
+toswitch = clean.upset_switch(df)
 
 # re-arrange data for predicting upsets
-df = Clean.upset_features(df)
+df = clean.upset_features(df)
 
 # split dataset into cross-validation folds and scale data
 folds_scaled = utils.split_scale(df, target, split_on, split_values)
@@ -43,13 +43,13 @@ i_test = utils.fold_split(df, 'season', TEST_YEAR)['i_test']
 
 # isolate examples to team identifiers
 test = df[df.index.isin(i_test)]
-test = Clean.ids_from_index(test)
+test = clean.ids_from_index(test)
 test = test[['t1_team_id', 't2_team_id']]
 
-test = Clean.switch_ids(test, toswitch)
+test = clean.switch_ids(test, toswitch)
 
 # add team names to data
-test = Clean.add_team_name(test, datdir='../data/')
+test = clean.add_team_name(test, datdir='../data/')
 
 test['t1_prob'] = probs_list
 test['uprob'] = (test['t1_prob'] * 100).astype(int)

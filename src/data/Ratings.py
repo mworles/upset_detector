@@ -1,10 +1,10 @@
 import pandas as pd
 import numpy as np
 import os
-import Clean
-import Generate
-import Transfer
-import Match
+import clean
+import generate
+import transfer
+import match
 import math
 import multiprocessing as mp
 import datetime
@@ -113,11 +113,11 @@ def games_by_team(df):
 
 def games_ratings(datdir, year=None):
     """Create a dataset with the requirements for computing team ratings."""
-    df = Generate.neutral_games(datdir)
+    df = generate.neutral_games(datdir)
     if year is not None:
         df = df[df['season'] == year]
     df['date'] = df['date_id'].str.replace('_', '/')
-    df = Generate.team_locations(df)
+    df = generate.team_locations(df)
     df = location_adjustment(df)
     df = compute_posessions(df)
     keep = ['season', 'date', 't1_team_id', 't2_team_id', 't1_score', 't2_score',
@@ -141,16 +141,16 @@ def game_box_games(df):
     df = df.dropna(how='any', subset=['home_score', 'away_score', 'neutral'])
     
     # add numeric team id
-    df = Match.id_from_name(df, 'team_tcp', 'away_team', drop=False)
-    df = Match.id_from_name(df, 'team_tcp', 'home_team', drop=False)
+    df = match.id_from_name(df, 'team_tcp', 'away_team', drop=False)
+    df = match.id_from_name(df, 'team_tcp', 'home_team', drop=False)
     
     # convert columns to apply neutral id function
-    df = Generate.game_score_convert(df)
+    df = generate.game_score_convert(df)
     # create team_1 and team_2 id identifer columns
-    df = Generate.convert_team_id(df, ['wteam', 'lteam'], drop=False)
+    df = generate.convert_team_id(df, ['wteam', 'lteam'], drop=False)
     # add column indicating scores and locations for each team
-    df = Generate.team_scores(df)
-    df = Generate.team_locations(df)
+    df = generate.team_scores(df)
+    df = generate.team_locations(df)
     # adjust score for location of game
     df = location_adjustment(df)
     
@@ -196,7 +196,7 @@ def game_box_possessions(df):
     return bp
 
 def game_box_for_ratings(date=None):
-    dba = Transfer.DBAssist()
+    dba = transfer.DBAssist()
     dba.connect()
     table = dba.return_table('game_scores')
     tbox = dba.return_table('game_box')
@@ -216,7 +216,7 @@ def game_box_for_ratings(date=None):
     df = pd.merge(df, pos, left_on='gid', right_on='gid', how='inner')
 
     # assign unique game identifer from date and teams
-    df = Generate.set_gameid_index(df, date_col='date', full_date=True,
+    df = generate.set_gameid_index(df, date_col='date', full_date=True,
                                    drop_date=False)
 
     # create duplicate of games so each team has row for each game
@@ -425,15 +425,15 @@ def run_day(df, day_max = None, n_iters=15, output=None):
     df_teams['date'] = date
     
     if output is not None:
-        rows = Transfer.dataframe_rows(df_teams)
-        Transfer.insert('ratings_at_day', rows)
+        rows = transfer.dataframe_rows(df_teams)
+        transfer.insert('ratings_at_day', rows)
         output.put(len(rows))
     else:
         return df_teams
 
 def run_year(year, n_iters = 15, multiprocessing=True):
     modifier = "WHERE season = %s" % (str(year))
-    df = Transfer.return_data('games_for_ratings', modifier=modifier)
+    df = transfer.return_data('games_for_ratings', modifier=modifier)
     df = day_number(df)
     day_min = minimum_day(df, n_games=3)
     all_days = list(set(df['daynum'].values))

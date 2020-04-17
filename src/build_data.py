@@ -6,30 +6,30 @@ the pipeline is controlled by a module. This structure allows individual steps
 in the pipeline to be removed, modified, or added in a flexible manner. 
 
 The script uses custom imports created for the project:
-Constants: module containing project-wide variables
+constants: module containing project-wide variables
 data: package used to clean and modify data
 features: package used to create features
 """
 # import custom modules/packages
-import Constants
+import constants
 import data
 
 # location of data directory from constants module
-datdir = Constants.DATA
+datdir = constants.DATA
 """
 # pre-process raw data
-data.Clean.scrub_files(Constants.RAW_MAP)
+data.clean.scrub_files(constants.RAW_MAP)
 
 # clean odds and spreads data
-data.Odds.clean_odds(datdir)
-data.Spreads.clean_spreads(datdir)
-data.Spreads.spreads_sbro(datdir)
+data.odds.clean_odds(datdir)
+data.spreads.clean_spreads(datdir)
+data.spreads.spreads_sbro(datdir)
 
 # create files matching school names to numeric identifiers
-data.Match.create_key(datdir)
+data.match.create_key(datdir)
 
 # create data on wins and games for each prior tournament
-data.Generate.tourney_outcomes(datdir)
+data.generate.tourney_outcomes(datdir)
 
 # create features
 features.Create.coach_features(datdir)
@@ -41,7 +41,7 @@ features.Create.merge_features(datdir)
 
 
 # combine features for both teams in matchups
-data.Generate.make_matchups(datdir)
+data.generate.make_matchups(datdir)
 """
 # generate targets for prediction
-data.Generate.make_targets(datdir)
+data.generate.make_targets(datdir)

@@ -1,4 +1,4 @@
-"""Match team names to ID numbers.
+"""match team names to ID numbers.
 
 This module contains functions used to match the names of schools from mixed
 external data sources to a single numeric identifier from a master ID file. Separate 
@@ -11,14 +11,14 @@ in the master file. This module uses a fuzzy string matching package to identify
 numeric identifers for non-exact matches.
 
 This module requires the `pandas` package. 
-It imports the custom Clean module.
+It imports the custom clean module.
 
 """
 import pandas as pd
 import numpy as np
-import Clean
-import Odds
-import Transfer
+import clean
+import odds
+import transfer
 import re
 
 def clean_schools(datdir):
@@ -32,7 +32,7 @@ def clean_schools(datdir):
         The relative path to subdirectory containing data files.
     """    
     # compiles all files into one dataset
-    df = Clean.combine_files(datdir)
+    df = clean.combine_files(datdir)
 
     # rows missing value for 'G' column are invalid
     df = df.dropna(subset=['G'])
@@ -41,7 +41,7 @@ def clean_schools(datdir):
     df = df[['School']].drop_duplicates()
     
     # add reformatted school name for better id matching
-    df['team_clean'] = map(Clean.school_name, df['School'].values)
+    df['team_clean'] = map(clean.school_name, df['School'].values)
     
     # rename to create unique team identifer for source
     df = df.rename(columns={'School': 'team_ss'})    
@@ -59,13 +59,13 @@ def clean_kp(datdir):
         The relative path to subdirectory containing data files.
     """
     # compiles all files into one dataset
-    df = Clean.combine_files(datdir)
+    df = clean.combine_files(datdir)
 
     # isolate data to unique names
     df = df[['TeamName']].drop_duplicates()
 
     # add reformatted school name for better id matching
-    df['team_clean'] = map(lambda x: Clean.school_name(x), df['TeamName'])
+    df['team_clean'] = map(lambda x: clean.school_name(x), df['TeamName'])
 
     # rename to create unique team identifer for source
     df = df.rename(columns={'TeamName': 'team_kp'})   
@@ -82,7 +82,7 @@ def clean_odds_portal(datdir):
     datdir: string
         The relative path to subdirectory containing data files.
     """
-    data = Odds.parse_oddsportal(datdir)
+    data = odds.parse_oddsportal(datdir)
     col_names = ['date', 'team_1', 'team_2', 'odds1', 'odds2']
     df = pd.DataFrame(data, columns=col_names)
 
@@ -93,13 +93,13 @@ def clean_odds_portal(datdir):
     df = df[df['team_oddsport'].notnull()]
     
     
-    df['team_clean'] = map(lambda x: Clean.school_name(x), df['team_oddsport'])
+    df['team_clean'] = map(lambda x: clean.school_name(x), df['team_oddsport'])
     
     return df
 
 def clean_pt(datdir):
 
-    df = Clean.combine_files(datdir)
+    df = clean.combine_files(datdir)
 
     # list of all unique team names
     teams = list(set(list(df['home']) + list(df['road'])))
@@ -107,7 +107,7 @@ def clean_pt(datdir):
     df = pd.DataFrame({'team_pt': teams})
     df = df[df['team_pt'].notnull()]
 
-    df['team_clean'] = map(lambda x: Clean.school_name(x), df['team_pt'])
+    df['team_clean'] = map(lambda x: clean.school_name(x), df['team_pt'])
 
     return df
 
@@ -142,12 +142,12 @@ def clean_sbro(datdir):
     df = df[df['team_sbro'].notnull()]
     team_split = [split_caps(x) for x in df['team_sbro']]
     team_full = map(join_team, team_split)
-    df['team_clean'] = map(lambda x: Clean.school_name(x), team_full)
+    df['team_clean'] = map(lambda x: clean.school_name(x), team_full)
 
     return df
 
 def clean_tcpalm(table_name):
-    dba = Transfer.DBAssist()
+    dba = transfer.DBAssist()
     dba.connect()
     table = dba.return_table(table_name)
     df = pd.DataFrame(table[1:], columns=table[0])
@@ -157,12 +157,12 @@ def clean_tcpalm(table_name):
     teams = [t for t in teams if t is not None]
     
     df = pd.DataFrame({'team_tcp': teams})
-    df['team_clean'] = map(lambda x: Clean.school_name(x), df['team_tcp'])
+    df['team_clean'] = map(lambda x: clean.school_name(x), df['team_tcp'])
     
     return df
     
 def clean_vi(table_name):
-    dba = Transfer.DBAssist()
+    dba = transfer.DBAssist()
     dba.connect()
     table = dba.return_table(table_name)
     df = pd.DataFrame(table[1:], columns=table[0])
@@ -173,7 +173,7 @@ def clean_vi(table_name):
     
     source_col = 'team_vi_' + table_name
     df = pd.DataFrame({source_col: teams})
-    df['team_clean'] = map(lambda x: Clean.school_name(x), df[source_col])
+    df['team_clean'] = map(lambda x: clean.school_name(x), df[source_col])
     
     return df
 
@@ -224,7 +224,7 @@ def match_team(source, id, min_year=None):
         rem_teams = nm_source['team_clean'].values
         
         # run fuzzy matching function on 'team_clean' for nonmerged schools
-        matches_scores = map(lambda x: Clean.fuzzy_match(x, rem_teams, with_score=True), nm_values)
+        matches_scores = map(lambda x: clean.fuzzy_match(x, rem_teams, with_score=True), nm_values)
         nm_id.loc[:, 'team_clean'] = [x[0] for x in matches_scores]
         nm_id.loc[:, 'score'] = [x[1] for x in matches_scores]
         
@@ -241,7 +241,7 @@ def match_team(source, id, min_year=None):
             print ''
             print 'ID name:         %s' % (nmgb.loc[v, 'name_spelling'])
             print 'Source name:     %s' % (nmgb.loc[v,'team_clean'])
-            match = str.upper(raw_input('Match? Y or N: '))
+            match = str.upper(raw_input('match? Y or N: '))
             matches.append(match)
 
         nmgb['match'] = matches
@@ -341,12 +341,12 @@ def create_key(datdir):
 
     # set location to write file and save file
     data_out = datdir + 'interim/'
-    Clean.write_file(key, data_out, 'team_key')
+    clean.write_file(key, data_out, 'team_key')
     
-    Transfer.create_from_schema('team_key', 'data/schema.json')
+    transfer.create_from_schema('team_key', 'data/schema.json')
 
-    rows = Transfer.dataframe_rows(key)
-    Transfer.insert('team_key', rows, at_once=True) 
+    rows = transfer.dataframe_rows(key)
+    transfer.insert('team_key', rows, at_once=True) 
 
 def id_from_name(df, key_col, name_col, drop=True, how='inner'):
     """From input data containing team name column specified in 'name_col', 
@@ -364,7 +364,7 @@ def id_from_name(df, key_col, name_col, drop=True, how='inner'):
         The name of team name column in the input df.
     """ 
     # read in the id key data
-    id = Transfer.return_data('team_key')
+    id = transfer.return_data('team_key')
     # from id key data, only need numeric identifer and key_col to merge on
     id = id[['team_id', key_col]]
     id['team_id'] = id['team_id'].astype(int)

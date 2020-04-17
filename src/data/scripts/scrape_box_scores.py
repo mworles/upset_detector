@@ -1,5 +1,5 @@
 from src.data import scrapers
-from src.data import Transfer
+from src.data import transfer
 import datetime
 
 date = datetime.datetime.now()
@@ -10,7 +10,7 @@ date = date.strftime('%Y/%m/%d')
 game_scores = scrapers.games.game_scores(date)
 
 try:
-    Transfer.insert('game_scores', game_scores, at_once=False)
+    transfer.insert('game_scores', game_scores, at_once=False)
 except Exception as e:
     print e
 
@@ -18,6 +18,6 @@ boxes = scrapers.games.box_scores(date)
 
 for b in boxes:
     try:
-        Transfer.insert('game_box', b, at_once=False)
+        transfer.insert('game_box', b, at_once=False)
     except Exception as e:
         print e

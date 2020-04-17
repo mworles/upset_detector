@@ -1,4 +1,4 @@
-from src.data import Updater
+from src.data import updater
 import datetime
 
 date = datetime.datetime.now()
@@ -6,4 +6,4 @@ date = datetime.datetime.now()
 date = date - datetime.timedelta(days=1)
 date = date.strftime('%Y/%m/%d')
 
-Updater.update_day(date)
+updater.update_day(date)

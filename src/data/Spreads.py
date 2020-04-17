@@ -1,13 +1,13 @@
 import os
 import pandas as pd
 import numpy as np
-import Clean
-import Odds
-import Generate
+import clean
+import odds
+import generate
 import re
-import Match
+import match
 import math
-import Transfer
+import transfer
 
 def spread_date(x):
     dl = x.split('/')
@@ -64,7 +64,7 @@ def spread_t1(row):
     return t1_spread
 
 def spreads_pt(datdir):
-    df = Clean.combine_files(datdir + '/external/pt/')
+    df = clean.combine_files(datdir + '/external/pt/')
     df = df[['date', 'home', 'road', 'line']]
 
     df = df[df['date'].notnull()]
@@ -76,16 +76,16 @@ def spreads_pt(datdir):
 
     df = df.drop('line', axis=1)
 
-    df = Match.id_from_name(df, 'team_pt', 'home', drop=False)
-    df = Match.id_from_name(df, 'team_pt', 'road', drop=False)
+    df = match.id_from_name(df, 'team_pt', 'home', drop=False)
+    df = match.id_from_name(df, 'team_pt', 'road', drop=False)
     
     df = df.dropna(how='any', subset=['home_id', 'road_id'])
 
-    df = Generate.convert_team_id(df, ['home_id', 'road_id'], drop=False)
+    df = generate.convert_team_id(df, ['home_id', 'road_id'], drop=False)
     
     df['t1_spread'] = np.where(df['t1_team_id'] == df['home_id'], -df['spread'], df['spread'])
     
-    df = Generate.set_gameid_index(df, date_col='date', full_date=True,
+    df = generate.set_gameid_index(df, date_col='date', full_date=True,
                                        drop_date=False)
     df = df.sort_index()
 
@@ -95,7 +95,7 @@ def spreads_pt(datdir):
     
     # save school stats data file
     data_out = datdir + '/interim/'
-    Clean.write_file(df, data_out, 'spreads_pt', keep_index=True)
+    clean.write_file(df, data_out, 'spreads_pt', keep_index=True)
     return df
 
 def date_sbro(date, years):
@@ -181,7 +181,7 @@ def parse_sbro(file):
     return df
 
 def spreads_sbro(datdir):
-    files = Clean.list_of_files(datdir + 'external/sbro/', tag='ncaa basketball')
+    files = clean.list_of_files(datdir + 'external/sbro/', tag='ncaa basketball')
     file_data = [parse_sbro(x) for x in files]
     df = pd.concat(file_data, sort=False)
     
@@ -191,24 +191,24 @@ def spreads_sbro(datdir):
     df['spread'] = map(format_spread, df['spread'].values)
     df['over_under'] = map(format_ovun, df['over_under'].values)
 
-    df = Match.id_from_name(df, 'team_sbro', 'away', drop=False)
-    df = Match.id_from_name(df, 'team_sbro', 'home', drop=False)
+    df = match.id_from_name(df, 'team_sbro', 'away', drop=False)
+    df = match.id_from_name(df, 'team_sbro', 'home', drop=False)
 
     df['fav_loc'] = np.where(df['favorite'] == df['home'], 'H', 'A')
     df['fav_id'] = np.where(df['fav_loc'] == 'H', df['home_id'], df['away_id'])
     
-    df = Generate.convert_team_id(df, ['home_id', 'away_id'], drop=False)
+    df = generate.convert_team_id(df, ['home_id', 'away_id'], drop=False)
 
     df['t1_spread'] = np.where(df['t1_team_id'] == df['fav_id'], -df['spread'], df['spread'])
     
-    df = Generate.set_gameid_index(df, date_col='date', full_date=True, drop_date=False)
+    df = generate.set_gameid_index(df, date_col='date', full_date=True, drop_date=False)
     
     keep_cols = ['date', 't1_team_id', 't2_team_id', 't1_spread', 'over_under']
     df = df[keep_cols]
     df = df.sort_values(['date', 't1_team_id'])
     
     data_out = datdir + '/interim/'
-    Clean.write_file(df, data_out, 'spreads_sbro', keep_index=True)
+    clean.write_file(df, data_out, 'spreads_sbro', keep_index=True)
     return df
 
 def blend_spreads(datdir):
@@ -234,7 +234,7 @@ def blend_spreads(datdir):
     df['t1_spread'] = map(pick_spread, both_spreads)
     df = df.drop(columns=['t1_spread_sbro', 't1_spread_pt'])
     
-    df['season'] = map(Clean.season_from_date, df['date'].values)
+    df['season'] = map(clean.season_from_date, df['date'].values)
     
     df = df.reset_index()
             
@@ -243,14 +243,14 @@ def blend_spreads(datdir):
     
     df = df.dropna(subset=['t1_spread'])
     
-    df['season'] = map(Clean.season_from_date, df['date'].values)
+    df['season'] = map(clean.season_from_date, df['date'].values)
     
     df = df.drop_duplicates()
 
     return df
 
 def spreads_vi(date=None):
-    dba = Transfer.DBAssist()
+    dba = transfer.DBAssist()
     dba.connect()
     df = dba.return_df('spreads')
     years = map(lambda x: x.split('-')[0], df['timestamp'].values)
@@ -264,13 +264,13 @@ def spreads_vi(date=None):
         if df.shape[0] == 0:
             return df
         else:
-            df = Odds.most_recent_odds(df)
+            df = odds.most_recent_odds(df)
     else:
         most_recent = max(df['timestamp'].values)
         df = df[df['timestamp'] == most_recent]
 
-    df = Match.id_from_name(df, 'team_vi_spreads', 'team_1', drop=False)
-    df = Match.id_from_name(df, 'team_vi_spreads', 'team_2', drop=False)
+    df = match.id_from_name(df, 'team_vi_spreads', 'team_1', drop=False)
+    df = match.id_from_name(df, 'team_vi_spreads', 'team_2', drop=False)
     format_spread = lambda x: line_format(x, type='spread')
     format_ovun = lambda x: line_format(x, type='line')
     df['over_under'] = map(format_ovun, df['line'].values)
@@ -278,12 +278,12 @@ def spreads_vi(date=None):
 
 
     fav = np.where(df['team_1'] == df['favorite'], df['team_1_id'], df['team_2_id'])
-    df = Generate.convert_team_id(df, ['team_1_id', 'team_2_id'], drop=False)
+    df = generate.convert_team_id(df, ['team_1_id', 'team_2_id'], drop=False)
     t1_fav = df['t1_team_id'] == fav
     vals_t1 = zip(spread_vals, t1_fav)
     df['t1_spread'] = [-x[0] if x[1] == True else x[0] for x in vals_t1]
 
-    df = Generate.set_gameid_index(df, date_col='date', full_date=True,
+    df = generate.set_gameid_index(df, date_col='date', full_date=True,
                                    drop_date=False)
 
     keep_cols = ['date', 't1_team_id', 't2_team_id', 't1_spread', 'over_under']

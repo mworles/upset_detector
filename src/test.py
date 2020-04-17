@@ -1,34 +1,34 @@
-from data import Transfer
-from data import Updater
+from data import transfer
+from data import updater
 from data import queries
-from data import Generate
+from data import generate
 import pandas as pd
 import numpy as np
 import pickle
-import Constants
+import constants
 from models import utils
 """
 def make_features(df, tables):
     if 'ratings_needed' in tables:
-        ratings = Transfer.return_data('ratings_needed')
+        ratings = transfer.return_data('ratings_needed')
         ratings = ratings.drop('season', axis=1)
-        df = Updater.assign_features(df, ratings, merge_on=['date'])
+        df = updater.assign_features(df, ratings, merge_on=['date'])
     
     if 'team_home' in tables:
-        home = Transfer.return_data('team_home')
+        home = transfer.return_data('team_home')
         home = home.drop('game_id', axis=1)
-        df = Updater.assign_features(df, home, merge_on=['date'])
+        df = updater.assign_features(df, home, merge_on=['date'])
     
     if 'spread' in tables:
-        spread = Transfer.return_data('spreads_by_team')
+        spread = transfer.return_data('spreads_by_team')
         spread = spread.drop('game_id', axis=1)
         spread['spread'] = - spread['spread']
         spread = spread.rename(columns={'spread': 'spread_rev'})
-        df = Updater.assign_features(df, spread, team='t1', merge_on=['date'])
+        df = updater.assign_features(df, spread, team='t1', merge_on=['date'])
     return df
 
 def add_result(df, target):
-    results = Transfer.return_data('results_by_team')
+    results = transfer.return_data('results_by_team')
     game_cols = ['game_id', 'team_id', 'date']
     target_drop = [x for x in results.columns if x not in game_cols]
     target_drop.remove(target)
@@ -41,7 +41,7 @@ def add_result(df, target):
 
 def add_spreads(df):
     # merge spreads
-    spreads = Transfer.return_data('spreads_by_team')
+    spreads = transfer.return_data('spreads_by_team')
     spreads = spreads.rename(columns={'team_id': 't1_team_id'})
     spreads = spreads.drop(['game_id'], axis=1)
     df = pd.merge(df, spreads, how='left',
@@ -72,9 +72,9 @@ def clean_set(df):
 
 def get_examples(arrange='neutral'):
     if arrange == 'neutral':
-        df = Transfer.return_data('game_info')
+        df = transfer.return_data('game_info')
     else:
-        df = Transfer.return_data('fav_dog')
+        df = transfer.return_data('fav_dog')
         if arrange == 'favorite':
             col_map = {'t_favor': 't1_team_id', 't_under': 't2_team_id'}
         elif arrange == 'underdog':
@@ -99,7 +99,7 @@ df = df.drop_duplicates(subset=['game_id'])
 df = df.set_index('game_id')
 
 split_on = 'season'
-split_values = Constants.SPLIT_YEARS
+split_values = constants.SPLIT_YEARS
 folds_scaled = utils.split_scale(df, split_on, split_values)
 
 score_type = 'f1'
@@ -120,7 +120,7 @@ scores = utils.write_results(exp_id, grid_id, trials)
 """
 from models.grids import scorer_grid
 
-class SearchExp():
+class searchExp():
 
     def __init__(self, id, trials, features, targets):
         self.id = id
@@ -140,7 +140,7 @@ ratings = pd.DataFrame([[1, 2], [1, 2]], index=[0, 1], columns=['col0', 'col1'])
 targets = pd.Series([0, 1], index=[0, 1])
 grid_id = 5
 
-exp = SearchExp(1, 100, ratings, targets, grid_id)
+exp = searchExp(1, 100, ratings, targets, grid_id)
 exp.use_score('f1')
 exp.split_scale()
 """

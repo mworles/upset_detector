@@ -1,6 +1,6 @@
 import ConfigParser
 import csv
-import Clean
+import clean
 import time
 import pymysql
 import os

@@ -2,7 +2,7 @@ import numpy as np
 from hyperopt import hp
 import sklearn.metrics as metrics
 from sklearn.linear_model import LogisticRegression, Ridge, Lasso
-from Constants import RANDOM_SEED
+from constants import RANDOM_SEED
 
 scorer_grid = {}
 scorer_grid['accuracy'] = {'function': metrics.accuracy_score,

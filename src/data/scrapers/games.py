@@ -53,7 +53,7 @@ def tcpalm_section(div, future=False):
     return game_info
 
 def tcpalm_url(date):
-    urlb = 'http://stats.tcpalm.com/sports-scores/College-Basketball-Scores-Matchups.aspx?'
+    urlb = 'http://stats.tcpalm.com/sports-scores/College-Basketball-Scores-matchups.aspx?'
     date_split = date.split('/')
     year_i = int(date_split[0])
     year = "Year=" + date_split[0]
@@ -231,7 +231,7 @@ def game_gym(url):
 
 def get_gyms(season):
     mod = 'WHERE season = %s' % (season)
-    games = Transfer.return_data('game_info', mod)
+    games = transfer.return_data('game_info', mod)
     dates = list(set(games['date']))
     if season == 2010:
         dates = [x for x in dates if x > '2009/12/15']
@@ -248,15 +248,15 @@ def get_gyms(season):
                     gym = Scrapers.game_gym(url)
                     gym[0].extend(['season', 'date', 'timestamp'])
                     gym[1].extend([season, date, timestamp])
-                    Transfer.insert('game_gym', gym, at_once=True)
+                    transfer.insert('game_gym', gym, at_once=True)
                 except:
                     print url
                     gid = re.findall(r'\d+', url.split('/')[-1])[0]
                     gym = [['gid', 'season', 'date'], [gid, season, date]]
-                    Transfer.insert('game_gym_error', gym, at_once=True)
+                    transfer.insert('game_gym_error', gym, at_once=True)
         else:
             gym = [['season', 'date'], [season, date]]
-            Transfer.insert('game_gym_error', gym, at_once=True)
+            transfer.insert('game_gym_error', gym, at_once=True)
 
 def get_scheduled(dates):
     

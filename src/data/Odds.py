@@ -2,10 +2,10 @@ import json
 import pandas as pd
 import numpy as np
 import calendar
-import Clean
-import Generate
-import Match
-import Transfer
+import clean
+import generate
+import match
+import transfer
 import datetime
 
 def oddsportal_games(year_file):
@@ -29,7 +29,7 @@ def oddsportal_games(year_file):
 def parse_oddsportal(datdir):
     all_games = []
 
-    year_files = Clean.list_of_files(datdir)
+    year_files = clean.list_of_files(datdir)
     all_games = [oddsportal_games(file) for file in year_files]
     all_flat = [game for year in all_games for game in year]
 
@@ -107,11 +107,11 @@ def clean_oddsportal(datdir):
     df['odds2'] = odds2
     
 
-    df = Match.id_from_name(df, 'team_oddsport', 'team_1', drop=False)
-    df = Match.id_from_name(df, 'team_oddsport', 'team_2', drop=False)
+    df = match.id_from_name(df, 'team_oddsport', 'team_1', drop=False)
+    df = match.id_from_name(df, 'team_oddsport', 'team_2', drop=False)
     
     l_games = get_odds_dicts(df)
-    df = Generate.convert_team_id(df, ['team_1_id', 'team_2_id'], drop=False)
+    df = generate.convert_team_id(df, ['team_1_id', 'team_2_id'], drop=False)
     df = team_odds(df, l_games)
 
     df = df.dropna(subset=['t1_team_id', 't2_team_id'])  
@@ -119,7 +119,7 @@ def clean_oddsportal(datdir):
     df['t1_team_id'] = df['t1_team_id'].astype(int)
     df['t2_team_id'] = df['t2_team_id'].astype(int)
     
-    df = Generate.set_gameid_index(df, date_col='date', full_date=True, drop_date=False)
+    df = generate.set_gameid_index(df, date_col='date', full_date=True, drop_date=False)
     
     keep_cols = ['date', 't1_team_id', 't2_team_id', 't1_odds', 't2_odds']
     df = df[keep_cols].sort_values('date').reset_index()
@@ -127,12 +127,12 @@ def clean_oddsportal(datdir):
     # drop rows with no odds
     df = df.dropna(subset=['t1_odds', 't2_odds'], how='all')
     
-    df['season'] = map(Clean.season_from_date, df['date'].values)
+    df['season'] = map(clean.season_from_date, df['date'].values)
     
     return df
 
 def odds_vi(date=None):
-    dba = Transfer.DBAssist()
+    dba = transfer.DBAssist()
     dba.connect()
     df = dba.return_df('odds')
 
@@ -151,14 +151,14 @@ def odds_vi(date=None):
         most_recent = max(df['timestamp'].values)
         df = df[df['timestamp'] == most_recent]
     
-    df = Match.id_from_name(df, 'team_vi_odds', 'team_1', drop=False)
-    df = Match.id_from_name(df, 'team_vi_odds', 'team_2', drop=False)
+    df = match.id_from_name(df, 'team_vi_odds', 'team_1', drop=False)
+    df = match.id_from_name(df, 'team_vi_odds', 'team_2', drop=False)
 
     l_games = get_odds_dicts(df)
-    df = Generate.convert_team_id(df, ['team_1_id', 'team_2_id'], drop=False)
+    df = generate.convert_team_id(df, ['team_1_id', 'team_2_id'], drop=False)
     df = team_odds(df, l_games)
 
-    df = Generate.set_gameid_index(df, date_col='date', full_date=True, drop_date=False)
+    df = generate.set_gameid_index(df, date_col='date', full_date=True, drop_date=False)
     keep_cols = ['date', 't1_team_id', 't2_team_id', 't1_odds', 't2_odds']
     df = df[keep_cols].sort_values('date').reset_index()
     
@@ -268,9 +268,9 @@ def matchup_odds_dates(mat, odds):
 
 
 def odds_table():
-    mat = Transfer.return_data('game_info')
+    mat = transfer.return_data('game_info')
     
-    odds = Odds.clean_oddsportal(datdir)
+    odds = odds.clean_oddsportal(datdir)
 
     # only have odds starting in season 2009
     mat_get = mat[mat['season'] >= 2009].copy()
@@ -286,7 +286,7 @@ def odds_table():
     mat_get = mat_get[~mat_get['game_id'].isin(merged_gid)].copy()
 
     # use function to match on proximal dates
-    mat_get = Odds.matchup_odds_dates(mat_get, odds_prox)
+    mat_get = odds.matchup_odds_dates(mat_get, odds_prox)
 
     # combine merged, proximal date-matched games, and pre-odds games
     df = pd.concat([mrg, mat_get, mat[mat['season'] < 2009]], sort=False)
@@ -296,8 +296,8 @@ def odds_table():
              't2_odds']]
     
     # compute decimal odds format
-    df['t1_odds_dec'] = map(Odds.decimal_odds, df['t1_odds'].values)
-    df['t2_odds_dec'] = map(Odds.decimal_odds, df['t2_odds'].values)
+    df['t1_odds_dec'] = map(odds.decimal_odds, df['t1_odds'].values)
+    df['t2_odds_dec'] = map(odds.decimal_odds, df['t2_odds'].values)
 
     # only keep rows with odds data
     df = df.dropna(subset=['t1_odds', 't2_odds'], how='all')

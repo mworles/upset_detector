@@ -1,9 +1,9 @@
 import pandas as pd
 import numpy as np
 from models import utils, grids
-from data import Clean
-from Constants import SPLIT_YEARS
-import Plot
+from data import clean
+from constants import SPLIT_YEARS
+import plot
 
 # define data datdirectory, import features and targets
 datdir = '../data/processed/'
@@ -20,7 +20,7 @@ grid_id = 1
 # remove examples missing the target
 has_target = targets[targets['upset'].notnull()].index.values
 df = df[df.index.isin(has_target)]
-df = Clean.upset_features(df)
+df = clean.upset_features(df)
 
 # split dataset into cross-validation folds and scale data
 folds_scaled = utils.split_scale(df, target, split_on, split_values)
@@ -41,5 +41,5 @@ y_preds = np.concatenate(preds_list).ravel().tolist()
 labels_list = [x['y_test'] for x in folds_scaled]
 y = [i for sub in labels_list for i in sub]
 
-Plot.plot_roc_curve(y, y_probs, grid_id)
-Plot.plot_confusion_matrix(y, y_preds, grid_id)
+plot.plot_roc_curve(y, y_probs, grid_id)
+plot.plot_confusion_matrix(y, y_preds, grid_id)

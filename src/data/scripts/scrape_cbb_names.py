@@ -1,5 +1,5 @@
 from src.data import scrapers
-from src.data import Transfer
+from src.data import transfer
 import pandas as pd
 import time
 
@@ -12,4 +12,4 @@ for season in range(2003, 2011):
 
 df = pd.DataFrame(all_seasons)
 df = df.drop_duplicates()
-Transfer.insert_df('team_sched', df, at_once=True, create=True)
+transfer.insert_df('team_sched', df, at_once=True, create=True)

@@ -2,7 +2,7 @@ def ratings_kp(datdir):
     """Create data containing team ratings."""
 
     def clean_season(df, season):
-        """Cleans inconsistent use of season. Some files contain 
+        """cleans inconsistent use of season. Some files contain 
         season, others Season, and others neither."""
         # if either 'Season' or 'season' in columns
         if any([c in df.columns for c in ['Season', 'season']]):
@@ -18,11 +18,11 @@ def ratings_kp(datdir):
     ratings_dir = datdir + '/external/kp/'
     
     # create list of file names from directory
-    files = Clean.list_of_files(ratings_dir)
+    files = clean.list_of_files(ratings_dir)
 
     # use files to get lists of season numbers and dataframes
     # data has no season column so must be collected from file name and added
-    seasons = [Clean.year4_from_string(x) for x in files]
+    seasons = [clean.year4_from_string(x) for x in files]
     dfs = [pd.read_csv(x) for x in files]
 
     # used nested function to create consistent season column
@@ -32,7 +32,7 @@ def ratings_kp(datdir):
     df = pd.concat(data_list, sort=False)
 
     # ratings data has team names, must be linked to numeric ids
-    df = Match.id_from_name(datdir, df, 'team_kp', 'TeamName')
+    df = match.id_from_name(datdir, df, 'team_kp', 'TeamName')
     
     # for consistency
     df.columns = map(str.lower, df.columns)
@@ -42,7 +42,7 @@ def ratings_kp(datdir):
     df['rankem'] = np.where(df['rankem'].isnull(), df['rankadjem'], df['rankem'])
 
     # reduce float value precision
-    df = Clean.round_floats(df, prec=2)
+    df = clean.round_floats(df, prec=2)
 
     # select columns to keep as features
     keep = ['team_id', 'season', 'adjtempo', 'adjoe', 'rankadjoe', 'adjde', 
@@ -51,4 +51,4 @@ def ratings_kp(datdir):
 
     # save team ratings file
     data_out = datdir + 'features/'
-    Clean.write_file(df, data_out, 'team_ratings')
+    clean.write_file(df, data_out, 'team_ratings')

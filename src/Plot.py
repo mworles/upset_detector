@@ -79,7 +79,7 @@ def plot_confusion_matrix(y, y_pred, grid_id, path='../plots/'):
     #title = "".join([label_name, " Matrix"])
     #plt.title(title, fontsize=20)
     ax.set_ylabel('True')
-    ax.set_xlabel('Prediction')
+    ax.set_xlabel('prediction')
     plt.tight_layout()
     f = "_".join(['grid', str(grid_id), 'cnfmat.jpg'])
     plt.savefig(path + f)

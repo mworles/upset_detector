@@ -2,7 +2,7 @@ from bs4 import BeautifulSoup
 import requests
 import unicodedata
 import time
-from src.data import Transfer
+from src.data import transfer
 
 def season_table(season):
     data_out = '../data/external/sportsref_schoolstats/'
@@ -127,19 +127,19 @@ def srcbb_team(season):
         try:
             roster = parse_rosters(soup)
             roster = add_season_team(roster, season, team)
-            Transfer.insert('team_roster', roster, at_once=True)
+            transfer.insert('team_roster', roster, at_once=True)
         except:
             print url
             fail = [['season', 'team'], [season, team]]
-            Transfer.insert('team_roster_error', fail, at_once=True)
+            transfer.insert('team_roster_error', fail, at_once=True)
             
         try:
             per_game = parse_pergame(soup)
             per_game = add_season_team(per_game, season, team)
-            Transfer.insert('player_pergame', per_game, at_once=True)
+            transfer.insert('player_pergame', per_game, at_once=True)
         except:
             fail = [['season', 'team'], [season, team]]
-            Transfer.insert('player_pergame_error', fail, at_once=True)
+            transfer.insert('player_pergame_error', fail, at_once=True)
 
 
 
@@ -236,9 +236,9 @@ def get_insert_schedules(season):
         sched = get_team_schedule(url, season)
         
         if len(sched) > 2:
-            Transfer.insert('cbb_schedule', sched, at_once=True)
+            transfer.insert('cbb_schedule', sched, at_once=True)
         else:
-            Transfer.insert('cbb_schedule_error', sched, at_once=True)
+            transfer.insert('cbb_schedule_error', sched, at_once=True)
 
 def team_from_row(row):
     try:

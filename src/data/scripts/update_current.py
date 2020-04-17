@@ -1,3 +1,3 @@
-from src.data import Updater
+from src.data import updater
 
-Updater.update_current()
+updater.update_current()

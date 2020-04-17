@@ -18,7 +18,7 @@ from hyperopt import fmin, tpe, Trials, space_eval, hp, STATUS_OK
 from grids import model_grid, space_grid, scorer_grid
 from sklearn.linear_model import LogisticRegression, Ridge
 from imblearn.over_sampling import RandomOverSampler
-from Constants import RANDOM_SEED
+from constants import RANDOM_SEED
 
 def score_to_class(x):
     if x[0] == float("nan"):

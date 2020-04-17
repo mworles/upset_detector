@@ -58,9 +58,9 @@ update_teams
     original team location data.
 
 """
-from src.data import Transfer
-from src.data import Clean
-from src.data import Generate
+from src.data import transfer
+from src.data import clean
+from src.data import generate
 import pandas as pd
 import numpy as np
 import re
@@ -84,7 +84,7 @@ def run(modifier=None):
     """
     
     # import games data, contains game and team identifiers
-    df = Transfer.return_data('game_info', modifier=modifier)
+    df = transfer.return_data('game_info', modifier=modifier)
 
     # to add data on where game was hosted
     th = home_games(df['game_id'].values)
@@ -135,7 +135,7 @@ def home_games(game_id):
 
     """
     # import team_home data
-    df = Transfer.return_data('team_home')
+    df = transfer.return_data('team_home')
     df = df[df['game_id'].isin(game_id)]
 
     # identify home team for game locations
@@ -170,13 +170,13 @@ def neutral_games(neutral):
 
     """
     # import and merge game cities and cities data, available after 2010
-    games = Transfer.return_data('game_cities')
-    cities = Transfer.return_data('cities')
+    games = transfer.return_data('game_cities')
+    cities = transfer.return_data('cities')
     df = pd.merge(games, cities, how='inner', left_on='city_id',
                   right_on='city_id')
 
     # create game id and keep relevant games
-    df = Generate.make_game_id(df, ['wteam', 'lteam'])
+    df = generate.make_game_id(df, ['wteam', 'lteam'])
     df = df[df['game_id'].isin(neutral)]
 
     # import map of city coordinates,
@@ -187,15 +187,15 @@ def neutral_games(neutral):
     df['game_loc'] = map(lambda x: locate_item(x, city_map), city_state)
 
     # import and combine tourney games prior to 2010
-    tg = Transfer.return_data('tourney_geog', modifier='WHERE season < 2010')
+    tg = transfer.return_data('tourney_geog', modifier='WHERE season < 2010')
 
     # add unique game id from teams and date
-    tg = Generate.make_game_id(tg, ['wteam', 'lteam'])
+    tg = generate.make_game_id(tg, ['wteam', 'lteam'])
     tg['game_loc'] = zip(tg['latitude'].values, tg['longitude'].values)
 
     # import and clean games with gyms from scraped schedule
     mod = 'WHERE season >= 2003 AND season <= 2009'
-    sg = Transfer.return_data('cbb_schedule', modifier=mod)
+    sg = transfer.return_data('cbb_schedule', modifier=mod)
     sg = transform_schedule(sg)
 
     # remove tourney games already obtained above
@@ -252,8 +252,8 @@ def city_coordinates(full_state=True):
 
     """
     # import and combine city and state data
-    usc = Transfer.return_data('us_cities')
-    uss = Transfer.return_data('us_states')
+    usc = transfer.return_data('us_cities')
+    uss = transfer.return_data('us_states')
     uss = uss.rename(columns={'ID': 'ID_STATE'})
     df = pd.merge(usc, uss, left_on='ID_STATE', right_on='ID_STATE',
                   how='inner')
@@ -307,7 +307,7 @@ def manual_cities(state_map):
 
     """
     # import data for supplemental cities
-    df = Transfer.return_data('cities_manual')
+    df = transfer.return_data('cities_manual')
     df = df.rename(columns={'city': 'CITY',
                             'state': 'STATE_CODE',
                             'lat': 'LATITUDE',
@@ -341,7 +341,7 @@ def team_coordinates(team_id):
 
     """
     # import team geography data, select teams
-    df = Transfer.return_data('team_geog')
+    df = transfer.return_data('team_geog')
     df = df[df['team_id'].isin(team_id)]
     
     # create map with (lattitude, longitude) tuples as values
@@ -372,7 +372,7 @@ def gym_schedule_coordinates(df):
     df = df.drop_duplicates(subset=['gym'])
 
     # get dict with keys as gym names and values as (city_state) locations
-    gg = Transfer.return_data('game_gym')
+    gg = transfer.return_data('game_gym')
     gym_map = gym_city_coordinates(gg)
 
     # isolate gyms with and without a match in gym_dict
@@ -420,7 +420,7 @@ def match_gym(name, options):
 
     """
     try:
-        result = Clean.fuzzy_match(name, options, cutoff=90)
+        result = clean.fuzzy_match(name, options, cutoff=90)
     # to catch strings with remaining unicode
     except TypeError:
         result = None
@@ -473,7 +473,7 @@ def gym_city_coordinates(df):
     gym_dict = df['game_loc'].to_dict()
 
     # update dict with manual gym locations
-    gm = Transfer.return_data('gym_manual', modifier=None)
+    gm = transfer.return_data('gym_manual', modifier=None)
     gm['game_loc'] = zip(gm['lat'].values, gm['lng'].values)
     gm = gm.set_index('gym')['game_loc'].to_dict()
     gym_dict.update(gm)
@@ -519,7 +519,7 @@ def transform_schedule(df):
 
     # obtain team numeric ids and game id for each game
     dft = schedule_team_ids(dft)
-    dft = Generate.make_game_id(dft, ['team_id', 'opp_id'], convert_date=False)
+    dft = generate.make_game_id(dft, ['team_id', 'opp_id'], convert_date=False)
 
     # isolate unique gym names for matching to gym locations
     dft = dft[['game_id', 'gym']]
@@ -568,13 +568,13 @@ def schedule_team_ids(df):
         Contains team numeric ids for both teams in the game.
 
     """
-    tk = Transfer.return_data('team_key')
+    tk = transfer.return_data('team_key')
     tk = tk[['team_id', 'team_ss']].copy()
     tk = tk.drop_duplicates()
 
     # import and merge the team names from team schedule links
     # schedule data uses names from both team_key and team_sched
-    ts = Transfer.return_data('team_sched')
+    ts = transfer.return_data('team_sched')
     ts['team_ss'] = ts['team_ss'].replace('Cal State Long Beach',
                                           'Long Beach State')
 
