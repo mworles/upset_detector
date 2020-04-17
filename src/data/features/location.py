@@ -69,10 +69,23 @@ from geopy.distance import great_circle
 
 
 def run(modifier=None):
-    """Returns data with game identifer, latitude, and longitude."""
+    """Returns dataframe with game identifer and location of game.
+
+    Parameters
+    ----------
+    modifier : str
+        Modifier for MySQL query to pull game data from game_info table.
+
+    Returns
+    -------
+    df : DataFrame
+        Contains game id, latittude, and longitude of game.
+
+    """
+    
     # import games data, contains game and team identifiers
     df = Transfer.return_data('game_info', modifier=modifier)
-    
+
     # to add data on where game was hosted
     th = home_games(df['game_id'].values)
     df = pd.merge(df, th, left_on='game_id', right_on='game_id', how='left')
@@ -336,7 +349,7 @@ def team_coordinates(team_id):
     df = df.set_index('team_id')
     team_map = df['lat_lng'].to_dict()
 
-    return team_dict
+    return team_map
 
 
 def gym_schedule_coordinates(df):
@@ -359,7 +372,7 @@ def gym_schedule_coordinates(df):
     df = df.drop_duplicates(subset=['gym'])
 
     # get dict with keys as gym names and values as (city_state) locations
-    gg = Transfer.return_data('game_gym', modifier=modifier)
+    gg = Transfer.return_data('game_gym')
     gym_map = gym_city_coordinates(gg)
 
     # isolate gyms with and without a match in gym_dict
@@ -377,7 +390,7 @@ def gym_schedule_coordinates(df):
 
     # create array of exact match or fuzzy match if no exact exists
     gym_orig, gym_fuzz = gyms['gym'].values, gyms['fuzz'].values
-    locate = np.where(gyms['fuzz'].isnull(), g, f)
+    locate = np.where(gyms['fuzz'].isnull(), gym_orig, gym_fuzz)
     
     # get coordinates for each gym in locate
     gyms['gym_loc'] = map(lambda x: locate_item(x, gym_map), locate)
@@ -442,8 +455,8 @@ def gym_city_coordinates(df):
     
     # remove specific irrelevant duplicates
     na1 = ((df['gym'] == 'wells fargo arena') & (df['city'] == 'Anchorage'))
-    na2 = ((df['gym'] == 'toyota center') & (df['city'] == 'Kennewick'))
     df = df[~na1]
+    na2 = ((df['gym'] == 'toyota center') & (df['city'] == 'Kennewick'))
     df = df[~na2]
 
     # after cleaning some duplicates remain, remove them
