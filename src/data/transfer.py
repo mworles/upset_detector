@@ -28,12 +28,11 @@ class DBColumn():
     """
     A container of data and metadata for an individual column.
 
-    ...
-
     Attributes
     ----------
     data : list
-        Column name and values input to the class instance.
+        Column data assigned as input to the class instance. First element is
+        str column name.
     name: str
         Name of the column.
     values: list
