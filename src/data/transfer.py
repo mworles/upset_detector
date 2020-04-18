@@ -1,83 +1,151 @@
+""" transfer
+
+A module to insert to and extract data from local MySQL database.
+
+Classes
+-------
+DBColumn
+    Define.
+DBTable
+    Define.
+DBAssist
+    Define.
+
+Functions
+---------
+
+"""
 import ConfigParser
-import csv
-import clean
-import time
-import pymysql
 import os
 import json
-import pandas as pd
 import math
+import pandas as pd
+import numpy as np
+import pymysql
+
 
 class DBColumn():
-    
+    """
+    A container of data and metadata for an individual column.
+
+    ...
+
+    Attributes
+    ----------
+    data : list
+        Column name and values input to the class instance.
+    name: str
+        Name of the column.
+    values: list
+        List of element values.
+    type: str
+        String defining the column type for MySQL table.
+    query: str
+        String containing the column name and type for a create or insert
+        query.
+
+    Methods
+    -------
+    convert_values
+        Returns the column values converted to necessary format for insertion
+        to MySQL table.
+    column_type
+        Returns the MySQL column type inferred from the column values.
+    format_value
+        Define.
+    """
     def __init__(self, data):
         self.data = data
-        self.name = self.clean_column_name(self.data[0])
+        self.name = self.data[0].replace('-', '_')
         self.values = self.data[1:]
-        self.type = self.get_column_type(self.values)
+        self.type = self.column_type(self.values)
         self.query = "".join([self.name, self.type])
 
-    def convert_values(self):
-        values_conv = map(lambda x: self.format_value(x, self.type), self.values)
-        return values_conv
-
+    # static method used when creating class instance
     @staticmethod
-    def clean_column_name(name):
-        name_clean = name.replace('-', '_')
-        return name_clean
-    
-    @staticmethod
-    def get_column_type(col):
-        try:
-            col_f = [x for x in col if x is not None]
-            col_f = [str(float(x)) if x != '' else 'NULL' for x in col_f]
-            # only non-null values for decimal format extraction
-            col_f = [x for x in col_f if x != 'NULL']
-            col_f = [x for x in col_f if math.isnan(float(x)) == False]
-            dec_splits = [x.split('.') for x in col_f]
-            imax = max([len(x[0]) for x in dec_splits])
-            dmax = max([len(x[1]) for x in dec_splits])
-            # for DECIMAL (M,D) mysql requires M >= D
-            col_type = """ DECIMAL (%s, %s) """ % (imax + dmax, dmax)
-        except:
-            col_type = """ VARCHAR (64) """
-        return col_type
+    def column_type(col_values):
+        """Returns string indicating MYSQL type to use for column.
 
-    @staticmethod
-    def format_value(x, col_type):
-        if x == None:
-            x = 'NULL'
-        try:
-            if math.isnan(x) == True:
-                x = 'NULL'
-        except:
-            if x == '':
-                x = 'NULL'
+        Parameters
+        ----------
+        col_values : list or array
+            All data points included in the column.
 
-        if "VARCHAR" in col_type:
-            if x != 'NULL':
-                x = str(x)
-                x = x.replace("'", r"\'")
-                xf = r"""'%s'""" % (x)
-            else:
-                xf = r"""NULL"""
-        elif "DECIMAL" in col_type:
-            if x == 'NULL':
-                xf = """NULL"""
-            else:
-                xf = """%s""" % (x)
-        return xf
+        Returns
+        -------
+        col_type : str
+            MySQL column type for a CREATE/INSERT query.
+
+        """
+        # collect all unique types as strings
+        elem_types = list(set([type(x).__name__ for x in col_values]))
         
+        # if any strings use VARCHAR, otherwise use FLOAT
+        if 'str' in elem_types:
+            # keep len at 64, sufficient size for expected values
+            col_type = " VARCHAR (64) "
+        else:
+            col_type = " FLOAT "
+        
+        return col_type
+    
+    def convert_values(self):
+        """
+        Return list of column values converted for MySQL insertion.
+
+        Raw column values of numeric or string types are converted to
+        corresponding string values for MySQL insert queries. Raw values of
+        None, empty strings, or NaN are converted to NULL. 
+        
+        Returns
+        -------
+        new_values : list
+            List of column values converted for MySQL insert command.
+
+        """
+        new_values = [self.format_value(x, self.type) for x in self.values]
+        nulls = ['nan', '', 'None', "'nan'", "''", "'None'"]
+        new_values = [x if x not in nulls else 'NULL' for x in new_values]
+        return new_values
+
+    @staticmethod
+    def format_value(raw_value, col_type):
+        """Return element as a formatted string for insertion to MySQL table.
+
+        Parameters
+        ----------
+        raw_value : str, float, int, or NaN
+            The original value provided as input to the DBTable.
+        col_type : {'VARCHAR', 'FLOAT'}
+            The MySQL type for the column.
+
+        Returns
+        -------
+        new_value : str
+            Value converted to string.
+
+        """
+        # code nulls separately to prevent inserting as strings
+        if "VARCHAR" in col_type:
+            # convert any numerics to string, keep any existing ' intact
+            new_value = str(raw_value).replace("'", r"\'")
+            new_value = r"""'{}'""".format(new_value)
+        else:
+            new_value = r"""{}""".format(raw_value)
+
+        return new_value
+
+
 class DBTable():
 
     def __init__(self, name, data):
         self.name = name
         self.column_names = data[0]
         self.column_list = map(list, zip(*data))
-    
+
     def setup_columns(self):
         self.columns = [DBColumn(x) for x in self.column_list]
-        
+
     def get_query_create(self):
         q_columns = ", \n".join([c.query for c in self.columns])
         q_create = """ """.join(["CREATE TABLE IF NOT EXISTS", self.name, "(", q_columns, ");"])
@@ -88,7 +156,7 @@ class DBTable():
         rows_conv = map(list, zip(*values_conv))
         rows_joined = [", ".join(r) for r in rows_conv]
         self.row_values = ["".join(["(", r, ")"]) for r in rows_joined]
-        
+
     def get_query_insert(self):
         rows_combined = ",\n".join(self.row_values)
         col_pref = ", ".join(self.column_names)
@@ -96,7 +164,7 @@ class DBTable():
         pref = " ".join(["INSERT INTO ", self.name, col_pref, "VALUES"])
         self.query_insert = " ".join([pref, rows_combined, ";"])
         self.query_rows = [pref + r for r in self.row_values]
-        
+
     def setup_table(self):
         self.setup_columns()
         self.get_query_create()
