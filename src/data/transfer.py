@@ -26,7 +26,7 @@ import pymysql
 
 class DBColumn():
     """
-    A container of data and metadata for an individual column.
+    A container for a column of data in DBTable.
 
     Attributes
     ----------
@@ -40,83 +40,63 @@ class DBColumn():
     type: str
         String defining the column type for MySQL table.
     query: str
-        String containing the column name and type for a create or insert
-        query.
-
+        String containing the column name and type for CREATE/INSERT query.
+    
     Methods
     -------
-    convert_values
-        Returns the column values converted to necessary format for insertion
-        to MySQL table.
     column_type
-        Returns the MySQL column type inferred from the column values.
-    format_value
-        Define.
+        Return the MySQL column type inferred from the column values.
+    convert_column
+        Return the column values converted to formatted strings.
+    convert_element
+        Return one element converted to a formatted string.
     """
     def __init__(self, data):
+        """Initialize DBColumn instance."""
         self.data = data
         self.name = self.data[0].replace('-', '_')
         self.values = self.data[1:]
-        self.type = self.column_type(self.values)
+        self.type = self.column_type()
         self.query = "".join([self.name, self.type])
 
-    # static method used when creating class instance
-    @staticmethod
-    def column_type(col_values):
-        """Returns string indicating MYSQL type to use for column.
-
-        Parameters
-        ----------
-        col_values : list or array
-            All data points included in the column.
-
-        Returns
-        -------
-        col_type : str
-            MySQL column type for a CREATE/INSERT query.
-
-        """
+    def column_type(self):
+        """Return string indicating MYSQL type to use for column."""
         # collect all unique types as strings
-        elem_types = list(set([type(x).__name__ for x in col_values]))
-        
+        elem_types = list(set([type(x).__name__ for x in self.values]))
+
         # if any strings use VARCHAR, otherwise use FLOAT
         if 'str' in elem_types:
             # keep len at 64, sufficient size for expected values
-            col_type = " VARCHAR (64) "
+            col_type = " VARCHAR (64)"
         else:
-            col_type = " FLOAT "
-        
+            col_type = " FLOAT"
+
         return col_type
-    
-    def convert_values(self):
+
+    def convert_column(self):
         """
         Return list of column values converted for MySQL insertion.
-
-        Raw column values of numeric or string types are converted to
-        corresponding string values for MySQL insert queries. Raw values of
-        None, empty strings, or NaN are converted to NULL. 
-        
+    
         Returns
         -------
-        new_values : list
-            List of column values converted for MySQL insert command.
-
+        new_values : list of str
+            String values converted from numeric or string types. None, 
+            empty strings, or NaN are converted to NULL.
+        
         """
-        new_values = [self.format_value(x, self.type) for x in self.values]
+        new_values = [self.convert_element(x) for x in self.values]
         nulls = ['nan', '', 'None', "'nan'", "''", "'None'"]
         new_values = [x if x not in nulls else 'NULL' for x in new_values]
         return new_values
 
-    @staticmethod
-    def format_value(raw_value, col_type):
-        """Return element as a formatted string for insertion to MySQL table.
+    def convert_element(self, raw_value):
+        """
+        Return element as a formatted string for insertion to MySQL table.
 
         Parameters
         ----------
-        raw_value : str, float, int, or NaN
-            The original value provided as input to the DBTable.
-        col_type : {'VARCHAR', 'FLOAT'}
-            The MySQL type for the column.
+        raw_value : str, float, int, NaN, or None
+            The original cell value when DBTable is initialized.
 
         Returns
         -------
@@ -125,53 +105,114 @@ class DBColumn():
 
         """
         # code nulls separately to prevent inserting as strings
-        if "VARCHAR" in col_type:
+        if "VARCHAR" in self.type:
             # convert any numerics to string, keep any existing ' intact
             new_value = str(raw_value).replace("'", r"\'")
             new_value = r"""'{}'""".format(new_value)
         else:
-            new_value = r"""{}""".format(raw_value)
+            new_value = """{}""".format(raw_value)
 
         return new_value
 
 
 class DBTable():
+    """
+    A container for 2-dimensional data for insertion to MySQL table.
 
+    Attributes
+    ----------
+    name : str
+        Name of the table in MySQL database.
+    data : list of list
+        First list must be column names, remaining lists contain rows of data.
+    columns: list of DBColumn
+        Contains DBColumn instance for each column in the table.
+
+    Methods
+    -------
+    query_rows
+        Return table rows as list of formatted strings.    
+    query_create
+        Return query for creating table in MySQL database.
+    query_insert
+        Return query for inserting data to table in MySQL database.
+    """
     def __init__(self, name, data):
+        """Initialize DBTable instance."""
         self.name = name
-        self.column_names = data[0]
-        self.column_list = map(list, zip(*data))
+        self.data = data
+        # initialize all columns to get names, types, and values
+        self.columns = [DBColumn(x) for x in map(list, zip(*self.data))]
 
-    def setup_columns(self):
-        self.columns = [DBColumn(x) for x in self.column_list]
+    def query_create(self):
+        """Return query for creating table in MySQL database."""
+        query_columns = ", \n".join([c.query for c in self.columns])
+        pref = "CREATE TABLE IF NOT EXISTS"
+        #create = """ """.join([pref, self.name, "(", query_columns, ");"])
+        create = "{0} {1} ({2});".format(pref, self.name, query_columns)
+        return create
 
-    def get_query_create(self):
-        q_columns = ", \n".join([c.query for c in self.columns])
-        q_create = """ """.join(["CREATE TABLE IF NOT EXISTS", self.name, "(", q_columns, ");"])
-        self.query_create = q_create
+    def query_insert(self, at_once=True):
+        """
+        Return query for inserting data to table in MySQL database.
+        
+        Parameters
+        ----------
+        at_once : bool, default True
+            Return a single formatted string for inserting all rows at once.
+            If False, return a list of separate strings for each row.
 
-    def get_row_values(self):
-        values_conv = [c.convert_values() for c in self.columns]
-        rows_conv = map(list, zip(*values_conv))
-        rows_joined = [", ".join(r) for r in rows_conv]
-        self.row_values = ["".join(["(", r, ")"]) for r in rows_joined]
+        Returns
+        -------
+        insert : str or list of str
+            Str or list for inserting table values to MySQL database.
 
-    def get_query_insert(self):
-        rows_combined = ",\n".join(self.row_values)
-        col_pref = ", ".join(self.column_names)
-        col_pref = "".join(['(', col_pref, ')'])
-        pref = " ".join(["INSERT INTO ", self.name, col_pref, "VALUES"])
-        self.query_insert = " ".join([pref, rows_combined, ";"])
-        self.query_rows = [pref + r for r in self.row_values]
+        """
+        # create prefix string for insert query
+        col_string = ", ".join(self.data[0])
+        pref = "INSERT INTO {0} ({1}) VALUES".format(self.name, col_string)
+        
+        # list with formatted string for each row
+        table_rows = self.query_rows()
+        
+        if at_once is True:
+            rows_combined = ",\n".join(table_rows)
+            insert = "{0} {1};".format(pref, rows_combined)
+        else:
+            insert = ["{0} {1};".format(pref, row) for row in table_rows]
 
-    def setup_table(self):
-        self.setup_columns()
-        self.get_query_create()
-        self.get_row_values()
-        self.get_query_insert()
+        return insert
+
+    def query_rows(self):
+        """Return table rows as list of formatted strings."""
+        column_values = [c.convert_column() for c in self.columns]
+        rows = map(list, zip(*column_values))
+        row_strings = [", ".join(row_list) for row_list in rows]
+        rows_formatted = ["({0})".format(row) for row in row_strings]
+        return rows_formatted
 
 
 class DBAssist():
+    """
+    A tool for inserting data to and extracting data from MySQL database.
+
+    Attributes
+    ----------
+    conn : pymysql.connection
+        An instance of pymysql connection class to establish connection with
+        MySQL database.
+    cursor : pymysql.cursor
+        Instance of pymysql cursor class called from the conn attribute.
+
+    Methods
+    -------
+    query_rows
+        Return table rows as list of formatted strings.    
+    query_create
+        Return query for creating table in MySQL database.
+    query_insert
+        Return query for inserting data to table in MySQL database.
+    """
     def __init__(self):
         self.conn = None
         self.cursor = None
@@ -190,7 +231,6 @@ class DBAssist():
                                     db=db)
         self.cursor = self.conn.cursor()
 
-
     def check_table(self, table):
         qp = """SELECT COUNT(*)
                 FROM information_schema.tables 
@@ -207,7 +247,8 @@ class DBAssist():
         return result
 
     def create_table(self, table):
-        self.cursor.execute(table.query_create)
+        create = table.query_create()
+        self.cursor.execute(create)
         self.conn.commit()
 
     def execute_commit(self, query):
@@ -218,10 +259,12 @@ class DBAssist():
         """Given table name with list of rows, insert all rows."""
         # obtain full insert query for all rows
         if at_once == True:
-            self.cursor.execute(table.query_insert)
+            insert_full = table.query_insert(at_once=at_once)
+            self.cursor.execute(insert_full)
             self.conn.commit()
         else:
-            map(lambda x: self.execute_commit(x), table.query_rows)
+            insert_rows = table.query_insert(at_once=at_once)
+            map(lambda x: self.execute_commit(x), insert_rows)
 
     def run_query(self, query):
         self.cursor.execute(query)
