@@ -4,6 +4,7 @@ ratings_t1 =    """SELECT *
                 INNER JOIN game_info AS g
                 ON r.team_id = g.t1_team_id AND r.date = g.date;
                 """
+
 ratings_t2 =    """SELECT *
                 FROM ratings_at_day as r
                 INNER JOIN game_info AS g

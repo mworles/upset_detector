@@ -1,26 +1,28 @@
-from data import transfer
-from data import updater
-from data import queries
-from data import generate
 import pandas as pd
 import numpy as np
 import pickle
-import constants
-from models import utils
+from src.data import transfer
+from src.data import updater
+from src.data import queries
+from src.data import generate
+from src import constants
+from src.models import utils
+
+
 """
 def make_features(df, tables):
     if 'ratings_needed' in tables:
-        ratings = transfer.return_data('ratings_needed')
+        ratings = transfer.DBAssist().return_data('ratings_needed')
         ratings = ratings.drop('season', axis=1)
         df = updater.assign_features(df, ratings, merge_on=['date'])
     
     if 'team_home' in tables:
-        home = transfer.return_data('team_home')
+        home = transfer.DBAssist().return_data('team_home')
         home = home.drop('game_id', axis=1)
         df = updater.assign_features(df, home, merge_on=['date'])
     
     if 'spread' in tables:
-        spread = transfer.return_data('spreads_by_team')
+        spread = transfer.DBAssist().return_data('spreads_by_team')
         spread = spread.drop('game_id', axis=1)
         spread['spread'] = - spread['spread']
         spread = spread.rename(columns={'spread': 'spread_rev'})
@@ -28,7 +30,7 @@ def make_features(df, tables):
     return df
 
 def add_result(df, target):
-    results = transfer.return_data('results_by_team')
+    results = transfer.DBAssist().return_data('results_by_team')
     game_cols = ['game_id', 'team_id', 'date']
     target_drop = [x for x in results.columns if x not in game_cols]
     target_drop.remove(target)
@@ -41,7 +43,7 @@ def add_result(df, target):
 
 def add_spreads(df):
     # merge spreads
-    spreads = transfer.return_data('spreads_by_team')
+    spreads = transfer.DBAssist().return_data('spreads_by_team')
     spreads = spreads.rename(columns={'team_id': 't1_team_id'})
     spreads = spreads.drop(['game_id'], axis=1)
     df = pd.merge(df, spreads, how='left',
@@ -72,9 +74,9 @@ def clean_set(df):
 
 def get_examples(arrange='neutral'):
     if arrange == 'neutral':
-        df = transfer.return_data('game_info')
+        df = transfer.DBAssist().return_data('game_info')
     else:
-        df = transfer.return_data('fav_dog')
+        df = transfer.DBAssist().return_data('fav_dog')
         if arrange == 'favorite':
             col_map = {'t_favor': 't1_team_id', 't_under': 't2_team_id'}
         elif arrange == 'underdog':

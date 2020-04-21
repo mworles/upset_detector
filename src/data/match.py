@@ -328,7 +328,6 @@ def create_key(datdir):
     visp_id = match_team(visp, id, min_year=2019)
     key_list.append(visp_id)
     
-    
     # read in master id file
     key = pd.read_csv(datdir + '/scrub/teams.csv')
     key = key[['team_id', 'team_name']]
@@ -342,11 +341,11 @@ def create_key(datdir):
     # set location to write file and save file
     data_out = datdir + 'interim/'
     clean.write_file(key, data_out, 'team_key')
-    
-    transfer.create_from_schema('team_key', 'data/schema.json')
 
-    rows = transfer.dataframe_rows(key)
-    transfer.insert('team_key', rows, at_once=True) 
+    dba = Transfer.DBAssist()
+    dba.create('team_key')
+    dba.insert('team_key', key, at_once=True) 
+
 
 def id_from_name(df, key_col, name_col, drop=True, how='inner'):
     """From input data containing team name column specified in 'name_col', 
@@ -364,7 +363,7 @@ def id_from_name(df, key_col, name_col, drop=True, how='inner'):
         The name of team name column in the input df.
     """ 
     # read in the id key data
-    id = transfer.return_data('team_key')
+    id = transfer.DBAssist().return_data('team_key')
     # from id key data, only need numeric identifer and key_col to merge on
     id = id[['team_id', key_col]]
     id['team_id'] = id['team_id'].astype(int)

@@ -103,6 +103,7 @@ def team_page(url):
     return soup
 
 def srcbb_team(season):
+    dba = transfer.DBAssist()
     table = season_table(season)
     rows = table.findAll('tr')
     base = 'https://www.sports-reference.com'
@@ -127,20 +128,19 @@ def srcbb_team(season):
         try:
             roster = parse_rosters(soup)
             roster = add_season_team(roster, season, team)
-            transfer.insert('team_roster', roster, at_once=True)
+            dba.insert('team_roster', roster, at_once=True)
         except:
             print url
             fail = [['season', 'team'], [season, team]]
-            transfer.insert('team_roster_error', fail, at_once=True)
+            dba.insert('team_roster_error', fail, at_once=True)
             
         try:
             per_game = parse_pergame(soup)
             per_game = add_season_team(per_game, season, team)
-            transfer.insert('player_pergame', per_game, at_once=True)
+            dba.insert('player_pergame', per_game, at_once=True)
         except:
             fail = [['season', 'team'], [season, team]]
-            transfer.insert('player_pergame_error', fail, at_once=True)
-
+            dba.insert('player_pergame_error', fail, at_once=True)
 
 
 def parse_schedule(soup):
@@ -229,16 +229,18 @@ def get_team_schedule(url, season):
 
     
 def get_insert_schedules(season):
+    dba = transfer.DBAssist()
     links = srcbb_schedule_links(season)
-    
+
     for url in links:
         time.sleep(1)
         sched = get_team_schedule(url, season)
-        
+
         if len(sched) > 2:
-            transfer.insert('cbb_schedule', sched, at_once=True)
+            dba.insert('cbb_schedule', sched, at_once=True)
         else:
-            transfer.insert('cbb_schedule_error', sched, at_once=True)
+            dba.insert('cbb_schedule_error', sched, at_once=True)
+
 
 def team_from_row(row):
     try:

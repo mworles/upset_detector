@@ -16,7 +16,7 @@ import clean
 import match
 import ratings
 import scrapers
-import transfer
+from src.data.transfer import DBAssist
 
 
 def set_gameid_index(df, date_col='date_id', full_date=False, drop_date=True):
@@ -83,7 +83,7 @@ def convert_team_id(df, id_cols, drop=True):
     return df
 
 def date_from_daynum(df):
-    seas = transfer.return_data('seasons')
+    seas = DBAssist().return_data('seasons')
     seas = seas.loc[:, ['season', 'dayzero']]
     df = pd.merge(df, seas, how='inner', left_on='season', right_on='season')
     df['date'] = df.apply(clean.game_date, axis=1)
@@ -243,18 +243,18 @@ def neutral_games(datdir):
 
 
 def convert_past_games():
-    df1 = transfer.return_data('reg_results')
+    df1 = DBAssist().return_data('reg_results')
     df1['game_cat'] = 'regular'
 
-    df2 = transfer.return_data('nit_results')
+    df2 = DBAssist().return_data('nit_results')
     df2 = df2.rename(columns={'secondarytourney': 'game_cat'})
 
-    df3 = transfer.return_data('ncaa_results')
+    df3 = DBAssist().return_data('ncaa_results')
     df3['game_cat'] = 'ncaa'
 
     df = pd.concat([df1, df2, df3], sort=True)
 
-    s = transfer.return_data('seasons')
+    s = DBAssist().return_data('seasons')
     s = s[['season', 'dayzero']]
 
     df = pd.merge(df, s, on='season', how='inner')
@@ -321,10 +321,10 @@ def tcp_team_home(df):
 def game_home(date=None):
     if date is not None:
         mod = """WHERE date = '%s'""" % (date)
-        df = transfer.return_data('game_scores', modifier=mod)
+        df = DBAssist().return_data('game_scores', modifier=mod)
         df = df.drop(columns=['home_score', 'away_score'])
     else:
-        df = transfer.return_data('game_scheduled')
+        df = DBAssist().return_data('game_scheduled')
     
     df = match.id_from_name(df, 'team_tcp', 'away_team', drop=False)
     df = match.id_from_name(df, 'team_tcp', 'home_team', drop=False)
@@ -338,7 +338,7 @@ def results_home(df):
 
     mat = df[['wteam', 'lteam', 'wloc']].values
 
-    s = transfer.return_data('seasons')
+    s = DBAssist().return_data('seasons')
     df = pd.merge(df, s, on='season', how='inner')
 
     # add string date column to games

@@ -1,13 +1,11 @@
 import pandas as pd
-from models import utils
-from data import clean, transfer
-from constants import SPLIT_YEARS
+from src.models import utils
+from src.data import clean
+from src.data import transfer
+from src import constants
 
-# define data datdirectory, import features and targets
-#datdir = '../data/processed/'
-#df = pd.read_csv(datdir + 'features.csv', index_col=0)
-#targets = pd.read_csv(datdir + 'targets.csv', index_col=0)
-mat = transfer.return_data('matchups')
+
+mat = transfer.DBAssist().return_data('matchups')
 mat = mat.set_index('game_id')
 feat_i = mat.columns.tolist().index('t1_team_off_adj')
 df = mat.iloc[:, feat_i:]
@@ -16,7 +14,7 @@ target = mat['t1_marg']
 df['season'] = mat['season']
 
 # input variable values
-split_values = SPLIT_YEARS
+split_values = constants.SPLIT_YEARS
 split_on = 'season'
 score_type = 'MAE'
 grid_id = 2

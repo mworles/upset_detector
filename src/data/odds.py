@@ -268,7 +268,7 @@ def matchup_odds_dates(mat, odds):
 
 
 def odds_table():
-    mat = transfer.return_data('game_info')
+    mat = transfer.DBAssist().return_data('game_info')
     
     odds = odds.clean_oddsportal(datdir)
 

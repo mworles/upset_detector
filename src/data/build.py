@@ -14,24 +14,29 @@ from src.data import features
 from src import constants
 
 def create_database(schema_file):
+    dba = transfer.DBAssist()
+
     with open(schema_file, 'r') as f:
         schema = json.load(f)
+
     for k in schema.keys():
         try:
-            transfer.create_from_schema(k, schema_file)
+            dba.create_table(k)
         except Exception as E:
             print E
 
 def matchups_bet(mat):
+    dba = transfer.DBAssist()
+
     # make table of odds/spreads specific to games in matchups
-    s = transfer.return_data('spreads_clean')
+    s = dba.return_data('spreads_clean')
 
     s = s.dropna(subset=['t1_spread'])
     s = s[['game_id', 't1_spread', 'over_under']]
 
     mrg1 = pd.merge(mat, s, how='left', left_on='game_id', right_on='game_id')
 
-    o = transfer.return_data('odds_clean')
+    o = dba.return_data('odds_clean')
     o = o[['game_id', 't1_odds', 't2_odds', 't1_odds_dec', 't2_odds_dec']]
 
     mrg2 = pd.merge(mrg1, o, how='left', left_on='game_id', right_on='game_id')
@@ -84,10 +89,11 @@ def get_fav_dog(gd):
     return un_fav
 
 def set_fav_dog(mat):
-
+    dba = transfer.DBAssist()
+    
     mat = mat[['game_id', 'season', 'date', 't1_eff_marg', 't2_eff_marg']]
     
-    mb = transfer.return_data('matchups_bet')
+    mb = dba.return_data('matchups_bet')
     mb = mb.drop(columns=['season', 'date', 'over_under'])
 
     df = pd.merge(mat, mb, how='inner', left_on='game_id', right_on='game_id')
@@ -130,6 +136,7 @@ def columns_by_team(df, col_names):
 
 def build(datdir, ratings=False):
     create_database('schema.json')
+    dba = transfer.DBAssist()
     
     """Run once to insert data gathered from flat files."""
     # pre-process raw data
@@ -141,31 +148,27 @@ def build(datdir, ratings=False):
     df_add = features.location.update_teams(df, constants.TEAM_CITY_UPDATE)
     df = pd.concat([df, df_add])
 
-    transfer.insert_df('team_geog', df, at_once=True)
+    dba.insert('team_geog', df, at_once=True)
     
     # lattitude and longitude of tourney games '85-'17
     df = pd.read_csv(datdir + 'external/kaggle/TourneyGeog.csv')
-    transfer.insert_df('tourney_geog', df, at_once=True)
+    dba.insert('tourney_geog', df, at_once=True)
     
     # manually obtained lattitude and longitude of some gyms
     df = pd.read_csv(datdir + 'external/locations/gym_manual.csv')
-    transfer.insert_df('gym_manual', gl, at_once=True, create=True)    
+    dba.create_insert('gym_manual', gl, at_once=True)    
     
     # manually obtained lattitude and longitude of some cities
     df = pd.read_csv(datadir + 'data/external/locations/cities_manual.csv')
-    transfer.insert_df('cities_manual', df, at_once=True, create=True)
-    
-
+    dba.create_insert('cities_manual', df, at_once=True)
     
     df = ratings.games_ratings(datdir)
-    rows = transfer.dataframe_rows(df)
-    transfer.insert('games_for_ratings', rows, at_once=False)
+    dba.insert('games_for_ratings', df, at_once=False)
     
     df = ratings.game_box_for_ratings()
-    rows = transfer.dataframe_rows(df)
-    transfer.insert('games_for_ratings', rows, at_once=False) 
-
-    df = transfer.return_data('games_for_ratings')
+    dba.insert('games_for_ratings', df, at_once=False) 
+    
+    df = dba.return_data('games_for_ratings')
     years = pd.unique(df['season']).tolist()
     
     if ratings != False:
@@ -175,93 +178,89 @@ def build(datdir, ratings=False):
     
     # clean from oddsportal and insert
     odds = odds.odds_table()
-    rows = transfer.dataframe_rows(odds)
-    transfer.insert('odds_clean', rows, at_once=True)
+    dba.insert('odds_clean', odds, at_once=True)
 
     # create table of odds by game_id and team
-    df = transfer.return_data('odds_clean')
+    df = dba.return_data('odds_clean')
     col_names = ['odds', 'odds_dec']
     cbt = columns_by_team(df, col_names)
-    transfer.insert_df('odds_by_team', cbt, at_once=True, create=True)
+    dba.create_insert('odds_by_team', cbt, at_once=True)
 
     # create blended clean spreads table
     df = spreads.blend_spreads(datdir)
     # move game_id to column
     df = df.reset_index()
-    rows = transfer.dataframe_rows(df)
-    transfer.insert('spreads_clean', rows, at_once=False) 
+    dba.insert('spreads_clean', df, at_once=False) 
 
-    df = transfer.return_data('spreads_clean')
+    df = dba.return_data('spreads_clean')
     df['t2_spread'] = - df['t1_spread']
     col_names = ['spread']
     sbt = columns_by_team(df, col_names)
-    transfer.insert_df('spreads_by_team', sbt, at_once=True, create=True)
-    
+    dba.create_insert('spreads_by_team', sbt, at_once=True)
+
     # get team home indicators
     # stored results
     for table in ['reg_results', 'ncaa_results', 'nit_results']:
-        df = transfer.return_data(table)
+        df = dba.return_data(table)
         df = generate.results_home(df)
-        results = transfer.dataframe_rows(df)
-        transfer.insert('team_home', results, at_once=False, create=False,
-                        delete=False)
+        dba.insert('team_home', df, at_once=False)
     
     # scraped results
     results = generate.game_home(date=None)
-    transfer.insert('team_home', results, at_once=False, create=False,
-                    delete=False)
+    dba.insert('team_home', results, at_once=False)
     
     # create game info for past seasons
     df = generate.convert_past_games()
     df = generate.make_game_info(df)
-    rows = transfer.dataframe_rows(df)
-    transfer.insert('game_info', rows, at_once=False)
+    dba.insert('game_info', df, at_once=False)
 
     # create game info for scraped scores
-    df = transfer.return_data('game_scores')
+    df = dba.return_data('game_scores')
     df = generate.convert_game_scores(df)
     df = generate.make_game_info(df)
-    rows = transfer.dataframe_rows(df)
-    transfer.insert('game_info', rows, at_once=True)
+    dba.insert('game_info', df, at_once=True)
     
     # game scores, win, and margin by team
-    df = transfer.return_data('game_info')
+    df = dba.return_data('game_info')
     df['t2_win'] = np.where(df['t1_win'] == 1, 0, 1)
     df['t2_marg'] = - df['t1_marg']
     col_names = ['score', 'win', 'marg']
     cbt = columns_by_team(df, col_names)
-    transfer.insert_df('results_by_team', cbt, at_once=True, create=True)
-    
+    dba.create_insert('results_by_team', cbt, at_once=True)
+
+
 def transform():
+    dba = transfer.DBAssist()
+    
     # create table of all game stats with row per team
     # regular season results
-    reg_dtl = transfer.return_data('reg_results_dtl')
-    reg_com = transfer.return_data('reg_results')
+    reg_dtl = dba.return_data('reg_results_dtl')
+    reg_com = dba.return_data('reg_results')
     reg_com = reg_com[reg_com['season'] < reg_dtl['season'].min()]
     df = pd.concat([reg_dtl, reg_com], sort=False)
     df = generate.games_by_team(df)    
-    transfer.insert_df('stats_by_team', df, create=True, at_once=False) 
+    dba.create_insert('stats_by_team', df, at_once=False) 
 
     # ncaa tourney game results
-    dtl = transfer.return_data('ncaa_results_dtl')
-    com = transfer.return_data('ncaa_results')
+    dtl = dba.return_data('ncaa_results_dtl')
+    com = dba.return_data('ncaa_results')
     com_keep = com[com['season'] < dtl['season'].min()]
     df = pd.concat([dtl, com_keep], sort=False)
     df = df.drop(['wloc', 'numot'], axis=1)
     sbt = generate.games_by_team(df)
-    transfer.insert_df('stats_by_team', sbt, at_once=True) 
+    dba.insert('stats_by_team', sbt, at_once=True) 
 
     # convert stats_by_team to stats_by_date
     # stats only exist after 2002
     mod = """WHERE season >= 2003"""
-    dfs = transfer.return_data('seasons', mod)
+    dfs = dba.return_data('seasons', mod)
     dfs = dfs[['season', 'dayzero']]
     seasons = list(set(dfs['season'].values))
     seasons.sort()
     
     for season in seasons:
         mod = "WHERE season = %s" % (season)
-        df = transfer.return_data('stats_by_team', mod)
+        df = dba.return_data('stats_by_team', mod)
         df = features.team.prep_stats_by_team(df)
         dates = list(set(df['date']))
         dates.sort()
@@ -271,56 +270,49 @@ def transform():
             df_date = compute_summaries(df, max_date=date)
             df_date['date'] = date
             df_date['season'] = season
-            transfer.insert_df('stats_by_date', df_date, at_once=True)
+            dba.insert('stats_by_date', df_date, at_once=True)
 
 
 def modify():
     dba = transfer.DBAssist()
-    dba.connect()
     table_name = "ratings_at_day"
-    schema = dba.table_schema(table_name)
-    result = dba.run_query(queries.ratings_t1)
-    table = dba.table_rows(result, schema)
+    table_columns = dba.table_columns(table_name)
+    r1 = dba.run_query(queries.ratings_t1)
+    df1 = pd.DataFrame(r1, columns=table_columns)
+    r2 = dba.run_query(queries.ratings_t2)
+    df2 = pd.DataFrame(r2, columns=table_columns)
+    df = pd.concat([df1, df2], sort=False)
 
-    result = dba.run_query(queries.ratings_t2)
-    t2 = dba.table_rows(result, schema)
-
-    table.extend(t2[1:])
-
-    transfer.insert('ratings_needed', table, at_once=True, create=False,
-                    delete=False)
+    dba.create_insert('ratings_needed', df, at_once=True)
     
     # create matchups table with game targets and features
     mod = "WHERE season >= 2003"
-    mat = transfer.return_data("game_info", modifier=mod)
+    mat = dba.return_data("game_info", modifier=mod)
     
-    rat = transfer.return_data("ratings_needed")
+    rat = dba.return_data("ratings_needed")
     rat = rat.drop('season', axis=1)
 
     df = updater.assign_features(mat, rat, merge_cols=['date'])
-    
+
     # select dates with ratings features
     mod = "WHERE date > '2002/10/01'"
-    home = transfer.return_data('team_home', modifier=mod)
+    home = dba.return_data('team_home', modifier=mod)
     home = home.drop('game_id', axis=1)
     df = updater.assign_features(df, home, merge_cols=['date'])
-    rows = transfer.dataframe_rows(df)
-    transfer.insert('matchups', rows, at_once=True, create=True,
-                    delete=True)
-    
+    dba = transfer.DBAssist()
+    dba.delete('matchups')
+    dba.create_insert('matchups', df, at_once=True)
+
     # merge matchups with spreads and odds, create table
     mat_bet = Builder.matchups_bet(df)
-    rows = transfer.dataframe_rows(mat_bet)
-    transfer.insert('matchups_bet', rows, create=True, at_once=True)
+    dba.create_insert('matchups_bet', mat_bet, at_once=True)
     
     # set favorite and underdog for all matchups
-    df = transfer.return_data('matchups', modifier=None)
+    df = dba.return_data('matchups', modifier=None)
     fav_dog = set_fav_dog(df)
-    transfer.insert_df('fav_dog', fav_dog, at_once=True, create=True,
-                       delete=False)
+    dba.create_insert('fav_dog', fav_dog, at_once=True)
 
-    df = transfer.return_data('seeds')
+    df = dba.return_data('seeds')
     # obtain the integer value from string seed
     df['seed'] = df['seed'].apply(clean.get_integer)
-    transfer.insert_df('team_seeds', df, at_once=True, create=True,
-                       delete=False)
+    dba.create_insert('team_seeds', df, at_once=True)

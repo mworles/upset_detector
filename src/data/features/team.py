@@ -1,4 +1,4 @@
-from src.data import transfer
+from src.data.transfer import DBAssist
 from src.data import match
 from src.data import clean
 from src.data import generate
@@ -191,7 +191,7 @@ def clean_box(df):
     mrg['season'] = map(clean.season_from_date, mrg['date'].values)
     
     # add dayzero date to create daynum
-    seasons = transfer.return_data('seasons', modifier="WHERE season = 2020")
+    seasons = DBAssist().return_data('seasons', modifier="WHERE season = 2020")
     seasons = seasons[['season', 'dayzero']]
     
     mrg['dayzero'] = seasons['dayzero'].values[0]
@@ -206,7 +206,7 @@ def clean_box(df):
     return mrg
 
 def box_stats_by_team(mod=None):
-    df = transfer.return_data('game_box', modifier=mod)
+    df = DBAssist().return_data('game_box', modifier=mod)
     st = split_teams(df)
     cb = clean_box(st)
     sbt = generate.games_by_team(cb)
@@ -263,7 +263,7 @@ def prep_stats_by_team(df):
     df = df[keep_cols]
     
     # add date to each game
-    dfs = transfer.return_data('seasons')
+    dfs = DBAssist().return_data('seasons')
     dfs = dfs[['season', 'dayzero']]
     df = pd.merge(df, dfs, how='inner', left_on='season', right_on='season')
     df['date'] = df.apply(clean.game_date, axis=1)

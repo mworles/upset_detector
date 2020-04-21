@@ -393,9 +393,8 @@ def scrub_files(file_map, out='mysql', subset=[]):
         table_name = file_map[f]['new_name']
         # insert into mysql or save csv files
         if out == 'mysql':
-            rows = transfer.dataframe_rows(df)
-            transfer.insert(table_name, rows, at_once=True, create=False,
-                            delete=True)
+            dba = transfer.DBAssist()
+            dba.create_insert(table_name, df, at_once=True)
         else:
             data_out = '../data/scrub/'
             write_file(df, data_out, table_name, keep_index=False)

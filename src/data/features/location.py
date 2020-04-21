@@ -58,6 +58,7 @@ update_teams
     original team location data.
 
 """
+from src.data.transfer import DBAssist
 from src.data import transfer
 from src.data import clean
 from src.data import generate
@@ -67,6 +68,7 @@ import re
 from datetime import datetime
 from geopy.distance import great_circle
 
+dba = transfer.DBAssist()
 
 def run(modifier=None):
     """Returns dataframe with game identifer and location of game.
@@ -82,9 +84,8 @@ def run(modifier=None):
         Contains game id, latittude, and longitude of game.
 
     """
-    
     # import games data, contains game and team identifiers
-    df = transfer.return_data('game_info', modifier=modifier)
+    df = dba.return_data('game_info', modifier=modifier)
 
     # to add data on where game was hosted
     th = home_games(df['game_id'].values)
@@ -135,7 +136,7 @@ def home_games(game_id):
 
     """
     # import team_home data
-    df = transfer.return_data('team_home')
+    df = DBAssist().return_data('team_home')
     df = df[df['game_id'].isin(game_id)]
 
     # identify home team for game locations
@@ -170,8 +171,8 @@ def neutral_games(neutral):
 
     """
     # import and merge game cities and cities data, available after 2010
-    games = transfer.return_data('game_cities')
-    cities = transfer.return_data('cities')
+    games = dba.return_data('game_cities')
+    cities = dba.return_data('cities')
     df = pd.merge(games, cities, how='inner', left_on='city_id',
                   right_on='city_id')
 
@@ -187,7 +188,7 @@ def neutral_games(neutral):
     df['game_loc'] = map(lambda x: locate_item(x, city_map), city_state)
 
     # import and combine tourney games prior to 2010
-    tg = transfer.return_data('tourney_geog', modifier='WHERE season < 2010')
+    tg = dba.return_data('tourney_geog', modifier='WHERE season < 2010')
 
     # add unique game id from teams and date
     tg = generate.make_game_id(tg, ['wteam', 'lteam'])
@@ -195,7 +196,7 @@ def neutral_games(neutral):
 
     # import and clean games with gyms from scraped schedule
     mod = 'WHERE season >= 2003 AND season <= 2009'
-    sg = transfer.return_data('cbb_schedule', modifier=mod)
+    sg = dba.return_data('cbb_schedule', modifier=mod)
     sg = transform_schedule(sg)
 
     # remove tourney games already obtained above
@@ -252,8 +253,8 @@ def city_coordinates(full_state=True):
 
     """
     # import and combine city and state data
-    usc = transfer.return_data('us_cities')
-    uss = transfer.return_data('us_states')
+    usc = dba.return_data('us_cities')
+    uss = dba.return_data('us_states')
     uss = uss.rename(columns={'ID': 'ID_STATE'})
     df = pd.merge(usc, uss, left_on='ID_STATE', right_on='ID_STATE',
                   how='inner')
@@ -307,7 +308,7 @@ def manual_cities(state_map):
 
     """
     # import data for supplemental cities
-    df = transfer.return_data('cities_manual')
+    df = dba.return_data('cities_manual')
     df = df.rename(columns={'city': 'CITY',
                             'state': 'STATE_CODE',
                             'lat': 'LATITUDE',
@@ -341,7 +342,7 @@ def team_coordinates(team_id):
 
     """
     # import team geography data, select teams
-    df = transfer.return_data('team_geog')
+    df = dba.return_data('team_geog')
     df = df[df['team_id'].isin(team_id)]
     
     # create map with (lattitude, longitude) tuples as values
@@ -372,7 +373,7 @@ def gym_schedule_coordinates(df):
     df = df.drop_duplicates(subset=['gym'])
 
     # get dict with keys as gym names and values as (city_state) locations
-    gg = transfer.return_data('game_gym')
+    gg = dba.return_data('game_gym')
     gym_map = gym_city_coordinates(gg)
 
     # isolate gyms with and without a match in gym_dict
@@ -473,7 +474,7 @@ def gym_city_coordinates(df):
     gym_dict = df['game_loc'].to_dict()
 
     # update dict with manual gym locations
-    gm = transfer.return_data('gym_manual', modifier=None)
+    gm = dba.return_data('gym_manual', modifier=None)
     gm['game_loc'] = zip(gm['lat'].values, gm['lng'].values)
     gm = gm.set_index('gym')['game_loc'].to_dict()
     gym_dict.update(gm)
@@ -568,13 +569,13 @@ def schedule_team_ids(df):
         Contains team numeric ids for both teams in the game.
 
     """
-    tk = transfer.return_data('team_key')
+    tk = dba.return_data('team_key')
     tk = tk[['team_id', 'team_ss']].copy()
     tk = tk.drop_duplicates()
 
     # import and merge the team names from team schedule links
     # schedule data uses names from both team_key and team_sched
-    ts = transfer.return_data('team_sched')
+    ts = dba.return_data('team_sched')
     ts['team_ss'] = ts['team_ss'].replace('Cal State Long Beach',
                                           'Long Beach State')
 

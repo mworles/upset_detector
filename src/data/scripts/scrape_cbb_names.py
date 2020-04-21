@@ -12,4 +12,6 @@ for season in range(2003, 2011):
 
 df = pd.DataFrame(all_seasons)
 df = df.drop_duplicates()
-transfer.insert_df('team_sched', df, at_once=True, create=True)
+
+dba = Transfer.DBAssist()
+dba.create_insert('team_sched', df, at_once=True)

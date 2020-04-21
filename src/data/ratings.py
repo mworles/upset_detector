@@ -425,15 +425,16 @@ def run_day(df, day_max = None, n_iters=15, output=None):
     df_teams['date'] = date
     
     if output is not None:
-        rows = transfer.dataframe_rows(df_teams)
-        transfer.insert('ratings_at_day', rows)
+        dba = Transfer.DBAssist()
+        dba.insert('ratings_at_day', df_teams)
         output.put(len(rows))
     else:
         return df_teams
 
 def run_year(year, n_iters = 15, multiprocessing=True):
     modifier = "WHERE season = %s" % (str(year))
-    df = transfer.return_data('games_for_ratings', modifier=modifier)
+    dba = transfer.DBAssist()
+    df = dba.return_data('games_for_ratings', modifier=modifier)
     df = day_number(df)
     day_min = minimum_day(df, n_games=3)
     all_days = list(set(df['daynum'].values))

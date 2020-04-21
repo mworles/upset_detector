@@ -1,6 +1,6 @@
 import pandas as pd
 import time
-from src.data import transfer
+from src.data.transfer import DBAssist
 from src.data import clean
 
 def team_from_href(href, strip=1):
@@ -71,14 +71,14 @@ def espn_player_table(team_id, season):
 def alternate_names():
     """Obtain dataframe with team id, team name, and alternate name versions."""
     # import team key data from table
-    tk = transfer.return_data('team_key')
+    tk = DBAssist().return_data('team_key')
     # clean and use team_ss as team name to match team in player_pergame table
     tk = tk[tk['team_ss'] != 'NULL']
     tk['team'] = map(clean.school_name, tk['team_ss'].values)
     tk = tk[['team_id', 'team']].drop_duplicates()
 
     # import, merge, and modify alternate names to align with espn team names
-    ts = transfer.return_data('team_spellings')
+    ts = DBAssist().return_data('team_spellings')
     tk = pd.merge(tk, ts, how='left', left_on='team_id', right_on='team_id')
     tk['name_spelling'] = tk['name_spelling'].str.replace(' ', '-')
     tk['name_spelling'] = tk['name_spelling'].str.replace('&', '')
@@ -90,7 +90,7 @@ def teams_missing_minutes(season):
     # get teams from player_pergame table with any missing minutes
     # select rows using the season argument
     mod = "WHERE min_pg IS NULL AND season = %s" % (season)
-    df = transfer.return_data('player_pergame', modifier=mod)
+    df = DBAssist().return_data('player_pergame', modifier=mod)
     df = df[['team', 'season']].drop_duplicates()
     
     # merge with modified team key to use alternate team name options
@@ -101,7 +101,7 @@ def teams_missing_minutes(season):
     
     # find teams with data already obtained in espn_pergame table
     mod = "WHERE season = %s" % (season)
-    epg = transfer.return_data('espn_pergame', modifier=mod)
+    epg = DBAssist().return_data('espn_pergame', modifier=mod)
     
     # create list of teams obtained
     try:
@@ -141,7 +141,8 @@ def get_espn_id(name_versions, espn_ids):
 
 def espn_from_season(season):
     """Obtain data needed from espn site for season."""
-    
+    dba = transfer.DBAssist()
+
     # df of teams needing data
     df_needed = teams_missing_minutes(season)
     
@@ -150,27 +151,27 @@ def espn_from_season(season):
     # get versions of team names with final 1 and 2 elements removed
     espn_ids = [espn_standings(season, strip=1)]
     espn_ids.append(espn_standings(season, strip=2))
-    
+
     # loop over unique teams neeeding data
     for team_id in list(set(df_needed['team_id'])):
         # boolean index for team's rows
         t_rows = df['team_id'] == team_id
         # identify all name versions and the player_pergame team name
         name_versions = df.loc[t_rows, 'name_spelling'].values
-        
+
         espn_id = get_espn_id(name_versions, espn_ids)
-        
+
         # create lists without data if no id found
         if espn_id is None:
             data = [['season'], [season]]
         # scrape lists of data for given espn team id and season
         else:
             data =espn_player_table(espn_id, season)
-        
+
         # obtain team name used in player_pergame table
         team = pd.unique(df.loc[t_rows, 'team'])[0]
         data[0] = ['team'] + data[0]
         data[1:] = [[team] + x for x in data[1:]]
-        
+
         # insert results to msyql table
-        transfer.insert('espn_pergame', data, at_once=True)    
+        dba.insert('espn_pergame', data, at_once=True)    

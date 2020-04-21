@@ -13,4 +13,6 @@ dates = clean.date_range(start, end)
 
 table = scrapers.games.get_scheduled(dates)
 
-transfer.insert('game_scheduled', table, at_once=False, delete=True)
+dba = transfer.DBAssist()
+dba.delete('game_scheduled')
+dba.insert('game_scheduled', table, at_once=False)
