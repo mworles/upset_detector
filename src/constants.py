@@ -1,3 +1,5 @@
+import os
+
 # year to use as test set
 TEST_YEAR = 2020
 
@@ -88,7 +90,16 @@ RAW_MAP['TourneyGeog'] = {'new_name': 'tourney_geog',
 RANDOM_SEED = 40195
 
 # relative path to data directory
+PATH_HERE = os.path.abspath(os.path.dirname(__file__))
+
 DATA = '../data/'
+DATA_DIR = os.path.join(PATH_HERE, DATA)
+
+CONFIG = '../.config'
+CONFIG_FILE= os.path.join(PATH_HERE, CONFIG)
+
+SCHEMA = 'data/schema.json'
+SCHEMA_FILE = os.path.join(PATH_HERE, SCHEMA)
 
 TEAM_CITY_UPDATE =  [[1465, ('Riverside', 'California')],
                      [1466, ('Florence', 'Alabama')]
