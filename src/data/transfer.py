@@ -1,24 +1,15 @@
 """ transfer
 
-A module for efficient interactions with MySQL database using python.
+A module for insertion and extraction of data with MySQL databases.
 
 Classes
 -------
 DBColumn
-    Define.
+    A container for one column of data in a database table.
 DBTable
-    Define.
+    A container of data for a database table.
 DBAssist
-    Define.
-
-Functions
----------
-schema_create
-    Define.
-make_table
-    Define.
-df_list
-    Define.
+    A tool for exchanging data with a MySQL database using pymysql.
 
 """
 import ConfigParser
@@ -28,11 +19,11 @@ import math
 import pandas as pd
 import numpy as np
 import pymysql
-import src.constants
-from typing import TypeVar, Generic
+from src.constants import SCHEMA_FILE
+from src.constants import CONFIG_FILE
 
 
-class DBColumn():
+class DBColumn(object):
     """
     A container for a column of data in DBTable.
 
@@ -115,7 +106,7 @@ class DBColumn():
         return new_value
 
 
-class DBTable(Generic[TypeVar('T')]):
+class DBTable(object):
     """
     A container for 2-dimensional data for insertion to MySQL table.
 
@@ -132,14 +123,28 @@ class DBTable(Generic[TypeVar('T')]):
     def __init__(self, name, data):
         """Initialize DBTable instance."""
         self.name = name
-        self.data = data
+        self.data = self.setup(data)
         # initialize all columns to get names, types, and values
         self.columns = [DBColumn(x) for x in map(list, zip(*self.data))]
+
+    def setup(self, data):
+        """Return a DBTable instance created from the data in a nested list or 
+        pandas DataFrame."""
+        if type(data) is list:
+            result = data
+        elif type(data) is pd.core.frame.DataFrame:
+            col_names = list(data.columns)
+            result = data.values.tolist()
+            result.insert(0, col_names)
+        else:
+            raise Exception('data must be list or DataFrame')
+
+        return result
 
     def query_create(self):
         """Return query for creating table in MySQL database."""
         query_columns = ", \n".join([c.query for c in self.columns])
-        pref = "CREATE TABLE IF NOT EXISTS"
+        pref = "CREATE TABLE "
         #create = """ """.join([pref, self.name, "(", query_columns, ");"])
         create = "{0} {1} ({2});".format(pref, self.name, query_columns)
         return create
@@ -196,162 +201,268 @@ class DBAssist():
         A pymysql cursor called from the conn attribute.
 
     """
-    def __init__(self):
-        self.conn = None
-        self.cursor = None
+    def __init__(self, conn=None, cursor=None):
+        self.conn = conn
+        self.cursor = cursor
 
-    def connect(self, config_file=src.constants.CONFIG_FILE):
-        """Establish connection with database."""
+    def connect(self, config_file=CONFIG_FILE):
+        """
+        Establish connection with database.
+        
+        Parameters
+        ----------
+
+        """
         parser = ConfigParser.ConfigParser()
         parser.readfp(open(config_file))
-        pwd = parser.get('Local', 'pwd')
-        db = parser.get('Local', 'db')
+        
         self.conn = pymysql.connect(host='127.0.0.1',
                                     port=3306,
                                     user='root',
-                                    passwd=pwd,
-                                    db=db)
+                                    passwd=parser.get('Local', 'pwd'),
+                                    db=parser.get('Local', 'db'))
         self.cursor = self.conn.cursor()
 
     def close(self):
-        """Close connection with database."""
+        """Close cursor and connection with database."""
         self.cursor.close()
         self.conn.close()
 
-    def create_table(self, table):
-        """Create a new table in database."""
+    def schema_query(self, table_name, schema_file=SCHEMA_FILE):
+        """
+        Return query used to create MySQL table using the specified schema.
+
+        Parameters
+        ----------
+        table_name : str
+            Name of the table as specified in the json file.
+        schema_file : str
+            Location of json file with table specs. Default is imported from
+            src/constants.
+
+        Returns
+        -------
+        query_create : str
+            Text of valid MySQL query to create table.
+
+        """
+        with open(schema_file, 'r') as f:
+            schema = json.load(f)[table_name]
+        
+        # join the column portion of the create query
+        cols = ["{0} {1}".format(c['name'], c['type']) for c in schema]
+        col_part = ", \n".join(cols)
+
+        # single str object for the full table
+        query_create = "CREATE TABLE {0} ({1});".format(table_name, col_part)
+        return query_create
+
+    def create_table(self, query_create):
+        """
+        Execute query used to create a table.
+
+        Parameters
+        ----------
+        query_create : str
+            
+        """
         self.connect()
-
-        if type(table) is DBTable:
-            create = table.query_create()
-        elif type(table) is str:
-            create = schema_create(table)
-        else:
-            raise Exception('Must be DBTable or in schema file')
-
-        self.cursor.execute(create)
+        try:
+            self.cursor.execute(query_create)
+        except pymysql.err.InternalError, e:
+            print e
         self.close()
 
+    def create_from_schema(self, table_name):
+        """
+        Create MySQL table from parameters specified in json file.
+
+        Parameters
+        ----------
+        table_name: str
+            Name of table. Must be included as key in schema_file.
+
+        """
+        query_create = self.schema_query(table_name)
+        self.create_table(query_create)
+
+    def create_from_data(self, name, data):
+        """
+        Create MySQL table by extracting names and types from sample of data.
+
+        Parameters
+        ----------
+        name : str
+            Name to assign the table in MySQL database.
+        data : list of list or pandas DataFrame
+
+        """
+        query_create = DBTable(name, data).query_create()
+        self.create_table(query_create)
+
     def execute_commit(self, query):
-        """Execute a query and commit any changes to database."""
+        """
+        Execute a query and commit changes to database.
+
+        Helpful to iterate over lists of insert queries so that unforeseen 
+        errors don't kill the script.
+
+        Parameters
+        ----------
+        query : str
+            Text of a MySQL query to execute.
+        """
         try:
             self.cursor.execute(query)
             self.conn.commit()
-        except pymysql.err.DataError:
-            print '{} not executed'.format(query)
+        except pymysql.err.DataError, e:
+            print e
 
-    def insert(self, name, data, at_once=True):
-        """Insert new rows to database."""
+    def insert_rows(self, table_name, data, at_once=True):
+        """
+        Insert new rows to database.
+
+        Parameters
+        ----------
+        name : str
+            Name of table in database where rows are inserted.
+        data : list of list or pandas DataFrame
+            Data to insert as new rows. 
+        at_once : bool
+            Insert rows and commit changes as a single query. If False, insert
+            each row and commit changes separately.
+
+        """
+        table = DBTable(table_name, data)
+
         self.connect()
-        
-        table = make_table(name, data)
 
         # insert full table at once
         if at_once == True:
-            insert_full = table.query_insert(at_once=at_once)
-            self.cursor.execute(insert_full)
-            self.conn.commit()
+            query_one = table.query_insert(at_once=at_once)
+            self.execute_commit(query_one)
         # insert one row at a time
         else:
-            insert_rows = table.query_insert(at_once=at_once)
-            map(lambda x: self.execute_commit(x), insert_rows)
+            query_list = table.query_insert(at_once=at_once)
+            map(lambda x: self.execute_commit(x), query_list)
 
         self.close()
 
-    def create_insert(self, name, data, at_once=True):
-        """Create new table and insert new rows in database."""
-        table = make_table(name, data)
-        self.create_table(table)
-        self.insert(name, table, at_once=at_once)
+    def delete_rows(self, table_name):
+        """
+        Delete all rows in a table in database.
 
-    def delete(self, table):
-        """Delete all rows in a table in database."""
+        Parameters
+        ----------
+        table_name : str
+            Name of the table in database.
+
+        """
+        query_delete = "DELETE from {}".format(table_name)
         self.connect()
-        query = "DELETE from {}".format(table.name)
-        self.cursor.execute(query)
-        self.conn.commit()
+        self.execute_commit(query_delete)
         self.close()
 
-    def replace(self, name, data, at_once=True):
-        """Replace all rows in a table in database."""
+    def replace_rows(self, table_name, data, at_once=True):
+        """
+        Replace all rows in a table in database.
+
+        Parameters
+        ----------
+        table_name : str
+            Name of table in database where rows are inserted.
+        data : list of list or pandas DataFrame
+            Data to insert as new rows. 
+        at_once : bool
+            Insert rows and commit changes as a single query. If False, insert
+            each row and commit changes separately.
+
+        """
+        self.delete_rows(table_name)
+        self.insert_rows(table_name, data, at_once=at_once)
+
+    def query_result(self, query, as_dict=True):
+        """
+        Return the results of a query on database.
+
+        Parameters
+        ----------
+        query : str
+            Text of a valid MySQL query.
+        as_dict : bool, default True
+            Return list of dict with value labels as keys for each dict.
+            If False, return tuple of tuples with tuple elements in order.
+
+        Returns
+        -------
+        result : list of dict, tuple of tuple
+            Result of the query.
+
+        """
         self.connect()
-
-        table = make_table(name, data)
-
-        self.delete(table)
-        self.insert(table, at_once=at_once)
-
-        self.close()
-
-    def run_query(self, query, as_dict=True):
-        """Return the results of a query on database."""
-        self.connect()
+        
         if as_dict == True:
             self.cursor = self.conn.cursor(pymysql.cursors.DictCursor)
+
         self.cursor.execute(query)
         result = self.cursor.fetchall()
         self.close()
         return result
 
     def table_columns(self, table_name):
-        """Return the column names from table in database."""
-        query = """SHOW COLUMNS FROM %s;""" % (table_name)
-        result = self.run_query(query, as_dict=False)
-        column_names = [col[0] for col in result]
-        return column_names  
+        """
+        Return the column names from table in database.
 
-    def return_data(self, table_name, as_list=False, subset=None, modifier=""):
-        """Return the data from table in database."""
+        Parameters
+        ----------
+        table_name : str
+            Name of table in database for retrieving column names.
+
+        Returns
+        -------
+        column_names : list of str
+            Names of columns in database table.
+
+        """
+        query = """SHOW COLUMNS FROM %s;""" % (table_name)
+        result = self.query_result(query, as_dict=False)
+        column_names = [col[0] for col in result]
+        return column_names
+
+    def return_data(self, table_name, subset=None, modifier=""):
+        """
+        Return the data from table in database.
+
+        Parameters
+        ----------
+        table_name : str
+            Name of table in database for retreiving data.
+        subset : str or list of str, default None, optional
+            Name of table column or list of columns to return.
+        modifier : str, default "", optional
+            Text of MySQL WHERE statement used to select rows to return.
+
+        Returns
+        -------
+        df : pandas DataFrame
+            Contents of table returned as dataframe.
+
+        """
         if subset is None:
-            get = '*'
+            columns_to_get = '*'
         elif type(subset) is str:
-            get = column
+            columns_to_get = subset
         elif type(subset) is list:
-            get = ", ".join(column)
+            columns_to_get = ", ".join(subset)
         else:
             sub_type = type(subset)
             msg = 'Subset must be None, str, or list, not {}'.format(sub_type)
             raise Exception(msg)
 
         # list of column indices where type is decimal
-        query = "SELECT {0} FROM {1} {2};".format(get, table_name, modifier)
-        result = self.run_query(query)
+        query = "SELECT {0} FROM {1} {2};".format(columns_to_get, table_name,
+                                                  modifier)
+        result = self.query_result(query)
         df = pd.DataFrame(result)
         
-        if as_list is True:
-            return df_list(df)
-        else:
-            return df
-
-
-def schema_create(table_name, schema_file=src.constants.SCHEMA_FILE):
-    """Return the string used as a query to create a table."""
-    with open(schema_file, 'r') as f:
-        schema = json.load(f)[table_name]
-    cols = ["{0} {1}".format(c['name'], c['type']) for c in schema]
-    col_part = ", \n".join(cols)
-    query_create = "CREATE TABLE {0} ({1});".format(table_name, col_part)
-    return query_create
-
-
-def make_table(name, data):
-    """Return a DBTable instance from a nested list or pandas DataFrame."""
-    if type(data) is DBTable:
-        table = data
-    elif type(data) is list:
-        table = DBTable(name, data)
-    elif type(data) is pd.core.frame.DataFrame:
-        rows = df_list(data)
-        table = DBTable(name, rows)
-    else:
-        raise Exception('data must be list or DataFrame')
-
-    return table
-
-
-def df_list(df):
-    """Return DataFrame columns and values as a nested list."""
-    col_names = list(df.columns)
-    data = df.values.tolist()
-    data.insert(0, col_names)
-    return data
+        return df
