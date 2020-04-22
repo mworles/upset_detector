@@ -89,9 +89,10 @@ RAW_MAP['TourneyGeog'] = {'new_name': 'tourney_geog',
 # seed number to use for random data processses
 RANDOM_SEED = 40195
 
-# relative path to data directory
+# create absolute path to this file
 PATH_HERE = os.path.abspath(os.path.dirname(__file__))
 
+# relative path to data directory
 DATA = '../data/'
 DATA_DIR = os.path.join(PATH_HERE, DATA)
 
