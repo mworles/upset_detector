@@ -300,7 +300,7 @@ def modify():
     home = home.drop('game_id', axis=1)
     df = updater.assign_features(df, home, merge_cols=['date'])
     dba = transfer.DBAssist()
-    dba.delete('matchups')
+    dba.delete_rows('matchups')
     dba.create_insert('matchups', df, at_once=True)
 
     # merge matchups with spreads and odds, create table
