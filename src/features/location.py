@@ -7,68 +7,60 @@ longitude for geographical coordinates.
 Functions
 ---------
 run
-    Returns dataframe with game identifer and geographical coordinates.
+    Return dataframe with game identifer and geographical coordinates.
 
 home_games
-    Returns dataframe with identifiers and coordinates for games with a
-    home team.
+    Return dataframe with coordinates for games at a team home site.
 
 neutral_games
-    Returns dataframe with identifiers and coordinates for games played at a
-    neutral site.
+    Return dataframe with coordinates for games at a neutral site.
 
 locate_item
-    Returns the geographical coordinates of an item from a dictionary.
+    Return the geographical coordinates of an item from a dictionary.
 
 city_coordinates
-    Returns dict mapping cities to geographical coordinates.
+    Return dict mapping cities to geographical coordinates.
 
 team_coordinates
-    Returns dict mapping teams to geographical coordinates.
+    Return dict mapping teams to geographical coordinates.
 
 gym_schedule_coordinates
-    Returns dict with locations for the gyms in team schedule data.
+    Return dict mapping gyms to geographical coordinates.
 
 match_gym
-    Returns a fuzzy string match for a given gym name.
+    Return a fuzzy string match for a given gym name.
 
 gym_city_coordinates
-    Returns dict mapping gym names from external source of gym cities
-    to geographical coordinates.
+    Return dict mapping gyms from gym/city data to geographical coordinates.
 
 transform_schedule
-    Returns dataframe with unique game identifier and gym name for games 
-    scraped from team schedules.
+    Return team schedule dataframe after cleaning tranformations.
 
 convert_schedule_date
-    Returns date from scraped team schedule converted to the project standard 
-    date format.
+    Return date from team schedule converted to the project's date format.
 
 schedule_team_ids
-    Returns dataframe with team numeric identifers added to raw schedule data.
+    Return dataframe pairing team numeric identifers to team names.
 
 game_distances
-    Returns dataframe with distance to game computed for both teams.
+    Return dataframe with team distance to game.
 
 travel_distance
-    Returns integer distance between a pair of geographical coordinates.
+    Return integer distance between a pair of geographical coordinates.
 
 update_teams
-    Returns dataframe with geographical coordinates of new teams to add to
-    original team location data.
+    Return dataframe with additional team geographical coordinates added.
 
 """
+import re
+from datetime import datetime
+import pandas as pd
+import numpy as np
+from geopy.distance import great_circle
 from src.data.transfer import DBAssist
 from src.data import transfer
 from src.data import clean
 from src.data import generate
-import pandas as pd
-import numpy as np
-import re
-from datetime import datetime
-from geopy.distance import great_circle
-
-dba = transfer.DBAssist()
 
 def run(modifier=None):
     """Returns dataframe with game identifer and location of game.
@@ -85,10 +77,15 @@ def run(modifier=None):
 
     """
     # import games data, contains game and team identifiers
+    dba = DBAssist()
     df = dba.return_data('game_info', modifier=modifier)
+    th = dba.return_data('team_home')
+    # connection no longer needed, close
+    dba.close()
 
     # to add data on where game was hosted
-    th = home_games(df['game_id'].values)
+    th = home_games(th, df['game_id'].values)
+    
     df = pd.merge(df, th, left_on='game_id', right_on='game_id', how='left')
 
     # add column indicating host is neutral or not
@@ -120,7 +117,7 @@ def run(modifier=None):
     return df
 
 
-def home_games(game_id):
+def home_games(df, game_id):
     """Returns dataframe with identifiers and coordinates for games with a 
     home team.
 
@@ -135,8 +132,6 @@ def home_games(game_id):
         Contains game id, home team id, and coordinate location of game.
 
     """
-    # import team_home data
-    df = DBAssist().return_data('team_home')
     df = df[df['game_id'].isin(game_id)]
 
     # identify home team for game locations
@@ -171,8 +166,10 @@ def neutral_games(neutral):
 
     """
     # import and merge game cities and cities data, available after 2010
+    dba = DBAssist()
     games = dba.return_data('game_cities')
     cities = dba.return_data('cities')
+
     df = pd.merge(games, cities, how='inner', left_on='city_id',
                   right_on='city_id')
 
@@ -210,6 +207,8 @@ def neutral_games(neutral):
     all = pd.concat([df, tg, sg], sort=False)
     all = all[all['game_loc'].notnull()]
     all = all[['game_id', 'game_loc']]
+    
+    dba.close()
 
     return all
 
@@ -253,8 +252,11 @@ def city_coordinates(full_state=True):
 
     """
     # import and combine city and state data
+    dba = DBAssist()
     usc = dba.return_data('us_cities')
     uss = dba.return_data('us_states')
+    dba.close()
+
     uss = uss.rename(columns={'ID': 'ID_STATE'})
     df = pd.merge(usc, uss, left_on='ID_STATE', right_on='ID_STATE',
                   how='inner')
@@ -308,7 +310,10 @@ def manual_cities(state_map):
 
     """
     # import data for supplemental cities
+    dba = DBAssist()
     df = dba.return_data('cities_manual')
+    dba.close()
+
     df = df.rename(columns={'city': 'CITY',
                             'state': 'STATE_CODE',
                             'lat': 'LATITUDE',
@@ -342,7 +347,10 @@ def team_coordinates(team_id):
 
     """
     # import team geography data, select teams
+    dba = DBAssist()
     df = dba.return_data('team_geog')
+    dba.close()
+
     df = df[df['team_id'].isin(team_id)]
     
     # create map with (lattitude, longitude) tuples as values
@@ -369,12 +377,15 @@ def gym_schedule_coordinates(df):
         Keys are string gym names, values are tuples (lattitude,longitude).
 
     """
+    # get dict with keys as gym names and values as (city_state) locations
+    dba = DBAssist()
+    gg = dba.return_data('game_gym')
+    dba.close()
+
+    gym_map = gym_city_coordinates(gg)
+
     # isolate the unique gym names, only need one row per unique gym
     df = df.drop_duplicates(subset=['gym'])
-
-    # get dict with keys as gym names and values as (city_state) locations
-    gg = dba.return_data('game_gym')
-    gym_map = gym_city_coordinates(gg)
 
     # isolate gyms with and without a match in gym_dict
     in_dict = df['gym'].isin(gym_map.keys())
@@ -474,7 +485,10 @@ def gym_city_coordinates(df):
     gym_dict = df['game_loc'].to_dict()
 
     # update dict with manual gym locations
+    dba = DBAssist()
     gm = dba.return_data('gym_manual', modifier=None)
+    dba.close()
+
     gm['game_loc'] = zip(gm['lat'].values, gm['lng'].values)
     gm = gm.set_index('gym')['game_loc'].to_dict()
     gym_dict.update(gm)
@@ -569,6 +583,7 @@ def schedule_team_ids(df):
         Contains team numeric ids for both teams in the game.
 
     """
+    dba = DBAssist()
     tk = dba.return_data('team_key')
     tk = tk[['team_id', 'team_ss']].copy()
     tk = tk.drop_duplicates()
@@ -578,7 +593,10 @@ def schedule_team_ids(df):
     ts = dba.return_data('team_sched')
     ts['team_ss'] = ts['team_ss'].replace('Cal State Long Beach',
                                           'Long Beach State')
-
+    
+    # connection no longer needed
+    dba.close()
+    
     # inner merge because only need ids for teams in team_sched
     tk = pd.merge(ts, tk, left_on='team_ss', right_on='team_ss', how='inner')
     tk['team_id'] = tk['team_id'].astype(int)

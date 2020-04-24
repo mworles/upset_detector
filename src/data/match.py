@@ -18,7 +18,7 @@ import pandas as pd
 import numpy as np
 import clean
 import odds
-import transfer
+from src.data.transfer import DBAssist
 import re
 
 def clean_schools(datdir):
@@ -147,10 +147,9 @@ def clean_sbro(datdir):
     return df
 
 def clean_tcpalm(table_name):
-    dba = transfer.DBAssist()
-    dba.connect()
-    table = dba.return_table(table_name)
-    df = pd.DataFrame(table[1:], columns=table[0])
+    dba = DBAssist()
+    df = dba.return_data(table_name)
+    dba.close()
     
     # all unique team names
     teams = list(set(list(df['home_team']) + list(df['away_team'])))
@@ -162,11 +161,11 @@ def clean_tcpalm(table_name):
     return df
     
 def clean_vi(table_name):
-    dba = transfer.DBAssist()
-    dba.connect()
+    dba = DBAssist()
     table = dba.return_table(table_name)
     df = pd.DataFrame(table[1:], columns=table[0])
-    
+    dba.close()
+
     # all unique team names
     teams = list(set(list(df['team_1']) + list(df['team_2'])))
     teams = [t for t in teams if t is not None]
@@ -338,14 +337,10 @@ def create_key(datdir):
     key = key.fillna('')
     key = key.drop_duplicates()
 
-    # set location to write file and save file
-    data_out = datdir + 'interim/'
-    clean.write_file(key, data_out, 'team_key')
-
-    dba = Transfer.DBAssist()
-    dba.create('team_key')
-    dba.insert('team_key', key, at_once=True) 
-
+    dba = DBAssist()
+    dba.create_from_schema('team_key')
+    dba.insert_rows('team_key', key, at_once=True) 
+    dba.close()
 
 def id_from_name(df, key_col, name_col, drop=True, how='inner'):
     """From input data containing team name column specified in 'name_col', 
@@ -363,7 +358,10 @@ def id_from_name(df, key_col, name_col, drop=True, how='inner'):
         The name of team name column in the input df.
     """ 
     # read in the id key data
-    id = transfer.DBAssist().return_data('team_key')
+    dba = DBAssist()
+    id = dba.return_data('team_key')
+    dba.close()
+
     # from id key data, only need numeric identifer and key_col to merge on
     id = id[['team_id', key_col]]
     id['team_id'] = id['team_id'].astype(int)

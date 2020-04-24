@@ -1,6 +1,7 @@
 import utils
 import time
 import re
+from src.data.transfer import DBAssist
 
 def decode(x): 
     return str(x.encode('utf-8').strip().decode('ascii', 'ignore'))
@@ -229,10 +230,11 @@ def game_gym(url):
         print e
         return [['gid'], [gid]]
 
+
 def get_gyms(season):
-    dba = transfer.DBAssist()
+    dba = DBAssist()
     mod = 'WHERE season = %s' % (season)
-    games = transfer.DBAssist().return_data('game_info', mod)
+    games = dba.return_data('game_info', mod)
     dates = list(set(games['date']))
     if season == 2010:
         dates = [x for x in dates if x > '2009/12/15']
@@ -249,15 +251,19 @@ def get_gyms(season):
                     gym = Scrapers.game_gym(url)
                     gym[0].extend(['season', 'date', 'timestamp'])
                     gym[1].extend([season, date, timestamp])
-                    dba.insert('game_gym', gym, at_once=True)
+                    dba.insert_rows('game_gym', gym, at_once=True)
                 except:
                     print url
                     gid = re.findall(r'\d+', url.split('/')[-1])[0]
                     gym = [['gid', 'season', 'date'], [gid, season, date]]
-                    dba.insert('game_gym_error', gym, at_once=True)
+                    dba.insert_rows('game_gym_error', gym, at_once=True)
         else:
             gym = [['season', 'date'], [season, date]]
-            dba.insert('game_gym_error', gym, at_once=True)
+            dba.insert_rows('game_gym_error', gym, at_once=True)
+    
+    # connection no longer needed
+    dba.close()
+
 
 def get_scheduled(dates):
     

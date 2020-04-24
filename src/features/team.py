@@ -1,10 +1,11 @@
+import datetime
+import pandas as pd
+import numpy as np
 from src.data.transfer import DBAssist
 from src.data import match
 from src.data import clean
 from src.data import generate
-import pandas as pd
-import numpy as np
-import datetime
+
 
 # code to use on team game row data
 def compute_game_stats(df):
@@ -191,7 +192,10 @@ def clean_box(df):
     mrg['season'] = map(clean.season_from_date, mrg['date'].values)
     
     # add dayzero date to create daynum
-    seasons = DBAssist().return_data('seasons', modifier="WHERE season = 2020")
+    dba = DBAssist()
+    seasons = dba.return_data('seasons', modifier="WHERE season = 2020")
+    dba.close()
+    
     seasons = seasons[['season', 'dayzero']]
     
     mrg['dayzero'] = seasons['dayzero'].values[0]
@@ -206,7 +210,10 @@ def clean_box(df):
     return mrg
 
 def box_stats_by_team(mod=None):
-    df = DBAssist().return_data('game_box', modifier=mod)
+    dba = DBAssist()
+    df = dba.return_data('game_box', modifier=mod)
+    dba.close()
+
     st = split_teams(df)
     cb = clean_box(st)
     sbt = generate.games_by_team(cb)
@@ -263,7 +270,10 @@ def prep_stats_by_team(df):
     df = df[keep_cols]
     
     # add date to each game
-    dfs = DBAssist().return_data('seasons')
+    dba = DBAssist()
+    dfs =dba.return_data('seasons')
+    dba.close()
+
     dfs = dfs[['season', 'dayzero']]
     df = pd.merge(df, dfs, how='inner', left_on='season', right_on='season')
     df['date'] = df.apply(clean.game_date, axis=1)

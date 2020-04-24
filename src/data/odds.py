@@ -1,12 +1,13 @@
 import json
+import datetime
+import calendar
 import pandas as pd
 import numpy as np
-import calendar
+from src.data.transfer import DBAssist
 import clean
 import generate
 import match
-import transfer
-import datetime
+
 
 def oddsportal_games(year_file):
     
@@ -132,9 +133,9 @@ def clean_oddsportal(datdir):
     return df
 
 def odds_vi(date=None):
-    dba = transfer.DBAssist()
-    dba.connect()
-    df = dba.return_df('odds')
+    dba = DBAssist()
+    df = dba.return_data('odds')
+    dba.close()
 
     years = map(lambda x: x.split('-')[0], df['timestamp'].values)
     dates = ["/".join([x, y]) for x, y in zip(years, df['game_date'].values)]
@@ -268,7 +269,9 @@ def matchup_odds_dates(mat, odds):
 
 
 def odds_table():
-    mat = transfer.DBAssist().return_data('game_info')
+    dba = DBAssist()
+    mat = dba.return_data('game_info')
+    dba.close()
     
     odds = odds.clean_oddsportal(datdir)
 

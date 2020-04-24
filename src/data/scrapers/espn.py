@@ -71,14 +71,20 @@ def espn_player_table(team_id, season):
 def alternate_names():
     """Obtain dataframe with team id, team name, and alternate name versions."""
     # import team key data from table
-    tk = DBAssist().return_data('team_key')
+    dba = DBAssist()
+    tk = dba.return_data('team_key')
+
     # clean and use team_ss as team name to match team in player_pergame table
     tk = tk[tk['team_ss'] != 'NULL']
     tk['team'] = map(clean.school_name, tk['team_ss'].values)
     tk = tk[['team_id', 'team']].drop_duplicates()
 
     # import, merge, and modify alternate names to align with espn team names
-    ts = DBAssist().return_data('team_spellings')
+    ts = dba.return_data('team_spellings')
+    
+    # connection no longer needed
+    dba.close()
+
     tk = pd.merge(tk, ts, how='left', left_on='team_id', right_on='team_id')
     tk['name_spelling'] = tk['name_spelling'].str.replace(' ', '-')
     tk['name_spelling'] = tk['name_spelling'].str.replace('&', '')
@@ -90,7 +96,8 @@ def teams_missing_minutes(season):
     # get teams from player_pergame table with any missing minutes
     # select rows using the season argument
     mod = "WHERE min_pg IS NULL AND season = %s" % (season)
-    df = DBAssist().return_data('player_pergame', modifier=mod)
+    dba =  DBAssist()
+    df = dba.return_data('player_pergame', modifier=mod)
     df = df[['team', 'season']].drop_duplicates()
     
     # merge with modified team key to use alternate team name options
@@ -101,7 +108,10 @@ def teams_missing_minutes(season):
     
     # find teams with data already obtained in espn_pergame table
     mod = "WHERE season = %s" % (season)
-    epg = DBAssist().return_data('espn_pergame', modifier=mod)
+    epg = dba.return_data('espn_pergame', modifier=mod)
+    
+    # connection no longer needed
+    dba.close()
     
     # create list of teams obtained
     try:
@@ -174,4 +184,7 @@ def espn_from_season(season):
         data[1:] = [[team] + x for x in data[1:]]
 
         # insert results to msyql table
-        dba.insert('espn_pergame', data, at_once=True)    
+        dba.insert_rows('espn_pergame', data, at_once=True)
+    
+    # connection no longer needed
+    dba.close()

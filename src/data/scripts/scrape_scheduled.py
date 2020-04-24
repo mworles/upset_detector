@@ -1,8 +1,8 @@
-from src.data import clean
-from src.data import scrapers
-from src.data import transfer
 import datetime
 import pandas as pd
+from src.data import clean
+from src.data import scrapers
+from src.data.transfer import DBAssist
 
 date = datetime.datetime.now()
 start = date.strftime('%Y/%m/%d')
@@ -13,6 +13,6 @@ dates = clean.date_range(start, end)
 
 table = scrapers.games.get_scheduled(dates)
 
-dba = transfer.DBAssist()
-dba.delete_rows('game_scheduled')
-dba.insert('game_scheduled', table, at_once=False)
+dba = DBAssist()
+dba.replace_rows('game_scheduled')
+dba.close()

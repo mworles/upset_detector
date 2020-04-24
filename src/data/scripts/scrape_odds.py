@@ -1,6 +1,8 @@
 from src.data import scrapers
-from src.data import transfer
+from src.data.transfer import DBAssist
 
 rows = scrapers.odds.run()
-dba = Transfer.DBAssist()
-dba.insert('odds', rows, at_once=False)
+
+dba = DBAssist()
+dba.insert_rows('odds', rows, at_once=False)
+dba.close()

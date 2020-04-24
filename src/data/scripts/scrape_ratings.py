@@ -1,6 +1,7 @@
 from src.data import scrapers
-from src.data import transfer
+from src.data.transfer import DBAssist
 
 rows = scrapers.ratings.run()
-dba = Transfer.DBAssist()
-dba.insert('ratings', rows, at_once=False)
+dba = DBAssist()
+dba.insert_rows('ratings', rows)
+dba.close()

@@ -14,7 +14,7 @@ import os
 import re
 import datetime
 from fuzzywuzzy import process
-import transfer
+from src.data.transfer import DBAssist
 
 def write_file(df, data_out, file_name, keep_index=False):
     """Specify location and save .csv data file in one line.
@@ -393,8 +393,10 @@ def scrub_files(file_map, out='mysql', subset=[]):
         table_name = file_map[f]['new_name']
         # insert into mysql or save csv files
         if out == 'mysql':
-            dba = transfer.DBAssist()
-            dba.create_insert(table_name, df, at_once=True)
+            dba = DBAssist()
+            dba.create_from_data(table_name, df)
+            dba.insert_rows(table_name, df, at_once=True)
+            dba.close()
         else:
             data_out = '../data/scrub/'
             write_file(df, data_out, table_name, keep_index=False)

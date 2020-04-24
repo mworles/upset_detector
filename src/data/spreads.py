@@ -1,13 +1,13 @@
 import os
+import re
+import math
 import pandas as pd
 import numpy as np
 import clean
 import odds
 import generate
-import re
 import match
-import math
-import transfer
+from src.data.transfer import DBAssist
 
 def spread_date(x):
     dl = x.split('/')
@@ -250,9 +250,10 @@ def blend_spreads(datdir):
     return df
 
 def spreads_vi(date=None):
-    dba = transfer.DBAssist()
-    dba.connect()
-    df = dba.return_df('spreads')
+    dba = DBAssist()
+    df = dba.return_data('spreads')
+    dba.close()
+
     years = map(lambda x: x.split('-')[0], df['timestamp'].values)
     dates = ["/".join([x, y]) for x, y in zip(years, df['game_date'].values)]
     df['date'] = dates

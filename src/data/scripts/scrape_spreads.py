@@ -1,7 +1,7 @@
 from src.data import scrapers
-from src.data import transfer
+from src.data.transfer import DBAssist
 
 rows = scrapers.spreads.run()
-dba = transfer.DBAssist()
-
-dba.insert('spreads', rows, at_once=False)
+dba = DBAssist()
+dba.insert_rows('spreads', rows, at_once=False)
+dba.close()

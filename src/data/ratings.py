@@ -1,13 +1,14 @@
-import pandas as pd
-import numpy as np
-import os
-import clean
-import generate
-import transfer
-import match
 import math
+import os
 import multiprocessing as mp
 import datetime
+import pandas as pd
+import numpy as np
+from src.data.transfer import DBAssist
+import clean
+import generate
+import match
+
 
 def reduce_margin(df, cap):
     # reduce outlier scores to limit impact of huge blowouts
@@ -196,10 +197,10 @@ def game_box_possessions(df):
     return bp
 
 def game_box_for_ratings(date=None):
-    dba = transfer.DBAssist()
-    dba.connect()
-    table = dba.return_table('game_scores')
-    tbox = dba.return_table('game_box')
+    dba = DBAssist()
+    table = dba.return_data('game_scores')
+    tbox = dba.return_data('game_box')
+    dba.close()
 
     dfo = pd.DataFrame(table[1:], columns=table[0])
     box = pd.DataFrame(tbox[1:], columns=tbox[0])
@@ -425,16 +426,20 @@ def run_day(df, day_max = None, n_iters=15, output=None):
     df_teams['date'] = date
     
     if output is not None:
-        dba = Transfer.DBAssist()
-        dba.insert('ratings_at_day', df_teams)
+        dba = DBAssist()
+        dba.insert_rows('ratings_at_day', df_teams)
+        dba.close()
+
         output.put(len(rows))
     else:
         return df_teams
 
 def run_year(year, n_iters = 15, multiprocessing=True):
-    modifier = "WHERE season = %s" % (str(year))
-    dba = transfer.DBAssist()
+    modifier = "WHERE season = {}".format(str(year))
+    dba = DBAssist()
     df = dba.return_data('games_for_ratings', modifier=modifier)
+    dba.close()
+
     df = day_number(df)
     day_min = minimum_day(df, n_games=3)
     all_days = list(set(df['daynum'].values))

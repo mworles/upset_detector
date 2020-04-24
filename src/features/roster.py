@@ -1,7 +1,7 @@
-from src.data.transfer import DBAssist
+import math
 import pandas as pd
 import numpy as np
-import math
+from src.data.transfer import DBAssist
 
 
 def fill_minutes(row, ref_dict):
@@ -25,9 +25,11 @@ def split_and_fill(df):
     has = df[df['min_pg'].notnull()].copy()
     tf = df[df['min_pg'].isnull()].copy()
     
+    dba = DBAssist()
     # import data from espn per_game table
-    ep = DBAssist().return_data('espn_pergame')
-    
+    ep = dba.return_data('espn_pergame')
+    dba.close()
+
     # create dict to look up by (season, team)
     ref_dict = {}
     
@@ -219,9 +221,13 @@ def add_continuity(df):
     return df
 
 def clean_roster(min_season=2002):
+    dba = DBAssist()
     # read roster info and player per game stats
-    tr = DBAssist().return_data('team_roster')
-    pg = DBAssist().return_data('player_pergame')
+    tr = dba.return_data('team_roster')
+    pg = dba.return_data('player_pergame')
+    
+    # connection no longer needed
+    dba.close()
 
     # merge rows for season, team, and player
     merge_on = ['season', 'team', 'name']

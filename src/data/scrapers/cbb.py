@@ -1,8 +1,8 @@
-from bs4 import BeautifulSoup
-import requests
 import unicodedata
 import time
-from src.data import transfer
+from bs4 import BeautifulSoup
+import requests
+
 
 def season_table(season):
     data_out = '../data/external/sportsref_schoolstats/'
@@ -103,7 +103,6 @@ def team_page(url):
     return soup
 
 def srcbb_team(season):
-    dba = transfer.DBAssist()
     table = season_table(season)
     rows = table.findAll('tr')
     base = 'https://www.sports-reference.com'
@@ -118,29 +117,33 @@ def srcbb_team(season):
         except:
             pass
     
+    dba = DBAssist()
+    
     for url in links:
         time.sleep(1)
         url_split = url.split('/')
         season = int(url_split[-1].split('.')[0])
         team = remove_unicode(url_split[-2])
         soup = team_page(url)
-
+        
         try:
             roster = parse_rosters(soup)
             roster = add_season_team(roster, season, team)
-            dba.insert('team_roster', roster, at_once=True)
+            dba.insert_rows('team_roster', roster)
         except:
             print url
             fail = [['season', 'team'], [season, team]]
-            dba.insert('team_roster_error', fail, at_once=True)
+            dba.insert_rows('team_roster_error', fail)
             
         try:
             per_game = parse_pergame(soup)
             per_game = add_season_team(per_game, season, team)
-            dba.insert('player_pergame', per_game, at_once=True)
+            dba.insert_rows('player_pergame', per_game)
         except:
             fail = [['season', 'team'], [season, team]]
-            dba.insert('player_pergame_error', fail, at_once=True)
+            dba.insert_rows('player_pergame_error', fail)
+    
+    dba.close()
 
 
 def parse_schedule(soup):
@@ -226,20 +229,6 @@ def get_team_schedule(url, season):
     
     sched = add_season_team(sched, season, team)
     return sched
-
-    
-def get_insert_schedules(season):
-    dba = transfer.DBAssist()
-    links = srcbb_schedule_links(season)
-
-    for url in links:
-        time.sleep(1)
-        sched = get_team_schedule(url, season)
-
-        if len(sched) > 2:
-            dba.insert('cbb_schedule', sched, at_once=True)
-        else:
-            dba.insert('cbb_schedule_error', sched, at_once=True)
 
 
 def team_from_row(row):
