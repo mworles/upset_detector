@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 import pickle
-from src.data import transfer
+from src.data.transfer import DBAssist()
 from src.data import updater
 from src.data import queries
 from src.data import generate
@@ -9,28 +9,33 @@ from src import constants
 from src.models import utils
 
 
-"""
 def make_features(df, tables):
+    dba = DBAssist()
     if 'ratings_needed' in tables:
-        ratings = transfer.DBAssist().return_data('ratings_needed')
+        ratings = dba.return_data('ratings_needed')
         ratings = ratings.drop('season', axis=1)
         df = updater.assign_features(df, ratings, merge_on=['date'])
     
     if 'team_home' in tables:
-        home = transfer.DBAssist().return_data('team_home')
+        home = dba.return_data('team_home')
         home = home.drop('game_id', axis=1)
         df = updater.assign_features(df, home, merge_on=['date'])
     
     if 'spread' in tables:
-        spread = transfer.DBAssist().return_data('spreads_by_team')
+        spread = dba.return_data('spreads_by_team')
         spread = spread.drop('game_id', axis=1)
         spread['spread'] = - spread['spread']
         spread = spread.rename(columns={'spread': 'spread_rev'})
         df = updater.assign_features(df, spread, team='t1', merge_on=['date'])
+        
+    dba.close()
     return df
 
 def add_result(df, target):
-    results = transfer.DBAssist().return_data('results_by_team')
+    dba = DBAssist()
+    results = dba.return_data('results_by_team')
+    dba.close()
+    
     game_cols = ['game_id', 'team_id', 'date']
     target_drop = [x for x in results.columns if x not in game_cols]
     target_drop.remove(target)
@@ -42,8 +47,9 @@ def add_result(df, target):
     return df
 
 def add_spreads(df):
+    dba = DBAssist()
     # merge spreads
-    spreads = transfer.DBAssist().return_data('spreads_by_team')
+    spreads = dba.return_data('spreads_by_team')
     spreads = spreads.rename(columns={'team_id': 't1_team_id'})
     spreads = spreads.drop(['game_id'], axis=1)
     df = pd.merge(df, spreads, how='left',
@@ -72,11 +78,13 @@ def clean_set(df):
     df = df.dropna(how='any')
     return df
 
+
 def get_examples(arrange='neutral'):
+    dba = DBAssist()
     if arrange == 'neutral':
-        df = transfer.DBAssist().return_data('game_info')
+        df = dba.return_data('game_info')
     else:
-        df = transfer.DBAssist().return_data('fav_dog')
+        df = dba.return_data('fav_dog')
         if arrange == 'favorite':
             col_map = {'t_favor': 't1_team_id', 't_under': 't2_team_id'}
         elif arrange == 'underdog':
@@ -84,8 +92,11 @@ def get_examples(arrange='neutral'):
         else:
             exit()
         df = df.rename(columns=col_map)
+    
+    dba.close()
     df = df[['game_id', 'season', 'date', 't1_team_id', 't2_team_id']]
     return df
+
 
 # import matchups with ordered favorites and underdogs
 df = get_examples(arrange='underdog')
@@ -93,9 +104,8 @@ tables = ['ratings_needed', 'team_home', 'spread']
 df = make_features(df, tables)
 df = add_target(df, 'win')
 df = clean_set(df)
-df.to_pickle('df2.pkl')
-"""
-df = pd.read_pickle('df2.pkl')
+
+
 df = df.reset_index()
 df = df.drop_duplicates(subset=['game_id'])
 df = df.set_index('game_id')
@@ -119,7 +129,7 @@ scores = utils.write_results(exp_id, grid_id, trials)
 
 
 
-"""
+
 from models.grids import scorer_grid
 
 class searchExp():
@@ -145,4 +155,3 @@ grid_id = 5
 exp = searchExp(1, 100, ratings, targets, grid_id)
 exp.use_score('f1')
 exp.split_scale()
-"""

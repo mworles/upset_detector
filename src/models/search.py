@@ -1,11 +1,13 @@
 import pandas as pd
 from src.models import utils
 from src.data import clean
-from src.data import transfer
+from src.data.transfer import DBAssist
 from src import constants
 
+dba = DBAssist()
+mat = dba.return_data('matchups')
+dba.close()
 
-mat = transfer.DBAssist().return_data('matchups')
 mat = mat.set_index('game_id')
 feat_i = mat.columns.tolist().index('t1_team_off_adj')
 df = mat.iloc[:, feat_i:]
