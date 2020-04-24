@@ -1,232 +1,124 @@
 """ transfer
 
-A module for insertion and extraction of data with MySQL databases.
+A module for data insertion and extraction with MySQL database.
 
 Classes
 -------
 DBColumn
-    A container for one column of data in a database table.
+    A container for one column of data in a MySQL table.
 DBTable
-    A container of data for a database table.
+    A container of data for a MySQL table.
 DBAssist
-    A tool for exchanging data with a MySQL database using pymysql.
+    A tool for creating MySQL objects and extracting data from database.
 
 """
 import ConfigParser
-import os
 import json
-import math
 import pandas as pd
-import numpy as np
 import pymysql
 from src.constants import SCHEMA_FILE
 from src.constants import CONFIG_FILE
-
-
-class DBColumn(object):
-    """
-    A container for a column of data in DBTable.
-
-    Attributes
-    ----------
-    data : list
-        Column data assigned as input to the class instance. First element is
-        str column name.
-    name: str
-        Name of the column.
-    values: list
-        List of element values.
-    type: str
-        String defining the column type for MySQL table.
-    query: str
-        String containing the column name and type for CREATE/INSERT query.
-
-    """
-    def __init__(self, data):
-        """Initialize DBColumn instance."""
-        self.data = data
-        self.name = self.data[0].replace('-', '_')
-        self.values = self.data[1:]
-        self.type = self.column_type()
-        self.query = "".join([self.name, self.type])
-
-    def column_type(self):
-        """Return string indicating MYSQL type to use for column."""
-        # collect all unique types as strings
-        elem_types = list(set([type(x).__name__ for x in self.values]))
-
-        # if any strings use VARCHAR, otherwise use FLOAT
-        if 'str' in elem_types:
-            # keep len at 64, sufficient size for expected values
-            col_type = " VARCHAR (64)"
-        else:
-            col_type = " FLOAT"
-
-        return col_type
-
-    def convert_column(self):
-        """
-        Return list of column values converted for MySQL insertion.
-    
-        Returns
-        -------
-        new_values : list of str
-            String values converted from numeric or string types. None, 
-            empty strings, or NaN are converted to NULL.
-        
-        """
-        new_values = [self.convert_element(x) for x in self.values]
-        nulls = ['nan', '', 'None', "'nan'", "''", "'None'"]
-        new_values = [x if x not in nulls else 'NULL' for x in new_values]
-        return new_values
-
-    def convert_element(self, raw_value):
-        """
-        Return element as a formatted string for insertion to MySQL table.
-
-        Parameters
-        ----------
-        raw_value : str, float, int, NaN, or None
-            The original cell value when DBTable is initialized.
-
-        Returns
-        -------
-        new_value : str
-            Value converted to string.
-
-        """
-        # code nulls separately to prevent inserting as strings
-        if "VARCHAR" in self.type:
-            # convert any numerics to string, keep any existing ' intact
-            new_value = str(raw_value).replace("'", r"\'")
-            new_value = r"""'{}'""".format(new_value)
-        else:
-            new_value = """{}""".format(raw_value)
-
-        return new_value
-
-
-class DBTable(object):
-    """
-    A container for 2-dimensional data for insertion to MySQL table.
-
-    Attributes
-    ----------
-    name : str
-        Name of the table in MySQL database.
-    data : list of list
-        First list must be column names, remaining lists contain rows of data.
-    columns: list of DBColumn
-        Contains DBColumn instance for each column in the table.
-
-    """
-    def __init__(self, name, data):
-        """Initialize DBTable instance."""
-        self.name = name
-        self.data = self.setup(data)
-        # initialize all columns to get names, types, and values
-        self.columns = [DBColumn(x) for x in map(list, zip(*self.data))]
-
-    def setup(self, data):
-        """Return a DBTable instance created from the data in a nested list or 
-        pandas DataFrame."""
-        if type(data) is list:
-            result = data
-        elif type(data) is pd.core.frame.DataFrame:
-            col_names = list(data.columns)
-            result = data.values.tolist()
-            result.insert(0, col_names)
-        else:
-            raise Exception('data must be list or DataFrame')
-
-        return result
-
-    def query_create(self):
-        """Return query for creating table in MySQL database."""
-        query_columns = ", \n".join([c.query for c in self.columns])
-        pref = "CREATE TABLE "
-        #create = """ """.join([pref, self.name, "(", query_columns, ");"])
-        create = "{0} {1} ({2});".format(pref, self.name, query_columns)
-        return create
-
-    def query_insert(self, at_once=True):
-        """
-        Return query for inserting data to table in MySQL database.
-        
-        Parameters
-        ----------
-        at_once : bool, default True
-            Return a single formatted string for inserting all rows at once.
-            If False, return a list of separate strings for each row.
-
-        Returns
-        -------
-        insert : str or list of str
-            Str or list for inserting table values to MySQL database.
-
-        """
-        # create prefix string for insert query
-        col_string = ", ".join(self.data[0])
-        pref = "INSERT INTO {0} ({1}) VALUES".format(self.name, col_string)
-        
-        # list with formatted string for each row
-        table_rows = self.query_rows()
-        
-        if at_once is True:
-            rows_combined = ",\n".join(table_rows)
-            insert = "{0} {1};".format(pref, rows_combined)
-        else:
-            insert = ["{0} {1};".format(pref, row) for row in table_rows]
-
-        return insert
-
-    def query_rows(self):
-        """Return table rows as list of formatted strings."""
-        column_values = [c.convert_column() for c in self.columns]
-        rows = map(list, zip(*column_values))
-        row_strings = [", ".join(row_list) for row_list in rows]
-        rows_formatted = ["({0})".format(row) for row in row_strings]
-        return rows_formatted
+from src.constants import DB_NAME
 
 
 class DBAssist():
     """
-    A tool for efficient exchanges with MySQL using the pymysql package.
+    A tool for creating MySQL objects and extracting data from database.
 
     Attributes
     ----------
+    db_name : str
+        Name of the target MySQL database.
     conn : pymysql.connection
         A pymysql connection with MySQL database.
-    cursor : pymysql.cursor
+    cursor : pymysql.cursors.Cursor
         A pymysql cursor called from the conn attribute.
 
     """
-    def __init__(self, conn=None, cursor=None):
-        self.conn = conn
-        self.cursor = cursor
+    def __init__(self, db_name=DB_NAME):
+        """Initialize DBAssist instance."""
+        self.db_name = db_name
+        self.conn = self.connect()
+        self.cursor = self.conn.cursor()
 
     def connect(self, config_file=CONFIG_FILE):
         """
         Establish connection with database.
         
+        Uses an INI-formatted configuration file for database 
+        access settings. Settings for the target database should be listed
+        under some label with 'user' and 'pwd' like so:
+        
+        [generic_label]
+        user = username
+        pwd = 1234
+        
         Parameters
         ----------
+        config_file : str
+            Path to file INI file with user name and password for database.
+
+        Returns
+        -------
+        conn : pymysql.connections.Connection
+            An open connection with MySQL database.
 
         """
         parser = ConfigParser.ConfigParser()
         parser.readfp(open(config_file))
         
-        self.conn = pymysql.connect(host='127.0.0.1',
-                                    port=3306,
-                                    user='root',
-                                    passwd=parser.get('Local', 'pwd'),
-                                    db=parser.get('Local', 'db'))
-        self.cursor = self.conn.cursor()
+        conn = pymysql.connect(host='127.0.0.1',
+                               port=3306,
+                               user=parser.get('Local', 'user'),
+                               passwd=parser.get('Local', 'pwd'),
+                               db=self.db_name)
+        return conn
 
     def close(self):
         """Close cursor and connection with database."""
         self.cursor.close()
         self.conn.close()
+
+    def create_from_data(self, table_name, data):
+        """
+        Create MySQL table by extracting names and types from sample of data.
+
+        Parameters
+        ----------
+        name : str
+            Name to assign the table in MySQL database.
+        data : list of list or pandas DataFrame
+
+        """
+        query_create = DBTable(name, data).query_create()
+        self.create_table(query_create)
+
+    def create_from_schema(self, table_name):
+        """
+        Create MySQL table from parameters specified in json file.
+
+        Parameters
+        ----------
+        table_name: str
+            Name of table. Must be included as key in schema_file.
+
+        """
+        query_create = self.schema_query(table_name)
+        self.create_table(query_create)
+
+    def create_table(self, query_create):
+        """
+        Execute query used to create a table.
+
+        Parameters
+        ----------
+        query_create : str
+            
+        """
+        try:
+            self.cursor.execute(query_create)
+        except pymysql.err.InternalError, e:
+            print e
 
     def schema_query(self, table_name, schema_file=SCHEMA_FILE):
         """
@@ -238,7 +130,7 @@ class DBAssist():
             Name of the table as specified in the json file.
         schema_file : str
             Location of json file with table specs. Default is imported from
-            src/constants.
+            src/constants.py.
 
         Returns
         -------
@@ -257,55 +149,12 @@ class DBAssist():
         query_create = "CREATE TABLE {0} ({1});".format(table_name, col_part)
         return query_create
 
-    def create_table(self, query_create):
-        """
-        Execute query used to create a table.
-
-        Parameters
-        ----------
-        query_create : str
-            
-        """
-        self.connect()
-        try:
-            self.cursor.execute(query_create)
-        except pymysql.err.InternalError, e:
-            print e
-        self.close()
-
-    def create_from_schema(self, table_name):
-        """
-        Create MySQL table from parameters specified in json file.
-
-        Parameters
-        ----------
-        table_name: str
-            Name of table. Must be included as key in schema_file.
-
-        """
-        query_create = self.schema_query(table_name)
-        self.create_table(query_create)
-
-    def create_from_data(self, name, data):
-        """
-        Create MySQL table by extracting names and types from sample of data.
-
-        Parameters
-        ----------
-        name : str
-            Name to assign the table in MySQL database.
-        data : list of list or pandas DataFrame
-
-        """
-        query_create = DBTable(name, data).query_create()
-        self.create_table(query_create)
-
     def execute_commit(self, query):
         """
         Execute a query and commit changes to database.
 
-        Helpful to iterate over lists of insert queries so that unforeseen 
-        errors don't kill the script.
+        Helpful to iterate over lists of insert queries to keep errors from 
+        killing the script.
 
         Parameters
         ----------
@@ -335,8 +184,6 @@ class DBAssist():
         """
         table = DBTable(table_name, data)
 
-        self.connect()
-
         # insert full table at once
         if at_once == True:
             query_one = table.query_insert(at_once=at_once)
@@ -345,8 +192,6 @@ class DBAssist():
         else:
             query_list = table.query_insert(at_once=at_once)
             map(lambda x: self.execute_commit(x), query_list)
-
-        self.close()
 
     def delete_rows(self, table_name):
         """
@@ -359,9 +204,7 @@ class DBAssist():
 
         """
         query_delete = "DELETE from {}".format(table_name)
-        self.connect()
         self.execute_commit(query_delete)
-        self.close()
 
     def replace_rows(self, table_name, data, at_once=True):
         """
@@ -381,6 +224,45 @@ class DBAssist():
         self.delete_rows(table_name)
         self.insert_rows(table_name, data, at_once=at_once)
 
+    def return_data(self, table_name, subset=None, modifier=""):
+        """
+        Return the data from table in database.
+
+        Parameters
+        ----------
+        table_name : str
+            Name of table in database for retreiving data.
+        subset : str or list of str, default None, optional
+            Name of table column or list of columns to return.
+        modifier : str, default "", optional
+            Text of MySQL WHERE statement used to select rows to return.
+
+        Returns
+        -------
+        df : pandas DataFrame
+            Contents of table returned as dataframe.
+
+        """
+        # set SELECT objects according to subset parameter
+        if subset is None:
+            columns_to_get = '*'
+        elif type(subset) is str:
+            columns_to_get = subset
+        elif type(subset) is list:
+            columns_to_get = ", ".join(subset)
+        else:
+            sub_type = type(subset)
+            msg = 'Subset must be None, str, or list, not {}'.format(sub_type)
+            raise Exception(msg)
+
+        # list of column indices where type is decimal
+        query = "SELECT {} FROM {} {};".format(columns_to_get, table_name,
+                                                  modifier)
+        result = self.query_result(query)
+        df = pd.DataFrame(result)
+
+        return df
+
     def query_result(self, query, as_dict=True):
         """
         Return the results of a query on database.
@@ -391,7 +273,8 @@ class DBAssist():
             Text of a valid MySQL query.
         as_dict : bool, default True
             Return list of dict with value labels as keys for each dict.
-            If False, return tuple of tuples with tuple elements in order.
+            If False, return tuple of tuples with tuple elements in order of
+            elements in table.
 
         Returns
         -------
@@ -399,15 +282,14 @@ class DBAssist():
             Result of the query.
 
         """
-        self.connect()
-        
+        # new cursor object to prevent altering the instance cursor attribute
         if as_dict == True:
-            self.cursor = self.conn.cursor(pymysql.cursors.DictCursor)
-
-        self.cursor.execute(query)
-        result = self.cursor.fetchall()
-        self.close()
-        return result
+            cursor = self.conn.cursor(pymysql.cursors.DictCursor)
+        else:
+            cursor = self.conn.cursor()
+        
+        cursor.execute(query)
+        return cursor.fetchall()
 
     def table_columns(self, table_name):
         """
@@ -429,40 +311,190 @@ class DBAssist():
         column_names = [col[0] for col in result]
         return column_names
 
-    def return_data(self, table_name, subset=None, modifier=""):
-        """
-        Return the data from table in database.
 
+class DBTable(object):
+    """
+    A container for tabular data for insertion to MySQL table.
+
+    Attributes
+    ----------
+    name : str
+        Name of the table in MySQL database.
+    data : list of list
+        First list must be column names, remaining lists contain rows of data.
+    columns: list of DBColumn
+        Contains DBColumn instance for each column in the table.
+
+    """
+    def __init__(self, name, data):
+        """Initialize DBTable instance."""
+        self.name = name
+        self.data = self.verify_data(data)
+        # initialize all columns to set names and types
+        # data transposed to list of columns to extract column types
+        self.columns = [DBColumn(x) for x in map(list, zip(*self.data))]
+
+    def verify_data(self, data):
+        """
+        Verity data attribute meets input requirements.
+        
         Parameters
         ----------
-        table_name : str
-            Name of table in database for retreiving data.
-        subset : str or list of str, default None, optional
-            Name of table column or list of columns to return.
-        modifier : str, default "", optional
-            Text of MySQL WHERE statement used to select rows to return.
+        data : list of list or pandas DataFrame
+            The original cell value when DBTable is initialized.
 
         Returns
         -------
-        df : pandas DataFrame
-            Contents of table returned as dataframe.
+        data_list : list of list
+            First list element is list of column names. Remaining elements are
+            lists of values for table rows.
 
         """
-        if subset is None:
-            columns_to_get = '*'
-        elif type(subset) is str:
-            columns_to_get = subset
-        elif type(subset) is list:
-            columns_to_get = ", ".join(subset)
+        if type(data) is list:
+            data_list = data
+        elif type(data) is pd.core.frame.DataFrame:
+            col_names = list(data.columns)
+            data_list = data.values.tolist()
+            data_list.insert(0, col_names)
         else:
-            sub_type = type(subset)
-            msg = 'Subset must be None, str, or list, not {}'.format(sub_type)
-            raise Exception(msg)
-
-        # list of column indices where type is decimal
-        query = "SELECT {0} FROM {1} {2};".format(columns_to_get, table_name,
-                                                  modifier)
-        result = self.query_result(query)
-        df = pd.DataFrame(result)
+            raise Exception('data must be list or DataFrame')
         
-        return df
+        column_names = data_list[0]
+        name_types = list(set([type(x).__name__ for x in column_names]))
+        if name_types != ['str']:
+            raise Exception('all column names must be str type')
+
+        return data_list
+
+    def query_create(self):
+        """Return text of query to create table in MySQL database."""
+        # obtain column portion of query with name and type
+        query_columns = ", \n".join([c.name_type for c in self.columns])
+        create = "CREATE TABLE {} ({});".format(self.name, query_columns)
+        return create
+
+    def query_insert(self, at_once=True):
+        """
+        Return query for inserting data to table in MySQL database.
+        
+        Parameters
+        ----------
+        at_once : bool, default True
+            Return a single insert query for inserting all rows at once.
+            If False, return a list with separate insert query for each row.
+
+        Returns
+        -------
+        insert : str or list of str
+            Str or list for inserting table values to MySQL database.
+
+        """
+        # create prefix string for insert query
+        col_string = ", ".join(self.data[0])
+        pref = "INSERT INTO {0} ({1}) VALUES".format(self.name, col_string)
+        
+        # list with formatted string for each row
+        table_rows = self.rows_for_insert()
+        
+        if at_once is True:
+            insert = "{0}\n{1};".format(pref, ",\n".join(table_rows))
+        else:
+            insert = ["{0} \n{1};".format(pref, row) for row in table_rows]
+
+        return insert
+
+    def rows_for_insert(self):
+        """Return list of str containing row values for table."""
+        # convert all values to str objects for insert query text
+        # list of columns to keep column types consistent
+        column_values = [c.convert_column() for c in self.columns]
+        # transpose back to list of row lists
+        rows = map(list, zip(*column_values))
+        rows_joined = ["({0})".format(", ".join(row)) for row in rows]
+        #rows_closed = ["({0})".format(row) for row in rows_joined]
+        return rows_joined
+
+
+class DBColumn(object):
+    """
+    A container for one column of data in a MySQL table.
+
+    Attributes
+    ----------
+    data : list
+        Column data assigned as input to the class instance. First element is
+        str column name.
+    name: str
+        Name of the column.
+    values: list
+        List of element values.
+    type: str
+        String defining the column type for MySQL table.
+    query: str
+        String containing the column name and type for CREATE/INSERT query.
+
+    """
+    def __init__(self, data):
+        """Initialize DBColumn instance."""
+        self.data = data
+        self.name = self.data[0].replace('-', '_')
+        self.values = self.data[1:]
+        self.type = self.return_type()
+        self.name_type = "".join([self.name, self.type])
+
+    def return_type(self):
+        """Return string indicating type to use for column."""
+        # collect all unique types as strings
+        elem_types = list(set([type(x).__name__ for x in self.values]))
+
+        # if any strings use VARCHAR, otherwise use FLOAT
+        if 'str' in elem_types:
+            # len 64 is minimumm sufficient size for expected values
+            column_type = " VARCHAR (64)"
+        else:
+            column_type = " FLOAT"
+
+        return column_type
+
+    def convert_column(self):
+        """
+        Return list of column values converted for MySQL insertion.
+        
+        To create the text for an insert query, the column's raw values are 
+        converted to strings and missing values are converted to NULL.
+
+        Returns
+        -------
+        new_values : list of str
+            String values converted from numeric or string types. 
+        
+        """
+        new_values = [self.convert_element(x) for x in self.values]
+        nulls = ['nan', '', 'None', "'nan'", "''", "'None'"]
+        new_values = [x if x not in nulls else 'NULL' for x in new_values]
+        return new_values
+
+    def convert_element(self, raw_value):
+        """
+        Return element as a formatted string for insertion to MySQL table.
+
+        Parameters
+        ----------
+        raw_value : str, float, int, NaN, or None
+            The original cell value when DBTable is initialized.
+
+        Returns
+        -------
+        new_value : str
+            Value converted to string.
+
+        """
+        # code nulls separately to prevent inserting as strings
+        if "VARCHAR" in self.type:
+            # because string types enclosed in '', string literal for single '
+            new_value = str(raw_value).replace("'", r"\'")
+            new_value = r"""'{}'""".format(new_value)
+        else:
+            new_value = """{}""".format(raw_value)
+
+        return new_value
