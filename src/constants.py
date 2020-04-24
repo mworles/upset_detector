@@ -96,6 +96,8 @@ PATH_HERE = os.path.abspath(os.path.dirname(__file__))
 DATA = '../data/'
 DATA_DIR = os.path.join(PATH_HERE, DATA)
 
+DB_NAME = 'bball'
+
 CONFIG = '../.config'
 CONFIG_FILE= os.path.join(PATH_HERE, CONFIG)
 
