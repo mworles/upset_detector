@@ -112,7 +112,7 @@ def clean_oddsportal(datdir):
     df = match.id_from_name(df, 'team_oddsport', 'team_2', drop=False)
     
     l_games = get_odds_dicts(df)
-    df = generate.convert_team_id(df, ['team_1_id', 'team_2_id'], drop=False)
+    df = clean.order_team_id(df, ['team_1_id', 'team_2_id'])
     df = team_odds(df, l_games)
 
     df = df.dropna(subset=['t1_team_id', 't2_team_id'])  
@@ -120,7 +120,8 @@ def clean_oddsportal(datdir):
     df['t1_team_id'] = df['t1_team_id'].astype(int)
     df['t2_team_id'] = df['t2_team_id'].astype(int)
     
-    df = generate.set_gameid_index(df, date_col='date', full_date=True, drop_date=False)
+    df = clean.make_game_id(df)
+    df = df.set_index('game_id')
     
     keep_cols = ['date', 't1_team_id', 't2_team_id', 't1_odds', 't2_odds']
     df = df[keep_cols].sort_values('date').reset_index()
@@ -156,12 +157,14 @@ def odds_vi(date=None):
     df = match.id_from_name(df, 'team_vi_odds', 'team_2', drop=False)
 
     l_games = get_odds_dicts(df)
-    df = generate.convert_team_id(df, ['team_1_id', 'team_2_id'], drop=False)
+    df = clean.order_team_id(df, ['team_1_id', 'team_2_id'])
     df = team_odds(df, l_games)
 
-    df = generate.set_gameid_index(df, date_col='date', full_date=True, drop_date=False)
+    df = clean.make_game_id(df)
+    df = df.set_index('game_id')
     keep_cols = ['date', 't1_team_id', 't2_team_id', 't1_odds', 't2_odds']
-    df = df[keep_cols].sort_values('date').reset_index()
+    df = df[keep_cols]
+    df = df.sort_values('date').reset_index()
     
     return df
     
