@@ -86,7 +86,7 @@ def compute_posessions(df):
     df['pos'] = pos.round(2)
     return df
 
-def games_by_team(df):
+def duplicate_games(df):
     """Reshape games data so that each team has own row for each game.""" 
     t1 = df.copy()
     t2 = df.copy()
@@ -114,17 +114,20 @@ def games_by_team(df):
 
 def games_ratings(datdir, year=None):
     """Create a dataset with the requirements for computing team ratings."""
-    df = generate.neutral_games(datdir)
+    df = neutral_games(datdir)
     if year is not None:
         df = df[df['season'] == year]
     df['date'] = df['date_id'].str.replace('_', '/')
-    df = generate.team_locations(df)
+
+    location_map = clean.team_location_map(df)
+    df = clean.map_teams(df, location_map, 'loc')
+    
     df = location_adjustment(df)
     df = compute_posessions(df)
     keep = ['season', 'date', 't1_team_id', 't2_team_id', 't1_score', 't2_score',
             'pos']
     df = df[keep]
-    df = games_by_team(df)
+    df = duplicate_games(df)
     df = reduce_margin(df, cap=22)
 
     # compute points per 100 possessions
@@ -132,6 +135,27 @@ def games_ratings(datdir, year=None):
     df['team_def'] = (100 * (df['opp_score'] / df['pos'])).round(3)
     
     return df
+
+
+def neutral_games(datdir):
+    """Create dataset of games with neutral team id, scores, and locations."""
+    # read in data file with game results
+    files = clean.list_of_files(datdir + 'scrub/', tag = 'results_dtl')
+    df_list = [pd.read_csv(x) for x in files]
+
+    # combine df games to one dataset
+    df = pd.concat(df_list, sort=False)
+    score_map = clean.team_score_map(df)
+    
+    df = date_from_daynum(df)
+    
+    df = clean.order_team_ids(df, ['wteam', 'lteam'])
+    df = clean.date_from_daynum(df)
+    df = clean.make_game_id(df)
+    df = clean.team_scores(df, score_map)
+    
+    return df
+
 
 def game_box_games(df):
     # add season column
@@ -148,10 +172,14 @@ def game_box_games(df):
     # convert columns to apply neutral id function
     df = generate.game_score_convert(df)
     # create team_1 and team_2 id identifer columns
-    df = generate.convert_team_id(df, ['wteam', 'lteam'], drop=False)
+    df = clean.order_team_id(df, ['wteam', 'lteam'])
     # add column indicating scores and locations for each team
-    df = generate.team_scores(df)
-    df = generate.team_locations(df)
+    score_map = clean.team_score_map(df)
+    df = clean.map_teams(df, score_map, 'score')
+
+    location_map = clean.team_location_map(df)
+    df = clean.map_teams(df, location_map, 'loc')
+    
     # adjust score for location of game
     df = location_adjustment(df)
     
@@ -217,11 +245,11 @@ def game_box_for_ratings(date=None):
     df = pd.merge(df, pos, left_on='gid', right_on='gid', how='inner')
 
     # assign unique game identifer from date and teams
-    df = generate.set_gameid_index(df, date_col='date', full_date=True,
-                                   drop_date=False)
+    df = make_game_id(df)
+    df = df.set_index('game_id')
 
     # create duplicate of games so each team has row for each game
-    df = games_by_team(df)
+    df = duplicate_games(df)
     # adjust victory margins to minimize impact of blowouts
     df = reduce_margin(df, cap=22)
 
@@ -457,3 +485,14 @@ def run_year(year, n_iters = 15, multiprocessing=True):
             p.start()
         
         results = [output.get() for p in processes]
+
+
+def game_score_convert(df):
+    home_won = df['home_score'] > df['away_score']
+    df['wteam'] = np.where(home_won, df['home_team_id'], df['away_team_id'])
+    df['lteam'] = np.where(home_won, df['away_team_id'], df['home_team_id'])
+    df['wscore'] = np.where(home_won, df['home_score'], df['away_score'])
+    df['lscore'] = np.where(home_won, df['away_score'], df['home_score'])
+    df['wloc'] = np.where(home_won, 'H', 'A')
+    df['wloc'] = np.where(df['neutral'] == 1, 'N', df['wloc'])
+    return df
