@@ -57,16 +57,16 @@ def update_day(date):
     # insert rows to game_info table for day's games
     mod = "where date = '%s'" % (date)
     df = dba.return_data('game_scores', modifier=mod)
-    df = generate.convert_game_scores(df)
-    df = generate.make_game_info(df)
+    df = build.convert_game_scores(df)
+    df = build.make_game_info(df)
     dba.insert_rows('game_info', df)
     
     # get team location for day's games, insert rows to team_home
-    rows = generate.game_home(date)
+    rows = build.game_home(date)
     dba.insert_rows('team_home', rows)
 
     # get team location for next week's scheduled games
-    rows = generate.game_home()
+    rows = build.game_home()
     dba.replace_rows('team_home_scheduled', rows)
     
     dba.close()
