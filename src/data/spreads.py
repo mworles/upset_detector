@@ -64,7 +64,8 @@ def spread_t1(row):
     return t1_spread
 
 def spreads_pt(datdir):
-    df = clean.combine_files(datdir + '/external/pt/')
+    file_list = clean.list_of_files(datdir + '/external/pt/')
+    df = clean.combine_files(file_list)
     df = df[['date', 'home', 'road', 'line']]
 
     df = df[df['date'].notnull()]
@@ -81,12 +82,12 @@ def spreads_pt(datdir):
     
     df = df.dropna(how='any', subset=['home_id', 'road_id'])
 
-    df = generate.convert_team_id(df, ['home_id', 'road_id'], drop=False)
+    df = clean.order_team_id(df, ['home_id', 'road_id'])
     
     df['t1_spread'] = np.where(df['t1_team_id'] == df['home_id'], -df['spread'], df['spread'])
     
-    df = generate.set_gameid_index(df, date_col='date', full_date=True,
-                                       drop_date=False)
+    df = clean.make_game_id(df)
+    df = df.set_index('game_id')
     df = df.sort_index()
 
     df = df[['date', 't1_team_id', 't2_team_id', 't1_spread']]
@@ -197,11 +198,12 @@ def spreads_sbro(datdir):
     df['fav_loc'] = np.where(df['favorite'] == df['home'], 'H', 'A')
     df['fav_id'] = np.where(df['fav_loc'] == 'H', df['home_id'], df['away_id'])
     
-    df = generate.convert_team_id(df, ['home_id', 'away_id'], drop=False)
+    df = clean.order_team_id(df, ['home_id', 'away_id'])
 
     df['t1_spread'] = np.where(df['t1_team_id'] == df['fav_id'], -df['spread'], df['spread'])
     
-    df = generate.set_gameid_index(df, date_col='date', full_date=True, drop_date=False)
+    df = clean.make_game_id(df)
+    df = df.set_index('game_id')
     
     keep_cols = ['date', 't1_team_id', 't2_team_id', 't1_spread', 'over_under']
     df = df[keep_cols]
@@ -279,13 +281,13 @@ def spreads_vi(date=None):
 
 
     fav = np.where(df['team_1'] == df['favorite'], df['team_1_id'], df['team_2_id'])
-    df = generate.convert_team_id(df, ['team_1_id', 'team_2_id'], drop=False)
+    df = clean.order_team_id(df, ['team_1_id', 'team_2_id'])
     t1_fav = df['t1_team_id'] == fav
     vals_t1 = zip(spread_vals, t1_fav)
     df['t1_spread'] = [-x[0] if x[1] == True else x[0] for x in vals_t1]
 
-    df = generate.set_gameid_index(df, date_col='date', full_date=True,
-                                   drop_date=False)
+    df = clean.make_game_id(df)
+    df = df.set_index('game_id')
 
     keep_cols = ['date', 't1_team_id', 't2_team_id', 't1_spread', 'over_under']
     df = df[keep_cols].sort_values('date').reset_index()
