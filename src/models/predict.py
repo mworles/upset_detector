@@ -3,6 +3,91 @@ from models import utils
 from data import clean
 from constants import TEST_YEAR
 
+def ids_from_index(df, full_date = False):
+    """Returns the input dataframe with team id columns added. Team id numbers 
+    are extracted from the dataframe index. Useful when team identifers have 
+    been removed from data (i.e., for model training) but need to be 
+    re-inserted for some reason, such as merging with other team data. 
+    
+    Arguments
+    ----------
+    df: pandas dataframe
+        Requires an index of unique game identifers that contain team id for 
+        both teams in the game.
+    """
+    # ensure index has name
+    df.index = df.index.rename('game_id')
+    # set index as column
+    df = df.reset_index()
+    
+    # assume game date contains year only
+    if full_date == False:
+        df['t1_team_id'] = df['game_id'].apply(lambda x: int(x[5:9]))
+        df['t2_team_id'] = df['game_id'].apply(lambda x: int(x[10:]))
+    # if full date, need 
+    else:
+        df['t1_team_id'] = df['game_id'].apply(lambda x: int(x[11:15]))
+        df['t2_team_id'] = df['game_id'].apply(lambda x: int(x[16:]))
+    
+    # return game identifer to index
+    df = df.set_index('game_id')
+    
+    return df
+
+
+def add_team_name(df, datdir='../data/'):
+    """Returns the input dataframe with team names added. Team names are read 
+    in from a file and merged with the input data using team identifers.
+    
+    Arguments
+    ----------
+    df: pandas dataframe
+        Requires team identifer columns 't1_team_id' and 't2_team_id'. 
+    datadir: string
+        Relative path to data directory.
+    """    
+    # specificy path to team name data and read in dataframe
+    path = "".join([datdir, 'scrub/teams.csv'])
+    nm = pd.read_csv(path)
+    
+    nm = nm[['team_id', 'team_name']]
+    
+    # merge and create name column for team 1
+    mrg = pd.merge(df, nm, left_on='t1_team_id', right_on='team_id',
+                   how='inner')
+    mrg = mrg.drop(columns=['team_id'])
+    mrg = mrg.rename(columns={'team_name': 'team_1'})
+    
+    # merge and create name column for team 2
+    mrg = pd.merge(mrg, nm, left_on='t2_team_id', right_on='team_id',
+                   how='inner')
+    mrg = mrg.drop(columns=['team_id'])
+    mrg = mrg.rename(columns={'team_name': 'team_2'})
+    
+    
+    return mrg
+
+def switch_ids(df, toswitch):
+    """Returns the input dataframe with team identifers switched in specified
+    rows as indicated by input boolean array. Useful when the intent is to 
+    organize data for presentation, such as when aligning all underdogs.
+    
+    Arguments
+    ----------
+    df: pandas dataframe
+        Requires team identifer columns 't1_team_id' and 't2_team_id'. 
+    toswitch: array
+        Contains boolean values where True indicates rows to switch.
+    """
+    # copy of data for replacing values    
+    dfr = df.copy()
+    # switch both team identifers
+    dfr.loc[toswitch, 't1_team_id'] = df.loc[toswitch, 't2_team_id']
+    dfr.loc[toswitch, 't2_team_id'] = df.loc[toswitch, 't1_team_id']
+    
+    return dfr
+
+
 # define data datdirectory, import features and targets
 datdir = '../data/processed/'
 df = pd.read_csv(datdir + 'features.csv', index_col=0)
