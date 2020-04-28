@@ -32,7 +32,8 @@ def clean_schools(datdir):
         The relative path to subdirectory containing data files.
     """    
     # compiles all files into one dataset
-    df = clean.combine_files(datdir)
+    file_list = clean.list_of_files(datadir)
+    df = clean.combine_files(file_list)
 
     # rows missing value for 'G' column are invalid
     df = df.dropna(subset=['G'])
@@ -41,7 +42,7 @@ def clean_schools(datdir):
     df = df[['School']].drop_duplicates()
     
     # add reformatted school name for better id matching
-    df['team_clean'] = map(clean.school_name, df['School'].values)
+    df['team_clean'] = map(format_school, df['School'].values)
     
     # rename to create unique team identifer for source
     df = df.rename(columns={'School': 'team_ss'})    
@@ -59,13 +60,14 @@ def clean_kp(datdir):
         The relative path to subdirectory containing data files.
     """
     # compiles all files into one dataset
-    df = clean.combine_files(datdir)
+    file_list = clean.list_of_files(datadir)
+    df = clean.combine_files(file_list)
 
     # isolate data to unique names
     df = df[['TeamName']].drop_duplicates()
 
     # add reformatted school name for better id matching
-    df['team_clean'] = map(lambda x: clean.school_name(x), df['TeamName'])
+    df['team_clean'] = map(lambda x: format_school(x), df['TeamName'])
 
     # rename to create unique team identifer for source
     df = df.rename(columns={'TeamName': 'team_kp'})   
@@ -93,13 +95,14 @@ def clean_odds_portal(datdir):
     df = df[df['team_oddsport'].notnull()]
     
     
-    df['team_clean'] = map(lambda x: clean.school_name(x), df['team_oddsport'])
+    df['team_clean'] = map(lambda x: format_school(x), df['team_oddsport'])
     
     return df
 
 def clean_pt(datdir):
 
-    df = clean.combine_files(datdir)
+    file_list = clean.list_of_files(datadir)
+    df = clean.combine_files(file_list)
 
     # list of all unique team names
     teams = list(set(list(df['home']) + list(df['road'])))
@@ -107,7 +110,7 @@ def clean_pt(datdir):
     df = pd.DataFrame({'team_pt': teams})
     df = df[df['team_pt'].notnull()]
 
-    df['team_clean'] = map(lambda x: clean.school_name(x), df['team_pt'])
+    df['team_clean'] = map(lambda x: format_school(x), df['team_pt'])
 
     return df
 
@@ -142,7 +145,7 @@ def clean_sbro(datdir):
     df = df[df['team_sbro'].notnull()]
     team_split = [split_caps(x) for x in df['team_sbro']]
     team_full = map(join_team, team_split)
-    df['team_clean'] = map(lambda x: clean.school_name(x), team_full)
+    df['team_clean'] = map(lambda x: format_school(x), team_full)
 
     return df
 
@@ -156,7 +159,7 @@ def clean_tcpalm(table_name):
     teams = [t for t in teams if t is not None]
     
     df = pd.DataFrame({'team_tcp': teams})
-    df['team_clean'] = map(lambda x: clean.school_name(x), df['team_tcp'])
+    df['team_clean'] = map(lambda x: format_school(x), df['team_tcp'])
     
     return df
     
@@ -172,7 +175,7 @@ def clean_vi(table_name):
     
     source_col = 'team_vi_' + table_name
     df = pd.DataFrame({source_col: teams})
-    df['team_clean'] = map(lambda x: clean.school_name(x), df[source_col])
+    df['team_clean'] = map(lambda x: format_school(x), df[source_col])
     
     return df
 
@@ -281,49 +284,41 @@ def create_key(datdir):
     
     # clean schools data and match to numeric identifier
     schools = clean_schools(datdir + 'external/school_stats/')
-    print 'matching school stats'
     schools_id = match_team(schools, id, min_year=1993)
     key_list = [schools_id]
     
     # clean team ratings data and match to numeric identifier
     kp = clean_kp(datdir + 'external/kp/')
-    print 'matching kenpom'
     kp_id = match_team(kp, id, min_year=2002)
     key_list.append(kp_id)
     
     # clean and match oddsportal odds teams
     op = clean_odds_portal(datdir + 'external/odds/')
-    print 'matching oddsportal'
     op_id = match_team(op, id, min_year=2009)
     key_list.append(op_id)
     
     # clean and match predictiontracker teams
     pt = clean_pt(datdir + 'external/pt/')
-    print 'matching predictiontracker'
     pt_id = match_team(pt, id, min_year=2003)
     key_list.append(pt_id)
     
     # clean and match sportsbookreviews teams
     sbro = clean_sbro(datdir)
-    print 'matching sportsbookreviews'
     sbro_id = match_team(sbro, id, min_year=2008)
     key_list.append(sbro_id)
     
     # clean tcpalm teams
     tcp = clean_tcpalm('game_scores')
-    print 'matching tcpalm'
     tcp_id = match_team(tcp, id, min_year=2019)
     key_list.append(tcp_id)
     
     # clean vegasinsider odds teams
     vio = clean_vi('odds')
-    print 'matching vi odds'
     vio_id = match_team(vio, id, min_year=2019)
     key_list.append(vio_id)
     
     # clean vegasinsider spreads teams
     visp = clean_vi('spreads')
-    print 'matching vi spreads'
     visp_id = match_team(visp, id, min_year=2019)
     key_list.append(visp_id)
     
@@ -338,7 +333,6 @@ def create_key(datdir):
     key = key.drop_duplicates()
 
     dba = DBAssist()
-    dba.create_from_schema('team_key')
     dba.insert_rows('team_key', key, at_once=True) 
     dba.close()
 
@@ -380,9 +374,18 @@ def id_from_name(df, key_col, name_col, drop=True, how='inner'):
         drop_cols.append(name_col)
     # remove columns from dataframe
     mrg = mrg.drop(drop_cols, axis=1)
-    
-    # create unique column name for added id
-    #id_name = name_col + '_id'
-    #mrg = mrg.rename(columns={'team_id': id_name})
-    
+
+
     return mrg
+
+def format_school(name_raw):
+    """Return school name formatted to match the team id key."""
+    # clean string
+    result = str.lower(name_raw)
+    result = re.sub('[().&*\']', '', result)
+    result = result.rstrip()
+    # replace spaces with hyphens to match format used in team id file
+    result = result.replace('  ', '-', x)
+    result = result.replace(' ', '-', x)
+
+    return result
