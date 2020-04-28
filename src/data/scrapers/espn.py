@@ -1,7 +1,7 @@
 import pandas as pd
 import time
 from src.data.transfer import DBAssist
-from src.data import clean
+from src.data.match import format_school
 
 def team_from_href(href, strip=1):
     hs = href.split('/')[-2:]
@@ -76,7 +76,7 @@ def alternate_names():
 
     # clean and use team_ss as team name to match team in player_pergame table
     tk = tk[tk['team_ss'] != 'NULL']
-    tk['team'] = map(clean.school_name, tk['team_ss'].values)
+    tk['team'] = map(format_school, tk['team_ss'].values)
     tk = tk[['team_id', 'team']].drop_duplicates()
 
     # import, merge, and modify alternate names to align with espn team names
