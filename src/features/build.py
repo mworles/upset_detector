@@ -66,6 +66,35 @@ def ratings_kp(datdir):
         # return data
         return df
     
+    def year4_from_string(s):
+        """Returns numeric 4-digit year from string containing 2-digit year."""
+        # extract digits from string
+        year2 = "".join(re.findall('\d+', s))
+        # default century is 2000
+        pre = '20'
+        # if final 2 year digits 80 or more, change prefix to 19
+        if int(year2) > 80:
+            pre = '19'
+        # create 4-digit numeric year
+        year4 = int(''.join([pre, year2]))
+        return year4    
+
+    def round_floats(df, prec=2):
+        """Returns dataframe with all float values rounded to specified precision. 
+        
+        Arguments
+        ----------
+        df: pandas dataframe
+            Contains float numeric desired to be rounded. 
+        prec: integer
+            The desired decimal point precision for rounding. Default is 2. 
+        """
+        for c in df.columns:
+            # only round columns of float data type
+            if df[c].dtype == 'float':
+                df[c] = df[c].round(decimals=prec)
+        return df
+    
     # location of files containing ratings for each season
     ratings_dir = datdir + '/external/kp/'
     
@@ -74,7 +103,7 @@ def ratings_kp(datdir):
 
     # use files to get lists of season numbers and dataframes
     # data has no season column so must be collected from file name and added
-    seasons = [clean.year4_from_string(x) for x in files]
+    seasons = [year4_from_string(x) for x in files]
     dfs = [pd.read_csv(x) for x in files]
 
     # used nested function to create consistent season column
@@ -94,7 +123,7 @@ def ratings_kp(datdir):
     df['rankem'] = np.where(df['rankem'].isnull(), df['rankadjem'], df['rankem'])
 
     # reduce float value precision
-    df = clean.round_floats(df, prec=2)
+    df = round_floats(df, prec=2)
 
     # select columns to keep as features
     keep = ['team_id', 'season', 'adjtempo', 'adjoe', 'rankadjoe', 'adjde', 
