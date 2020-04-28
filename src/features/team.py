@@ -216,7 +216,7 @@ def box_stats_by_team(mod=None):
 
     st = split_teams(df)
     cb = clean_box(st)
-    sbt = generate.games_by_team(cb)
+    sbt = build.games_by_team(cb)
     sbt = sbt.rename(columns={'team_id': 'team'})
     sbt = match.id_from_name(sbt, 'team_tcp', 'team')
     sbt = sbt.rename(columns={'opp_id': 'opp'})
@@ -270,13 +270,7 @@ def prep_stats_by_team(df):
     df = df[keep_cols]
     
     # add date to each game
-    dba = DBAssist()
-    dfs =dba.return_data('seasons')
-    dba.close()
-
-    dfs = dfs[['season', 'dayzero']]
-    df = pd.merge(df, dfs, how='inner', left_on='season', right_on='season')
-    df['date'] = df.apply(clean.game_date, axis=1)
+    df = clean.date_from_daynum(df)
     
     # remove cols not needed
     df = df.drop(['season', 'daynum', 'dayzero'], axis=1)
