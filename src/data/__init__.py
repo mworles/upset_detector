@@ -1,6 +1,8 @@
-import match
 import clean
-import transfer
+import match
 import odds
+import ratings
 import spreads
+import transfer
+import updater
 import scrapers
