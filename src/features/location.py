@@ -174,7 +174,9 @@ def neutral_games(neutral):
                   right_on='city_id')
 
     # create game id and keep relevant games
-    df = generate.make_game_id(df, ['wteam', 'lteam'])
+    df = clean.date_from_daynum(df)
+    df = clean.order_team_id(df, ['wteam', 'lteam'])
+    df = clean.make_game_id(df)
     df = df[df['game_id'].isin(neutral)]
 
     # import map of city coordinates,
@@ -188,7 +190,9 @@ def neutral_games(neutral):
     tg = dba.return_data('tourney_geog', modifier='WHERE season < 2010')
 
     # add unique game id from teams and date
-    tg = generate.make_game_id(tg, ['wteam', 'lteam'])
+    tg = clean.date_from_daynum(tg)
+    tg = clean.order_team_id(tg, ['wteam', 'lteam'])
+    tg = clean.make_game_id(tg)
     tg['game_loc'] = zip(tg['latitude'].values, tg['longitude'].values)
 
     # import and clean games with gyms from scraped schedule
@@ -534,8 +538,9 @@ def transform_schedule(df):
 
     # obtain team numeric ids and game id for each game
     dft = schedule_team_ids(dft)
-    dft = generate.make_game_id(dft, ['team_id', 'opp_id'], convert_date=False)
-
+    df = clean.order_team_id(df, 'team_id', 'opp_id')
+    df = clean.make_game_id(df)
+    
     # isolate unique gym names for matching to gym locations
     dft = dft[['game_id', 'gym']]
 
