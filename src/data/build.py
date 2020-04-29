@@ -377,14 +377,14 @@ def scrub_files(file_map, out='mysql', subset=[]):
 def results_home(df):
 
     mat = df[['wteam', 'lteam', 'wloc']].values
-    location_map = clean.team_location_map(df)
+    location_map = clean.team_site_map(df)
     
     df = clean.date_from_daynum(df)
     df = clean.order_team_ids(df, ['wteam', 'lteam'])
     df = clean.make_game_id(df)
     df = df.set_index('game_id')
     
-    location_map = clean.team_location_map(df)
+    location_map = clean.team_site_map(df)
     df = clean.map_teams(df, location_map, 'loc')
 
     home_dict = {'H': 1, 'A': 0, 'N': 0}

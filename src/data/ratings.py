@@ -119,7 +119,7 @@ def games_ratings(datdir, year=None):
         df = df[df['season'] == year]
     df['date'] = df['date_id'].str.replace('_', '/')
 
-    location_map = clean.team_location_map(df)
+    location_map = clean.team_site_map(df)
     df = clean.map_teams(df, location_map, 'loc')
     
     df = location_adjustment(df)
@@ -177,7 +177,7 @@ def game_box_games(df):
     score_map = clean.team_score_map(df)
     df = clean.map_teams(df, score_map, 'score')
 
-    location_map = clean.team_location_map(df)
+    location_map = clean.team_site_map(df)
     df = clean.map_teams(df, location_map, 'loc')
     
     # adjust score for location of game
