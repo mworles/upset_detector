@@ -12,13 +12,22 @@ dates_in_range
 date_after_interval
 check_date
 season_of_date
+make_game_id
+date_from_daynum
+order_team_ids
+team_scores
+map_teams
+team_score_map
+team_site_map
+has_columns
 
 """
 import pandas as pd
 import os
 import datetime
 from fuzzywuzzy import process
-from src.data.transfer import DBAssist
+from transfer import DBAssist
+
 
 def list_of_files(relative_path, tag = None):
     """
@@ -52,7 +61,8 @@ def list_of_files(relative_path, tag = None):
 
 def combine_files(file_list, index_col=False):
     """
-    Return dataframe produced by combining a list of files.
+    Return dataframe produced by combining a list of tabulatar data files into
+    a single table.
     
     Parameters
     ----------
@@ -177,28 +187,6 @@ def date_after_interval(interval, start_date='today'):
     return date_interval
 
 
-def check_date(date_string):
-    """
-    Return datetime date or raise exception if format isn't correct.
-
-    Parameters
-    ----------
-    date: str
-        Str of date to check.
-
-    Returns
-    -------
-    dt_date : datetime.date
-        Datetime.date object from str date.
-
-    """
-    try:
-        dt_date = datetime.datetime.strptime(date_string, "%Y/%m/%d").date()
-        return dt_date
-    except ValueError as e:
-        raise Exception(e)
-
-
 def season_of_date(date):
     """
     Return baskeball season extracted from string date.
@@ -227,39 +215,26 @@ def season_of_date(date):
     return season
 
 
-def make_game_id(df):
+def check_date(date_string):
     """
-    Return dataframe with a distinct game identifier column constructed from
-    team numeric identifers and date of game.
+    Return datetime date or raise exception if format isn't correct.
 
     Parameters
     ----------
-    df: pandas dataframe
-        Must contain two numeric team identifer columns and a date column.
-        
+    date: str
+        Str of date to check.
+
     Returns
     -------
-    df: pandas dataframe
-        Dataframe with distinct game identifer in 'game_id' column.
+    dt_date : datetime.date
+        Datetime.date object from str date.
 
     """
-    # ensure data has ordered numeric team identifiers
-    need = ['t1_team_id', 't2_team_id', 'date']
-    has_all = all(elem in df.columns for elem in need)
-    assert(has_all is True), "df must contain {}".format(", ".join(need))
-    
-    # reformat date to use underscore separator
-    date_under = df['date'].str.replace('/', '_')
-    
-    # need team numeric identifier ints as strings
-    id_lower = df['t1_team_id'].astype(int).astype(str)
-    id_upper = df['t2_team_id'].astype(int).astype(str)
-    
-    # game_id is date combined with both teams
-    df['game_id'] = date_under + '_' + id_lower + '_' + id_upper
-    
-    # return data with new index
-    return df
+    try:
+        dt_date = datetime.datetime.strptime(date_string, "%Y/%m/%d").date()
+        return dt_date
+    except ValueError as e:
+        raise Exception(e)
 
 
 def date_from_daynum(df):
@@ -303,6 +278,41 @@ def date_from_daynum(df):
     return df
 
 
+def make_game_id(df):
+    """
+    Return dataframe with a distinct game identifier column constructed from
+    team numeric identifers and date of game.
+
+    Parameters
+    ----------
+    df: pandas dataframe
+        Must contain two numeric team identifer columns and a date column.
+        
+    Returns
+    -------
+    df: pandas dataframe
+        Dataframe with distinct game identifer in 'game_id' column.
+
+    """
+    # ensure data has ordered numeric team identifiers
+    need = ['t1_team_id', 't2_team_id', 'date']
+    has_all = all(elem in df.columns for elem in need)
+    assert(has_all is True), "df must contain {}".format(", ".join(need))
+    
+    # reformat date to use underscore separator
+    date_under = df['date'].str.replace('/', '_')
+    
+    # need team numeric identifier ints as strings
+    id_lower = df['t1_team_id'].astype(int).astype(str)
+    id_upper = df['t2_team_id'].astype(int).astype(str)
+    
+    # game_id is date combined with both teams
+    df['game_id'] = date_under + '_' + id_lower + '_' + id_upper
+    
+    # return data with new index
+    return df
+
+
 def order_team_ids(df, id_cols):
     """
     Return dataframe with ordered numeric team identifiers.
@@ -330,15 +340,27 @@ def order_team_ids(df, id_cols):
     
     return df
 
-def team_scores(df, score_map):
-    has_columns(df, ['t1_team_id', 't2_team_id'])
-    game_t1_t2 = zip(df.index.values, df['t1_team_id'], df['t2_team_id'])
-    df['t1_score'] = map(lambda x: score_map[x[0]][x[1]], game_t1_t2)
-    df['t2_score'] = map(lambda x: score_map[x[0]][x[2]], game_t1_t2)
-    return df
-
 
 def map_teams(df, team_map, col_name):
+    """
+    Return dataframe with team values from map assigned to new columns.
+    
+    Parameters
+    ----------
+    df: pandas dataframe
+        Must contain team identifer columns 't1_team_id' and 't2_team_id'.
+    team_map: dict
+        Dict keys must match index of df. Values are dicts with team numeric
+        identifiers as keys and team-specific values.
+    col_name : str
+        The suffix to assign the new column names.
+
+    Returns
+    -------
+    df : pandas dataframe
+        The input dataframe with team values assigned to 2 new columns.
+    
+    """
     has_columns(df, ['t1_team_id', 't2_team_id'])
     team1_team2 = zip(df.index.values, df['t1_team_id'], df['t2_team_id'])
     t1_col = 't1_' + col_name
@@ -349,17 +371,49 @@ def map_teams(df, team_map, col_name):
 
 
 def team_score_map(df):
+    """
+    Return dict mapping game index to scores for each team.
+
+    Parameters
+    ----------
+    df: pandas dataframe
+        Must contain columns 'wteam', 'wscore', 'lteam', 'lscore' to indicate
+        winner, winning score, loser, losing score.
+
+    Returns
+    -------
+    team_map : dict
+        Dict with df index as keys. Values are dicts with team numeric
+        identifiers as keys and team scores as values.
+
+    """    
     # test if df contains required columns
     has_columns(df, ['wteam', 'wscore', 'lteam', 'lscore'])
     wmap = zip(df.index.values, df['wteam'].values, df['wscore'].values)
     lmap = zip(df.index.values, df['lteam'].values, df['lscore'].values)
-    game_dict = {game: {team: score} for game, team, score in wmap}
-    lose_dict = {game: {team: score} for game, team, score in lmap}
-    [game_dict[game].update(lose_dict[game]) for game in lose_dict.keys()]
-    return game_dict
+    team_map = {game: {team: score} for game, team, score in wmap}
+    loser_map = {game: {team: score} for game, team, score in lmap}
+    [team_map[game].update(loser_map[game]) for game in loser_map.keys()]
+    return team_map
 
 
-def team_location_map(df):
+def team_site_map(df):
+    """
+    Return dict mapping game index to site (H, A, or N) for each team.
+
+    Parameters
+    ----------
+    df: pandas dataframe
+        Must contain columns 'wteam', lteam', 'wloc' to indicate
+        winner, loser, winner location.
+
+    Returns
+    -------
+    team_map : dict
+        Dict with df index as keys. Values are dicts with team numeric
+        identifiers as keys and team site as values.
+
+    """    
     has_columns(df, ['wteam', 'lteam', 'wloc'])
     wmap = zip(df.index.values, df['wteam'].values, df['wloc'].values)
     lteam_dict = {'A': 'H', 'H': 'A', 'N': 'N'}
@@ -372,5 +426,6 @@ def team_location_map(df):
 
 
 def has_columns(df, columns):
+    """Assert that a dataframe contains all of the lised columns."""
     has_all = all(elem in df.columns for elem in columns)
     assert(has_all is True), "df must contain {}".format(", ".join(columns))
