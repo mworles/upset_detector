@@ -28,8 +28,35 @@ import datetime
 from fuzzywuzzy import process
 from transfer import DBAssist
 
+def combine_files(path, tag = None, index_col=False):
+    """
+    Return dataframe produced by combining tabular data files into
+    a single table.
+    
+    Parameters
+    ----------
+    path: string
+        Path to directory containing the files.
+    tag: str, optional, default None
+        If given, restrict file list to files containing the tag.
+    index_col: bool, optional, default False
+        If True, use first column in the file as dataframe index.
 
-def list_of_files(relative_path, tag = None):
+    Returns
+    -------
+    df : pandas DataFrame
+        Dataframe resulting from combining the files.
+    
+    """
+    # combine all dataframes
+    file_list = list_of_files(path, tag=tag)
+    df_list = [pd.read_csv(x, index_col=index_col) for x in file_list]
+    df = pd.concat(df_list, sort=False)
+
+    return df
+
+
+def list_of_files(path, tag = None):
     """
     Return list of all files in a directory. 
     
@@ -47,41 +74,16 @@ def list_of_files(relative_path, tag = None):
 
     """
     # collect names of all files in directory
-    file_names = os.listdir(rel_path)
+    file_names = os.listdir(path)
 
     # if tag given, select file names that include tag
     if tag is not None:
         file_names = [x for x in file_names if tag in x]
 
     # add directory path to files
-    files = [directory + x for x in file_names]
+    files = [path + x for x in file_names]
 
     return files
-
-
-def combine_files(file_list, index_col=False):
-    """
-    Return dataframe produced by combining a list of tabulatar data files into
-    a single table.
-    
-    Parameters
-    ----------
-    file_list: list of str
-        List of data files to combine.
-    index_col: bool, optional, default False
-        If True, use first column in the file as dataframe index.
-
-    Returns
-    -------
-    df : pandas DataFrame
-        Dataframe resulting from combining the files.
-    
-    """
-    # combine all dataframes
-    df_list = [pd.read_csv(x, index_col=index_col) for x in file_list]
-    df = pd.concat(df_list, sort=False)
-
-    return df
 
 
 def fuzzy_match(target, options, cutoff=85, with_score=False):
