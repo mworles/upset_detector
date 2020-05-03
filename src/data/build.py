@@ -55,6 +55,10 @@ def run(datdir=constants.DATA_DIR):
     dba.create_from_data('gym_manual', df)
     dba.insert_rows('gym_manual', df)
 
+    df = odds.parse_oddsportal(DATA_DIR + "/external/odds/")
+    dba.create_from_data('oddsportal', df)
+    dba.insert_rows('oddsportal', df)
+
     # games needed for ratings
     games = ratings.games_ratings(datdir)
     games_new = ratings.game_box_for_ratings()
