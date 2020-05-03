@@ -10,8 +10,7 @@ import spreads
 import clean
 import generate
 import queries
-import features
-
+from src import features
 
 def update_day(date):
     "Run once daily after all games have ended."
