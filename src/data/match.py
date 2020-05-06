@@ -1,340 +1,358 @@
-"""match team names to ID numbers.
+""" match.
 
-This module contains functions used to match the names of schools from mixed
-external data sources to a single numeric identifier from a master ID file. Separate 
-functions have been created for pre-processing team names from different data
-sources, as each source requires unique cleaning operations prior to attempting 
-to match. 
-
-School names from external sources contain exact and non-exact matches to names 
-in the master file. This module uses a fuzzy string matching package to identify
-numeric identifers for non-exact matches.
-
-This module requires the `pandas` package. 
-It imports the custom clean module.
+A module for matching alternate versions of team school names to one distinct
+numeric identifer for each team. Numeric identifers are used to merge data
+from disparate sources across the project. 
 
 """
 import pandas as pd
 import numpy as np
 import clean
-import odds
 from src.data.transfer import DBAssist
+from src.constants import DATA_DIR
+from src.constants import SOURCE_ID_YEARS
 import re
 
-def clean_schools(datdir):
-    """Returns a dataframe produced by combining data from files in the input 
-    directory and cleaning school names. Used to pre-process school names for 
-    matching with numeric team identifiers. 
-
-    Arguments
-    ----------
-    datdir: string
-        The relative path to subdirectory containing data files.
-    """    
-    # compiles all files into one dataset
-    file_list = clean.list_of_files(datadir)
-    df = clean.combine_files(file_list)
-
-    # rows missing value for 'G' column are invalid
-    df = df.dropna(subset=['G'])
-
-    # isolate data to unique school names
-    df = df[['School']].drop_duplicates()
-    
-    # add reformatted school name for better id matching
-    df['team_clean'] = map(format_school, df['School'].values)
-    
-    # rename to create unique team identifer for source
-    df = df.rename(columns={'School': 'team_ss'})    
-    
-    return df
-    
-def clean_kp(datdir):
-    """Returns a dataframe produced by combining data from files in the input 
-    directory and cleaning school names. Used to pre-process school names for 
-    matching with numeric team identifiers. 
-
-    Arguments
-    ----------
-    datdir: string
-        The relative path to subdirectory containing data files.
+class TeamSource():
     """
-    # compiles all files into one dataset
-    file_list = clean.list_of_files(datadir)
-    df = clean.combine_files(file_list)
+    A container for unique sources of team name data.
 
-    # isolate data to unique names
-    df = df[['TeamName']].drop_duplicates()
-
-    # add reformatted school name for better id matching
-    df['team_clean'] = map(lambda x: format_school(x), df['TeamName'])
-
-    # rename to create unique team identifer for source
-    df = df.rename(columns={'TeamName': 'team_kp'})   
-    
-    return df
-
-def clean_odds_portal(datdir):
-    """Returns a dataframe produced by combining data from files in the input 
-    directory and cleaning school names. Used to pre-process school names for 
-    matching with numeric team identifiers. 
-
-    Arguments
+    Attributes
     ----------
-    datdir: string
-        The relative path to subdirectory containing data files.
+    label: str
+        Label to assign the source in the team name key table.
+    data: pandas DataFrame
+        Source of data providing the team names.
+    team_columns: list of str
+        Names of all columns containing team names.
+    unique: list of str
+        All unique team names with nulls removed.
+    clean: list of str
+        Team names reformatted for optimal matching with master id file.
+    team_id : list of numeric
+        Unique numeric team identifers.
+
     """
-    data = odds.parse_oddsportal(datdir)
-    col_names = ['date', 'team_1', 'team_2', 'odds1', 'odds2']
-    df = pd.DataFrame(data, columns=col_names)
+    def __init__(self, label, data, team_columns):
+        """Initialize TeamSource instance."""
+        self.label = label
+        self.data = data
+        self.team_columns = team_columns
+        # want single unique list with nulls removed before searching for id
+        self.unique = self.unique_teams()
+        # clean created separately in case of additional pre-processing
+        self.clean = None
+        self.team_id = None
 
-    # list of all unique team names
-    teams = list(set(list(df['team_1']) + list(df['team_2'])))
-    
-    df = pd.DataFrame({'team_oddsport': teams})
-    df = df[df['team_oddsport'].notnull()]
-    
-    
-    df['team_clean'] = map(lambda x: format_school(x), df['team_oddsport'])
-    
-    return df
+    def unique_teams(self):
+        """Return list of teams with nulls and duplicates removed."""
+        raw = list(self.data[self.team_columns[0]])
 
-def clean_pt(datdir):
+        if len(self.team_columns) == 2:
+            raw = raw + list(self.data[self.team_columns[1]])
 
-    file_list = clean.list_of_files(datadir)
-    df = clean.combine_files(file_list)
+        unique_teams = list(set(raw))
+        nulls = [None, '']
+        valid_teams = [t for t in list(set(raw)) if t not in nulls]
+        # remove nans by removing any floats
+        valid_teams = [x for x in valid_teams if not isinstance(x, float)]
 
-    # list of all unique team names
-    teams = list(set(list(df['home']) + list(df['road'])))
+        return valid_teams
 
-    df = pd.DataFrame({'team_pt': teams})
-    df = df[df['team_pt'].notnull()]
+    def clean_teams(self, teams=None):
+        """
+        Return instance with teams assigned.
+        
+        Parameters
+        ----------
+        teams : list of str, optional
+            Option to input teams in case of additional preprocessing after
+            creating instance.
+        
+        Returns
+        -------
+        self : instance of TeamSource
+            Return self with clean attribute set.
 
-    df['team_clean'] = map(lambda x: format_school(x), df['team_pt'])
+        """
+        if teams is None:
+            teams = self.unique
+        
+        
+        self.clean = map(lambda name: self.format_school(name), teams)
 
-    return df
+        return self
 
+    def format_school(self, name_raw):
+        """
+        Return school name formatted to match the version used in the id key.
 
-def clean_sbro(datdir):
-    def split_caps(x):
-        result = re.findall('[A-Z][^A-Z]*', x)
-        if len(result) == 0:
-            return x
+        Parameters
+        ----------
+        name_raw : str
+            The original team name from the source data
+
+        Returns
+        -------
+        name_clean : str
+            Team name reformatted to merge with team numeric id key.
+
+        """
+        # clean string
+        name_clean = str.lower(name_raw)
+        name_clean = re.sub('[().&*\']', '', name_clean)
+        name_clean = name_clean.rstrip()
+        # replace spaces with hyphens to match format used in team id file
+        name_clean = name_clean.replace('  ', '-')
+        name_clean = name_clean.replace(' ', '-')    
+        
+        return name_clean
+
+    def find_ids(self, id_data):
+        """
+        Return school name formatted to match the version used in the id key.
+
+        Parameters
+        ----------
+        id_data : pandas DataFrame
+            Master id data containing 'name_spelling', 'team_id', and
+            'lastd1season' columns.
+
+        Returns
+        -------
+        self : TeamSource instance
+            Return self with team_id attribute set.
+
+        """
+        min_year = SOURCE_ID_YEARS[self.label]
+        id_map = self.create_id_map(id_data, min_year=min_year)
+        self.team_id = map(lambda team: self.find_id(team, id_map), self.clean)
+        return self
+
+    def create_id_map(self, df, min_year):
+        """
+        Return dict mapping unique team spellings to team numeric identifer
+        from master id data.
+
+        Parameters
+        ----------
+        df : pandas DataFrame
+            Master id data containing 'name_spelling', 'team_id', and
+            'lastd1season' columns.
+        min_year : int
+            The lowest year available in the source data. Used to narrow the
+            range of teams to find numeric identifers.
+
+        Returns
+        -------
+        id_map : dict
+            Dict mapping unique team name versions to numeric identifiers.
+
+        """
+        df = df[df['lastd1season'] >= min_year]
+        df = df[['name_spelling', 'team_id']].set_index('name_spelling')
+        id_map = df['team_id'].to_dict()
+        
+        return id_map
+
+    def find_id(self, team, id_map):
+        """
+        Return team numeric identifier from exact or fuzzy string match.
+
+        Parameters
+        ----------
+        team : str
+            Team name from data source reformatted for optimal matching.
+        id_map : dict
+            Dict mapping unique team name versions to numeric identifiers.
+
+        Returns
+        -------
+        team_id : int or None
+            Team numeric identifer found through exact match or fuzzy string
+            match. None if no exact match or fuzzy match meeting a numeric
+            similarity cutoff can be found.
+
+        """
+        if team in id_map.keys():
+            team_id = id_map[team]
         else:
-            return result
-    
-    def join_team(team_list):
-        team_full = ''
-        for w in team_list:
-            if len(w) == 1:
-                pass
+            fuzz_match = clean.fuzzy_match(team, id_map.keys(), cutoff=85)
+            if fuzz_match is None:
+                team_id = None
             else:
-                if team_full != '':
-                    w = ' ' + w + ' '
-                else:
-                    w = w + ' '
-            team_full += w
-        return team_full
-
-    df = pd.read_csv(datdir + 'external/sbro/spreads_sbro.csv')
+                team_id = id_map[fuzz_match]
     
-    # list of all unique team names
-    teams = list(set(list(df['home']) + list(df['away'])))
+        return team_id
 
-    df = pd.DataFrame({'team_sbro': teams})
-    df = df[df['team_sbro'].notnull()]
-    team_split = [split_caps(x) for x in df['team_sbro']]
-    team_full = map(join_team, team_split)
-    df['team_clean'] = map(lambda x: format_school(x), team_full)
+    def make_key(self):
+        """
+        Create a pandas dataframe key from TeamSource instance. Columns are
+        the source label with original unique team names and 'team_id' with 
+        numeric team identifiers.
+        
+        """
+        key_data = {self.label: self.unique, 'team_id': self.team_id}
+        df = pd.DataFrame(key_data)
+        df = df[df['team_id'].notnull()]
+        self.key = df
+        return self
 
-    return df
 
-def clean_tcpalm(table_name):
+def run(data_dir=DATA_DIR):
     dba = DBAssist()
-    df = dba.return_data(table_name)
-    dba.close()
-    
-    # all unique team names
-    teams = list(set(list(df['home_team']) + list(df['away_team'])))
-    teams = [t for t in teams if t is not None]
-    
-    df = pd.DataFrame({'team_tcp': teams})
-    df['team_clean'] = map(lambda x: format_school(x), df['team_tcp'])
-    
-    return df
-    
-def clean_vi(table_name):
-    dba = DBAssist()
-    table = dba.return_table(table_name)
-    df = pd.DataFrame(table[1:], columns=table[0])
+    names = dba.return_data('team_spellings')
+    teams = dba.return_data('teams')
     dba.close()
 
-    # all unique team names
-    teams = list(set(list(df['team_1']) + list(df['team_2'])))
-    teams = [t for t in teams if t is not None]
-    
-    source_col = 'team_vi_' + table_name
-    df = pd.DataFrame({source_col: teams})
-    df['team_clean'] = map(lambda x: format_school(x), df[source_col])
-    
-    return df
-
-
-def match_team(source, id, min_year=None):
-    """Returns a dataframe produced by matching team names in df to team names 
-    in id. 
-
-    Arguments
-    ----------
-    df: pandas dataframe
-        Contains original team name and 'team_clean' column to attempt match.
-    id: pandas dataframe
-        Contains numeric team identifer and string team names in 
-        'name_spelling' column.
-    """
-    if min_year is not None:
-        id = id[id['lastd1season'] >= min_year]
-
-    # identify number of unique schools for later comparison
-    n_schools = len(pd.unique(id['team_id']))
-    source_col = [x for x in source.columns if x != 'team_clean'][0]
-    
-    # join school name to id number in team identifer file 
-    merged = pd.merge(id, source, how='outer', left_on='name_spelling',
-                       right_on=['team_clean'])
-    matched = merged.dropna().drop_duplicates()    
-    nm_id = merged[merged['team_clean'].isnull()]
-    
-    nm_id = nm_id.drop([source_col], axis=1)
-    # remove where team id was matched
-    nm_id = nm_id[~nm_id['team_id'].isin(matched['team_id'].values)]
-    
-    nm_source = merged[merged['team_id'].isnull()]
-    
-    keep_cols = ['team_id', source_col]
-    matched = matched[keep_cols]
-    matched = matched.dropna()
-    matched = matched.drop_duplicates()
-    
-    if nm_source.shape[0] == 0:
-        df = matched.copy()
-    else:
-        nm_values = nm_id['name_spelling'].values
-
-        # list of team names from source df not merged
-        # will use as list of options for fuzzy matching
-        rem_teams = nm_source['team_clean'].values
-        
-        # run fuzzy matching function on 'team_clean' for nonmerged schools
-        matches_scores = map(lambda x: clean.fuzzy_match(x, rem_teams, with_score=True), nm_values)
-        nm_id.loc[:, 'team_clean'] = [x[0] for x in matches_scores]
-        nm_id.loc[:, 'score'] = [x[1] for x in matches_scores]
-        
-        nmgb = nm_id.groupby('team_id')
-        nmgb = nmgb.apply(lambda x: x.sort_values(['score'], ascending=False))
-        nmgb = nmgb.reset_index(drop=True).groupby('team_id').head(1)
-        
-        matches = []
-        index_vals = nmgb.index.values
-        
-        print ''
-        print '%s D1 numeric ids not merged' % (len(index_vals))
-        for v in index_vals:
-            print ''
-            print 'ID name:         %s' % (nmgb.loc[v, 'name_spelling'])
-            print 'Source name:     %s' % (nmgb.loc[v,'team_clean'])
-            match = str.upper(raw_input('match? Y or N: '))
-            matches.append(match)
-
-        nmgb['match'] = matches
-        
-        nmgb['team_clean'] = np.where(nmgb['match'] == 'Y', nmgb['team_clean'], None)
-        nmgb = pd.merge(nmgb, source, left_on='team_clean', right_on='team_clean',
-                        how='left')
-        df = pd.concat([matched, nmgb[keep_cols]])
-        
-        
-        source_teams = pd.unique(source[source_col])
-        source_nm = [t for t in source_teams if t not in df[source_col].values]
-        print '%s source teams not matched' % (len(source_nm))
-        print source_nm
-
-    return df
-
-def create_key(datdir):
-    """Creates a data file containing the unique team numeric identifer and 
-    original team names for all matched data sources.
-
-    Arguments
-    ----------
-    datdir: string
-        Relative path to data directory.
-    """ 
-    # read in id and team spellings file
-    id = pd.read_csv(datdir + '/scrub/team_spellings.csv')
-    id = id[['team_id', 'name_spelling']]
-    ido = id.copy()
-    
-    teams = pd.read_csv('../data/scrub/teams.csv')
-    id = pd.merge(id, teams, how='inner', left_on='team_id', 
+    id = pd.merge(names, teams, how='inner', left_on='team_id',
                   right_on='team_id')
     
     id['name_spelling'] = id['name_spelling'].str.replace(' ', '-')
     id['name_spelling'] = id['name_spelling'].str.replace('.', '')
+    id = id.drop_duplicates()
+    id = id.loc[:, ['team_id', 'team_name', 'name_spelling', 'lastd1season']]
+
+    sources = make_sources(data_dir)
+    sources = [source.find_ids(id) for source in sources]
+    sources = [source.make_key() for source in sources]
+
+    key = master_key(sources)
     
-    # clean schools data and match to numeric identifier
-    schools = clean_schools(datdir + 'external/school_stats/')
-    schools_id = match_team(schools, id, min_year=1993)
-    key_list = [schools_id]
-    
-    # clean team ratings data and match to numeric identifier
-    kp = clean_kp(datdir + 'external/kp/')
-    kp_id = match_team(kp, id, min_year=2002)
-    key_list.append(kp_id)
-    
-    # clean and match oddsportal odds teams
-    op = clean_odds_portal(datdir + 'external/odds/')
-    op_id = match_team(op, id, min_year=2009)
-    key_list.append(op_id)
-    
-    # clean and match predictiontracker teams
-    pt = clean_pt(datdir + 'external/pt/')
-    pt_id = match_team(pt, id, min_year=2003)
-    key_list.append(pt_id)
-    
+    return key
+
+
+def make_sources(data_dir=DATA_DIR):
+    """
+    Returns list of TeamSource instances with clean attributes set for
+    finding team numeric identifers.
+
+    Parameters
+    ----------
+    data_dir: string
+        Path to directory containing flat data files.
+
+    Returns
+    -------
+    sources: list of TeamSource instances
+
+    """ 
+    dba = DBAssist()
+
+    # sports reference season school stats .csv files
+    raw = clean.combine_files(DATA_DIR + 'external/school_stats/')
+    source_cbb = TeamSource('team_ss', raw, ['School'])
+
+    # kenpom team ratings .csv files
+    raw = clean.combine_files(DATA_DIR + 'external/kp/')
+    source_kp = TeamSource('team_kp', raw, ['TeamName'])
+
+    # predictiontracker .csv files
+    raw = clean.combine_files(DATA_DIR + 'external/pt/')
+    source_pt = TeamSource('team_pt', raw, ['home', 'road'])
+
+    # table from oddsportal scraper 
+    raw = dba.return_data('oddsportal')
+    source_op = TeamSource('team_oddsport', raw, ['team_1', 'team_2'])
+
+    # table from tcpalm box score scraper
+    raw = dba.return_data('game_scores')
+    source_tcp = TeamSource('team_tcp', raw, ['home_team', 'away_team'])
+
+    # table from scraped vegasinsider odds
+    raw = dba.return_data('odds')
+    source_vi_odds = TeamSource('team_vi_odds', raw, ['team_1', 'team_2'])
+
+    # table from scraped vegasinsider spreads
+    raw = dba.return_data('spreads')
+    source_vi_spreads = TeamSource('team_vi_spreads', raw, ['team_1', 'team_2'])
+
+    sources = [source_cbb, source_kp, source_pt, source_op, source_tcp,
+               source_vi_odds, source_vi_spreads]
+
+    sources = [source.clean_teams() for source in sources]
+
     # clean and match sportsbookreviews teams
-    sbro = clean_sbro(datdir)
-    sbro_id = match_team(sbro, id, min_year=2008)
-    key_list.append(sbro_id)
+    raw = pd.read_csv(DATA_DIR + 'external/sbro/spreads_sbro.csv')
+    source_sbro = TeamSource('team_sbro', raw, ['home', 'away'])
+    # create spaced names from camelcase strings
+    teams_spaced = map(clean_camel, source_sbro.unique)
+    source_sbro = source_sbro.clean_teams(teams_spaced)
+
+    sources.append(source_sbro)
     
-    # clean tcpalm teams
-    tcp = clean_tcpalm('game_scores')
-    tcp_id = match_team(tcp, id, min_year=2019)
-    key_list.append(tcp_id)
+    dba.close()
     
-    # clean vegasinsider odds teams
-    vio = clean_vi('odds')
-    vio_id = match_team(vio, id, min_year=2019)
-    key_list.append(vio_id)
-    
-    # clean vegasinsider spreads teams
-    visp = clean_vi('spreads')
-    visp_id = match_team(visp, id, min_year=2019)
-    key_list.append(visp_id)
-    
+    return sources
+
+
+def clean_camel(team):
+    """
+    Return camelcase team name parsed using regex.
+
+    Parameters
+    ----------
+    team : str
+        The original team name from the source data.
+
+    Returns
+    -------
+    result : str
+        Team name with spaces inserted according to camelcase.
+
+    """
+    # all caps names are commonly used acronyms 
+    if team.isupper():
+        result = team
+
+    else:
+        # elements to find are 1+ consecutive upper not followed by lower
+        # or single upper followed by 1 or more lower
+        regex = '[A-Z&]+(?![a-z])|[A-Z][a-z\']+'
+        regex_result = re.findall(regex, team)
+        
+        # if len=0 string is all lower, keep raw string
+        if len(regex_result) == 0:
+            result = team
+        else:
+            result = " ".join(regex_result)
+
+    return result
+
+
+def master_key(sources):
+    """
+    Return a master team key dataframe from combining all team name sources.
+
+    Parameters
+    ----------
+    sources : list of TeamSource instances
+        Team sources that have team_id attributes from finding numeric
+        identifiers to match the source team names.
+
+    Returns
+    -------
+    key : pandas DataFrame
+        Contains a master team numeric identifer and name, and a column
+        containing the corresponding team name from each source.
+
+    """
     # read in master id file
-    key = pd.read_csv(datdir + '/scrub/teams.csv')
+    dba = DBAssist()
+    key = dba.return_data('teams')
+    dba.close()
+
     key = key[['team_id', 'team_name']]
 
     # create universal key
-    for df in key_list:
-        key = pd.merge(key, df, on='team_id', how='left')
+    for source in sources:
+        key = pd.merge(key, source.key, on='team_id', how='left')
     key = key.fillna('')
     key = key.drop_duplicates()
+    key = key.sort_values('team_id')
+    
+    return key
 
-    dba = DBAssist()
-    dba.insert_rows('team_key', key, at_once=True) 
-    dba.close()
 
 def id_from_name(df, key_col, name_col, drop=True, how='inner'):
     """From input data containing team name column specified in 'name_col', 
@@ -375,17 +393,4 @@ def id_from_name(df, key_col, name_col, drop=True, how='inner'):
     # remove columns from dataframe
     mrg = mrg.drop(drop_cols, axis=1)
 
-
     return mrg
-
-def format_school(name_raw):
-    """Return school name formatted to match the team id key."""
-    # clean string
-    result = str.lower(name_raw)
-    result = re.sub('[().&*\']', '', result)
-    result = result.rstrip()
-    # replace spaces with hyphens to match format used in team id file
-    result = result.replace('  ', '-', x)
-    result = result.replace(' ', '-', x)
-
-    return result
