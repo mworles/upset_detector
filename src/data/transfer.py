@@ -90,7 +90,7 @@ class DBAssist():
         data : list of list or pandas DataFrame
 
         """
-        query_create = DBTable(name, data).query_create()
+        query_create = DBTable(table_name, data).query_create()
         self.create_table(query_create)
 
     def create_from_schema(self, table_name):
