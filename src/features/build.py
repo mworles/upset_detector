@@ -4,51 +4,8 @@ import roster
 from src.data.transfer import DBAssist
 
 def run():
-    dba = DBAssist()
-
-    # outcomes from previous tourneys
-    df = dba.return_data('ncaa_results')
-    ts = tourney.team_success(df)
-
-    coaches = dba.return_data('coaches')
-
-    # merge coach file with team tourney outcomes file
-    # outer merge as some coaches will have no tourney games
-    df = pd.merge(coaches, ts, how='outer', on=['season', 'team_id'])
-
-    cs = coach.tourney_success(df)
-
-    df = roster.run()
-
-def team_success(df):
-    """Uses game results to create team performance indicators for each 
-    tournament year.""" 
-
-    # separate winners and losers, to create a team-specific win indicator
-    # winners
-    wteams = df[['season', 'wteam']]
-    wteams = wteams.rename(columns={'wteam': 'team_id'})
-    wteams['win'] = 1
+    coach_features = coach.run()
     
-    # losers
-    lteams = df[['season', 'lteam']]
-    lteams = lteams.rename(columns={'lteam': 'team_id'})
-    lteams['win'] = 0
-
-    # combine data to create one row per team per game
-    by_team = pd.concat([wteams, lteams], ignore_index=True)
-
-    # columns to group by
-    gcols = ['season', 'team_id']
-    
-    # count and sum number of rows per "group"
-    by_team = by_team.groupby(gcols)['win'].aggregate(['count', 'sum']).reset_index()
-
-    # count is the number of games, sum is the number of wins
-    by_team = by_team.rename(columns={'count': 'games',
-                                      'sum': 'wins'})
-
-    return by_team
 
 def ratings_kp(datdir):
     """Create data containing team ratings."""
