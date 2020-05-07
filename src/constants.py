@@ -107,3 +107,12 @@ SCHEMA_FILE = os.path.join(PATH_HERE, SCHEMA)
 TEAM_CITY_UPDATE =  [[1465, ('Riverside', 'California')],
                      [1466, ('Florence', 'Alabama')]
                      ]
+
+SOURCE_ID_YEARS = {'team_ss': 1993,
+                   'team_kp': 2002,
+                   'team_pt': 2003,
+                   'team_oddsport': 2009,
+                   'team_tcp': 2019,
+                   'team_vi_odds': 2019,
+                   'team_vi_spreads': 2019,
+                   'team_sbro': 2009}
