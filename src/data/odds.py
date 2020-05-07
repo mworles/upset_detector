@@ -37,8 +37,24 @@ def parse_oddsportal(datdir):
     encode_cell = lambda x: x.encode('ascii', 'ignore')
 
     all_flat = [[encode_cell(x) for x in game] for game in all_flat]
+    
+    col_names = ['date', 'team_1', 'team_2', 'odds1', 'odds2']
+    df = pd.DataFrame(all_flat, columns=col_names)
 
-    return all_flat
+    date_new = oddsportal_dates(df['date'].values)
+    df = df.drop('date', axis=1)
+    df['date'] = date_new
+    
+    # remove duplicates
+    df = df.drop_duplicates(subset=['date', 'team_1', 'team_2'])
+
+    odds1 = df['odds1'].apply(format_odds).values
+    odds2 = df['odds2'].apply(format_odds).values
+    df = df.drop(['odds1', 'odds2'], axis=1)
+    df['odds1'] = odds1
+    df['odds2'] = odds2
+    return df
+
 
 def oddsportal_dates(date_values):
         
@@ -89,28 +105,12 @@ def team_odds(df, game_dicts):
 
 
 def clean_oddsportal(datdir):
-    oddsdir = datdir + "/external/odds/"
-    data = parse_oddsportal(oddsdir)
-    col_names = ['date', 'team_1', 'team_2', 'odds1', 'odds2']
-    df = pd.DataFrame(data, columns=col_names)
-
-    date_new = oddsportal_dates(df['date'].values)
-    df = df.drop('date', axis=1)
-    df['date'] = date_new
+    df = dba.return_data('oddsportal')
     
-    # remove duplicates
-    df = df.drop_duplicates(subset=['date', 'team_1', 'team_2'])
+    key_col = 'team_oddsport'
+    df['team_1_id'] = match.ids_from_names(df['team_1'].values, key_col)
+    df['team_2_id'] = match.ids_from_names(df['team_2'].values, key_col)
 
-    odds1 = df['odds1'].apply(format_odds).values
-    odds2 = df['odds2'].apply(format_odds).values
-    df = df.drop(['odds1', 'odds2'], axis=1)
-    df['odds1'] = odds1
-    df['odds2'] = odds2
-    
-
-    df = match.id_from_name(df, 'team_oddsport', 'team_1', drop=False)
-    df = match.id_from_name(df, 'team_oddsport', 'team_2', drop=False)
-    
     l_games = get_odds_dicts(df)
     df = clean.order_team_id(df, ['team_1_id', 'team_2_id'])
     df = team_odds(df, l_games)
@@ -130,7 +130,7 @@ def clean_oddsportal(datdir):
     df = df.dropna(subset=['t1_odds', 't2_odds'], how='all')
     
     df['season'] = map(clean.season_from_date, df['date'].values)
-    
+
     return df
 
 def odds_vi(date=None):
@@ -153,8 +153,9 @@ def odds_vi(date=None):
         most_recent = max(df['timestamp'].values)
         df = df[df['timestamp'] == most_recent]
     
-    df = match.id_from_name(df, 'team_vi_odds', 'team_1', drop=False)
-    df = match.id_from_name(df, 'team_vi_odds', 'team_2', drop=False)
+    key_col = 'team_vi_odds'
+    df['team_1_id'] = match.ids_from_names(df['team_1'].values, key_col)
+    df['team_2_id'] = match.ids_from_names(df['team_2'].values, key_col)
 
     l_games = get_odds_dicts(df)
     df = clean.order_team_id(df, ['team_1_id', 'team_2_id'])
