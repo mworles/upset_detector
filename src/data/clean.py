@@ -26,6 +26,7 @@ import pandas as pd
 import os
 import datetime
 from fuzzywuzzy import process
+from fuzzywuzzy import fuzz
 from transfer import DBAssist
 
 def combine_files(path, tag = None, index_col=False):
@@ -109,17 +110,18 @@ def fuzzy_match(target, options, cutoff=85, with_score=False):
 
     """
     # extract best-matching string and the distance similarity ratio
-    best_match, match_score = process.extractOne(target, options)
+    match, score = process.extractOne(target, options, scorer=fuzz.ratio)
     
-    # cutoff ignored if with_score set to True
+    # if cutoff given, use None for match if score is below cutoff
+    if cutoff is not None:
+        if score < cutoff:
+            match = None
+
+    # option to return tuple with matched string and the score
     if with_score == True:
-        result = (best_match, match_score)
+        result = (match, score)
     else:
-    # use matched string only if score >= cutoff
-        if match_score >= cutoff:
-            result = best_match
-        else:
-            result = None
+        result = match
 
     return result
 
