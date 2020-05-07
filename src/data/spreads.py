@@ -64,8 +64,7 @@ def spread_t1(row):
     return t1_spread
 
 def spreads_pt(datdir):
-    file_list = clean.list_of_files(datdir + '/external/pt/')
-    df = clean.combine_files(file_list)
+    df = clean.combine_files(datdir + '/external/pt/')
     df = df[['date', 'home', 'road', 'line']]
 
     df = df[df['date'].notnull()]
@@ -77,9 +76,10 @@ def spreads_pt(datdir):
 
     df = df.drop('line', axis=1)
 
-    df = match.id_from_name(df, 'team_pt', 'home', drop=False)
-    df = match.id_from_name(df, 'team_pt', 'road', drop=False)
-    
+    key_col = 'team_pt'
+    df['home_id'] = match.ids_from_names(df['home'].values, key_col)
+    df['away_id'] = match.ids_from_names(df['road'].values, key_col)
+
     df = df.dropna(how='any', subset=['home_id', 'road_id'])
 
     df = clean.order_team_id(df, ['home_id', 'road_id'])
@@ -192,8 +192,9 @@ def spreads_sbro(datdir):
     df['spread'] = map(format_spread, df['spread'].values)
     df['over_under'] = map(format_ovun, df['over_under'].values)
 
-    df = match.id_from_name(df, 'team_sbro', 'away', drop=False)
-    df = match.id_from_name(df, 'team_sbro', 'home', drop=False)
+    key_col = 'team_sbro'
+    df['home_id'] = match.ids_from_names(df['home'].values, key_col)
+    df['away_id'] = match.ids_from_names(df['road'].values, key_col)
 
     df['fav_loc'] = np.where(df['favorite'] == df['home'], 'H', 'A')
     df['fav_id'] = np.where(df['fav_loc'] == 'H', df['home_id'], df['away_id'])
@@ -272,8 +273,10 @@ def spreads_vi(date=None):
         most_recent = max(df['timestamp'].values)
         df = df[df['timestamp'] == most_recent]
 
-    df = match.id_from_name(df, 'team_vi_spreads', 'team_1', drop=False)
-    df = match.id_from_name(df, 'team_vi_spreads', 'team_2', drop=False)
+    key_col = 'team_vi_spreads'
+    df['team_1_id'] = match.ids_from_names(df['team_1'].values, key_col)
+    df['team_2_id'] = match.ids_from_names(df['team_2'].values, key_col)
+
     format_spread = lambda x: line_format(x, type='spread')
     format_ovun = lambda x: line_format(x, type='line')
     df['over_under'] = map(format_ovun, df['line'].values)
