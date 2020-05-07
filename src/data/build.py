@@ -444,8 +444,9 @@ def make_game_info(df):
     return df
 
 def convert_game_scores(df):
-    df = match.id_from_name(df, 'team_tcp', 'away_team', drop=False)
-    df = match.id_from_name(df, 'team_tcp', 'home_team', drop=False)
+    key_col = 'team_tcp'
+    df['away_team_id'] = match.ids_from_names(df['away_team'].values, key_col)
+    df['home_team_id'] = match.ids_from_names(df['home_team'].values, key_col)
 
     df['game_cat'] = "NA"
     df['season'] = map(clean.season_from_date, df['date'].values)
@@ -464,8 +465,8 @@ def game_home(date=None):
         df = dba.return_data('game_scheduled')
     dba.close()
 
-    df = match.id_from_name(df, 'team_tcp', 'away_team', drop=False)
-    df = match.id_from_name(df, 'team_tcp', 'home_team', drop=False)
+    df['away_team_id'] = match.ids_from_names(df['away_team'].values, key_col)
+    df['home_team_id'] = match.ids_from_names(df['home_team'].values, key_col)
     df = order_team_id(df, ['home_team_id', 'away_team_id'])
     df = make_game_id(df)
     df = df.set_index('game_id')
