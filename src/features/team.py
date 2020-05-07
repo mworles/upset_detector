@@ -182,7 +182,7 @@ def clean_box(df):
     lose_cols = ['l' + x for x in change_cols]
     lose_map = {k:v for k,v in zip(change_cols, lose_cols)}
     dfl = dfl.rename(columns=lose_map)
-    #dfl = match.id_from_name(dfl, 'team_tcp', 'team')
+
     dfl = dfl.rename(columns={'team': 'lteam'})
     dfl = dfl.drop(columns=['numot'])
     
@@ -218,9 +218,12 @@ def box_stats_by_team(mod=None):
     cb = clean_box(st)
     sbt = build.games_by_team(cb)
     sbt = sbt.rename(columns={'team_id': 'team'})
-    sbt = match.id_from_name(sbt, 'team_tcp', 'team')
     sbt = sbt.rename(columns={'opp_id': 'opp'})
-    sbt = match.id_from_name(sbt, 'team_tcp', 'opp', how='left')
+    
+    key_col = 'team_tcp'
+    sbt['team_id'] = match.ids_from_names(sbt['team'].values, key_col)
+    sbt['opp_id'] = match.ids_from_names(sbt['opp'].values, key_col)
+
     return sbt
 
 def sum_stats(gb):
