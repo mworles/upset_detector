@@ -166,9 +166,10 @@ def game_box_games(df):
     df = df.dropna(how='any', subset=['home_score', 'away_score', 'neutral'])
     
     # add numeric team id
-    df = match.id_from_name(df, 'team_tcp', 'away_team', drop=False)
-    df = match.id_from_name(df, 'team_tcp', 'home_team', drop=False)
-    
+    key_col = 'team_tcp'
+    df['away_team_id'] = match.ids_from_names(df['away_team'].values, key_col)
+    df['home_team_id'] = match.ids_from_names(df['home_team'].values, key_col)
+
     # convert columns to apply neutral id function
     df = generate.game_score_convert(df)
     # create team_1 and team_2 id identifer columns
