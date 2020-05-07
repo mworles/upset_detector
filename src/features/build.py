@@ -113,8 +113,8 @@ def ratings_kp(datdir):
     df = pd.concat(data_list, sort=False)
 
     # ratings data has team names, must be linked to numeric ids
-    df = match.id_from_name(datdir, df, 'team_kp', 'TeamName')
-    
+    df['team_id'] = match.ids_from_names(df['TeamName'].values, 'team_kp')
+
     # for consistency
     df.columns = map(str.lower, df.columns)
 
