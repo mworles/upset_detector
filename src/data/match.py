@@ -7,8 +7,8 @@ from different external sources across the project.
 Classes
 -------
 TeamSource
-    A container for a unique source of team name data. Attributes contain
-    source's data, methods transform and create related objects.
+    A container for a unique source of team name data. Includes attributes to
+    hold source data and methods to transform data and create related objects.
 
 Functions
 ---------
@@ -51,6 +51,7 @@ class TeamSource():
         Unique numeric team identifers assigned to each team.
     key: pandas DataFrame
         Dataframe containing original unique team names and team id.
+
     """
     def __init__(self, label, data, team_columns):
         """Initialize TeamSource instance."""
