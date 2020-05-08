@@ -63,7 +63,8 @@ from src.data import clean
 from src.data import generate
 
 def run(modifier=None):
-    """Returns dataframe with game identifer and location of game.
+    """
+    Return dataframe with unique game identifers and location of games.
 
     Parameters
     ----------
@@ -72,7 +73,7 @@ def run(modifier=None):
 
     Returns
     -------
-    df : DataFrame
+    df : pandas DataFrame
         Contains game id, latittude, and longitude of game.
 
     """
@@ -118,7 +119,8 @@ def run(modifier=None):
 
 
 def home_games(df, game_id):
-    """Returns dataframe with identifiers and coordinates for games with a 
+    """
+    Return dataframe with identifiers and coordinates for games with a 
     home team.
 
     Parameters
@@ -148,7 +150,8 @@ def home_games(df, game_id):
 
 
 def neutral_games(neutral):
-    """Returns dataframe with identifiers and coordinates for games played at
+    """
+    Return dataframe with identifiers and coordinates for games played at
     a neutral site.
     
     Imports game locations from different sources and contains sequence of 
@@ -218,7 +221,8 @@ def neutral_games(neutral):
 
 
 def locate_item(item, item_map):
-    """Returns the geographical coordinates of an item from a dictionary.
+    """
+    Return geographical coordinates of an item from a dictionary.
 
     Parameters
     ----------
@@ -242,7 +246,8 @@ def locate_item(item, item_map):
 
 
 def city_coordinates(full_state=True):
-    """Returns dict mapping cities to lattitude and longitude.
+    """
+    Return a dict mapping cities to lattitude and longitude.
 
     Parameters
     ----------
@@ -299,7 +304,8 @@ def city_coordinates(full_state=True):
 
 
 def manual_cities(state_map):
-    """Returns dataframe containing data for supplemental cities to add to
+    """
+    Return dataframe containing data for supplemental cities to add to
     original US cities table.
 
     Parameters
@@ -337,7 +343,8 @@ def manual_cities(state_map):
 
 
 def team_coordinates(team_id):
-    """Returns dict mapping teams to geographical coordinates.
+    """
+    Return a dict mapping teams to geographical coordinates.
     
     Parameters
     ----------
@@ -366,9 +373,10 @@ def team_coordinates(team_id):
 
 
 def gym_schedule_coordinates(df):
-    """Returns dict mapping gyms from the input schedule data to geographical
-    coordinates of gyms from a separate external source. Gym names are linked
-    using combination of direct merging and fuzzy string matching. 
+    """
+    Return a dict mapping gyms from the input schedule data to geographical
+    coordinates of gyms from a separate external source. Coordinates are linked
+    using either exact match or fuzzy string match to gym name. 
 
     Parameters
     ----------
@@ -419,7 +427,8 @@ def gym_schedule_coordinates(df):
 
 
 def match_gym(name, options):
-    """Returns the closest match to a gym name from a list of options using a
+    """
+    Return the closest match to a gym name from a list of options using a
     fuzzy string matching algorithm.
 
     Parameters
@@ -440,14 +449,15 @@ def match_gym(name, options):
     # to catch strings with remaining unicode
     except TypeError:
         result = None
-    
+
     return result
 
 
 def gym_city_coordinates(df):
-    """Returns dict mapping gym names from external source of gym cities
+    """
+    Return a dict mapping gym names from external source of gym cities
     to geographical coordinates.
-    
+
     A sequence of steps cleans the gym and city values prior to creating the 
     gym map.
 
@@ -499,8 +509,10 @@ def gym_city_coordinates(df):
 
     return gym_dict
 
+
 def transform_schedule(df):
-    """Returns dataframe with unique game identifier and gym name for games 
+    """
+    Return dataframe with unique game identifier and gym name for games 
     scraped from team schedules.
     
     Sequence of data transformations create the project game
@@ -574,7 +586,8 @@ def convert_schedule_date(raw_date):
 
 
 def schedule_team_ids(df):
-    """Returns schedule dataframe with team numeric identifers added.
+    """
+    Return schedule dataframe with team numeric identifers added.
     
     Parameters
     ----------
@@ -620,7 +633,8 @@ def schedule_team_ids(df):
 
 
 def game_distances(df, team_map):
-    """Returns dataframe with distance to game computed for both teams.
+    """
+    Return dataframe with distance to game computed for both teams.
 
     Parameters
     ----------
@@ -649,7 +663,8 @@ def game_distances(df, team_map):
 
 
 def travel_distance(point_pair):
-    """Returns integer distance between a pair of geographical coordinates.
+    """
+    Return integer distance between a pair of geographical coordinates.
 
     Parameters
     ----------
@@ -668,7 +683,8 @@ def travel_distance(point_pair):
 
 
 def update_teams(df, team_cities):
-    """Returns dataframe with geographical coordinates of new teams to add to
+    """
+    Return dataframe with geographical coordinates of new teams to add to
     original team location data.
 
     Parameters
@@ -683,7 +699,7 @@ def update_teams(df, team_cities):
     -------
     df_add : DataFrame
         Team id number and geographical coordinates of teams to add.
-        
+
     """
     # obtain list of team ids present in existing table
     teams_have = df['team_id'].values
