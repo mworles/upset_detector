@@ -337,9 +337,13 @@ def compute_summaries(df, max_date=None):
     
     return mrg3
 
-def tourney_performance(df):
+def tourney_performance(modifier=None):
     """Uses game results to create team performance indicators for each 
     tournament year.""" 
+    dba = DBAssist()
+    # import results from previous tournaments
+    df = dba.return_data('ncaa_results')
+    dba.close()
 
     # separate winners and losers, to create a team-specific win indicator
     # winners
