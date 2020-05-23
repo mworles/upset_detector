@@ -58,7 +58,6 @@ import pandas as pd
 import numpy as np
 from geopy.distance import great_circle
 from src.data.transfer import DBAssist
-from src.data import transfer
 from src.data import clean
 
 def run(modifier=None):
