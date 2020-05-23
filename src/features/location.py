@@ -60,7 +60,6 @@ from geopy.distance import great_circle
 from src.data.transfer import DBAssist
 from src.data import transfer
 from src.data import clean
-from src.data import generate
 
 def run(modifier=None):
     """
