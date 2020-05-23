@@ -1,8 +1,8 @@
 """ location
 
-A module for transforming, linking, and calcuating data pertaining to the 
-physical location of events, places, or teams. Uses 2-dimensional latittude and
-longitude for geographical coordinates.
+A module for transforming and linking data with the physical location of
+events, places, or teams. Uses latittude and longitude for geographical
+coordinates.
 
 Functions
 ---------
