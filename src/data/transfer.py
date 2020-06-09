@@ -12,14 +12,13 @@ DBAssist
     A tool for creating MySQL objects and extracting data from database.
 
 """
-import ConfigParser
+
+import configparser
 import json
 import pandas as pd
 import pymysql
 from src.constants import SCHEMA_FILE
 from src.constants import CONFIG_FILE
-from src.constants import DB_NAME
-
 
 class DBAssist():
     """
@@ -35,9 +34,8 @@ class DBAssist():
         A pymysql cursor called from the conn attribute.
 
     """
-    def __init__(self, db_name=DB_NAME):
+    def __init__(self):
         """Initialize DBAssist instance."""
-        self.db_name = db_name
         self.conn = self.connect()
         self.cursor = self.conn.cursor()
 
@@ -64,14 +62,14 @@ class DBAssist():
             An open connection with MySQL database.
 
         """
-        parser = ConfigParser.ConfigParser()
+        parser = configparser.ConfigParser()
         parser.readfp(open(config_file))
         
         conn = pymysql.connect(host='127.0.0.1',
                                port=3306,
                                user=parser.get('Local', 'user'),
                                passwd=parser.get('Local', 'pwd'),
-                               db=self.db_name)
+                               db=parser.get('Local', 'db'))
         return conn
 
     def close(self):
@@ -117,8 +115,8 @@ class DBAssist():
         """
         try:
             self.cursor.execute(query_create)
-        except pymysql.err.InternalError, e:
-            print e
+        except pymysql.err.InternalError as e:
+            print(e)
 
     def schema_query(self, table_name, schema_file=SCHEMA_FILE):
         """
@@ -164,8 +162,8 @@ class DBAssist():
         try:
             self.cursor.execute(query)
             self.conn.commit()
-        except pymysql.err.DataError, e:
-            print e
+        except pymysql.err.DataError as e:
+            print(e)
 
     def insert_rows(self, table_name, data, at_once=True):
         """
