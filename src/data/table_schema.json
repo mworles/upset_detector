@@ -1,0 +1,16 @@
+{   
+    "coaches":
+    [   {"name": "season", "type": "INTEGER"},
+        {"name": "team_id", "type": "INTEGER"},
+        {"name": "first_day", "type": "INTEGER"},
+        {"name": "last_day", "type": "INTEGER"},
+        {"name": "coach_name", "type": "VARCHAR(50)"}
+    ],
+
+    "tourney_success":
+    [   {"name": "season", "type": "INTEGER"},
+        {"name": "team_id", "type": "INTEGER"},
+        {"name": "games", "type": "INTEGER"},
+        {"name": "wins", "type": "INTEGER"}
+    ]
+}
