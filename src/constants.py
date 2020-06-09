@@ -29,3 +29,5 @@ SOURCE_ID_YEARS = {'team_ss': 1993,
                    'team_vi_odds': 2019,
                    'team_vi_spreads': 2019,
                    'team_sbro': 2009}
+
+S3_BUCKET = 'worley-upset-detector-public'
