@@ -30,7 +30,6 @@ shift_down
 """
 import numpy as np
 import pandas as pd
-import team
 from src.data.transfer import DBAssist
 
 def run(modifier=None):
@@ -52,7 +51,6 @@ def run(modifier=None):
     # import coach season data
     dba = DBAssist()
     df = dba.return_data('coaches')
-    dba.close()
 
     # handle rare cases of multiple rows for same coach, team, and season
     df = df.sort_values(['team_id', 'last_day'])
@@ -65,7 +63,7 @@ def run(modifier=None):
     coaches_end = coaches_end.drop(['first_day', 'last_day'], axis=1)
     
     # get tourney outcomes for coaches who made the tourney
-    tourney_results = team.tourney_performance()
+    tourney_results = dba.return_data('tourney_success')
     tourney_outcomes = pd.merge(coaches_end, tourney_results, how='inner',
                                 on=['season', 'team_id'])
 
@@ -94,6 +92,9 @@ def run(modifier=None):
     
     # keep identifers (team, season) and numeric features only
     coach_features = coach_features.drop(['coach_name'], axis=1)
+
+    # close database connection
+    dba.close()
 
     return coach_features
 
