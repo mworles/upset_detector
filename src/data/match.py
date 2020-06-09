@@ -33,7 +33,7 @@ import re
 
 class TeamSource():
     """
-    A container for a unique source of team name data.
+    A class to contain data for a unique source of team names.
 
     Attributes
     ----------
