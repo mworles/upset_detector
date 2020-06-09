@@ -6,3 +6,4 @@
 /src/data/scrapers/driver
 *.pkl
 /upset_detector.egg-info
+__pycache__/
