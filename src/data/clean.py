@@ -5,8 +5,6 @@ project data.
 
 Functions
 ---------
-list_of_files
-combine_files
 fuzzy_match
 dates_in_range
 date_after_interval
@@ -31,64 +29,6 @@ from fuzzywuzzy import process
 from fuzzywuzzy import fuzz
 from src.data import table_map
 from src.constants import S3_BUCKET
-
-
-def combine_files(path, tag = None, index_col=False):
-    """
-    Return dataframe produced by combining tabular data files into
-    a single table.
-    
-    Parameters
-    ----------
-    path: string
-        Path to directory containing the files.
-    tag: str, optional, default None
-        If given, restrict file list to files containing the tag.
-    index_col: bool, optional, default False
-        If True, use first column in the file as dataframe index.
-
-    Returns
-    -------
-    df : pandas DataFrame
-        Dataframe resulting from combining the files.
-    
-    """
-    # combine all dataframes
-    file_list = list_of_files(path, tag=tag)
-    df_list = [pd.read_csv(x, index_col=index_col) for x in file_list]
-    df = pd.concat(df_list, sort=False)
-
-    return df
-
-
-def list_of_files(path, tag = None):
-    """
-    Return list of all files in a directory. 
-    
-    Parameters
-    ----------
-    relative_path: string
-        Relative path to directory containing the files.
-    tag: str, optional, default None
-        If given, restrict file list to files containing the tag.
-
-    Returns
-    -------
-    files : list of str
-        List of all files with each element containing the relative path.
-
-    """
-    # collect names of all files in directory
-    file_names = os.listdir(path)
-
-    # if tag given, select file names that include tag
-    if tag is not None:
-        file_names = [x for x in file_names if tag in x]
-
-    # add directory path to files
-    files = [path + x for x in file_names]
-
-    return files
 
 
 def fuzzy_match(target, options, cutoff=85, with_score=False):
