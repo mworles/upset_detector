@@ -22,12 +22,16 @@ team_site_map
 has_columns
 
 """
-import pandas as pd
 import os
 import datetime
+import boto3
+import io
+import pandas as pd
 from fuzzywuzzy import process
 from fuzzywuzzy import fuzz
-from transfer import DBAssist
+from src.data import table_map
+from src.constants import S3_BUCKET
+
 
 def combine_files(path, tag = None, index_col=False):
     """
@@ -241,7 +245,7 @@ def check_date(date_string):
         raise Exception(e)
 
 
-def date_from_daynum(df):
+def date_from_daynum(df, seasons):
     """
     Return dataframe with string date computed from 'daynum' column.
 
@@ -259,15 +263,10 @@ def date_from_daynum(df):
     # test if df contains required columns
     has_columns(df, ['daynum', 'season'])
 
-    # import season data that has date of zero daynum for each season
-    dba = DBAssist()
-    seas = dba.return_data('seasons')
-    dba.close()
-
     # season dayzero to datetime to compute deltas
     dt_zero = map(lambda x: datetime.datetime.strptime(x, '%m/%d/%Y'),
-                  seas['dayzero'])
-    season_map = {k: v for k, v in zip(seas['season'].values, dt_zero)}
+                  seasons['dayzero'])
+    season_map = {k: v for k, v in zip(seasons['season'].values, dt_zero)}
     
     season_day = zip(df['season'].values, df['daynum'].values)
 
@@ -433,3 +432,49 @@ def has_columns(df, columns):
     """Assert that a dataframe contains all of the lised columns."""
     has_all = all(elem in df.columns for elem in columns)
     assert(has_all is True), "df must contain {}".format(", ".join(columns))
+
+
+def s3_data(file_name):
+    s3_resource = boto3.resource('s3')    
+    s3_object = s3_resource.Object(bucket_name=S3_BUCKET, key=file_name)
+    response = s3_object.get()
+    data_string = response['Body'].read().decode('utf-8', 'ignore')
+    data = pd.read_csv(io.StringIO(data_string))
+    return data
+
+
+def s3_folder_data(folder_name):
+    folder_files = s3_folder_files(folder_name)
+    s3_resource = boto3.resource('s3')
+    df_list = []
+    for file in folder_files:
+        s3_object = s3_resource.Object(bucket_name=S3_BUCKET, key=file)
+        response = s3_object.get()
+        data_string = response['Body'].read().decode('utf-8', 'ignore')
+        file_data = pd.read_csv(io.StringIO(data_string))
+        file_data['file'] = file
+        df_list.append(file_data)
+    df = pd.concat(df_list)
+    return df
+
+
+def s3_folder_files(folder_name):
+    s3_resource = boto3.resource('s3')
+    s3_bucket = s3_resource.Bucket(S3_BUCKET)
+    file_prefix = "{}/".format(folder_name)
+    files = [obj.key for obj in s3_bucket.objects.filter(Prefix=file_prefix)]
+    files.remove(file_prefix)
+    return files
+
+
+def convert_raw_file(file_name, key=table_map.KEY):
+    df = s3_data(file_name)
+    raw_name = file_name.replace('.csv', '')
+    try:
+        df = df.rename(columns=key[raw_name]['columns'])
+    except KeyError:
+        pass
+    # make any other columns lowercase for consistency
+    df.columns = df.columns.str.lower()
+
+    return df
