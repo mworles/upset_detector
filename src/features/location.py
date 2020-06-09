@@ -175,7 +175,8 @@ def neutral_games(neutral):
                   right_on='city_id')
 
     # create game id and keep relevant games
-    df = clean.date_from_daynum(df)
+    seasons = dba.return_data('seasons')
+    df = clean.date_from_daynum(df, seasons)
     df = clean.order_team_id(df, ['wteam', 'lteam'])
     df = clean.make_game_id(df)
     df = df[df['game_id'].isin(neutral)]
@@ -191,7 +192,8 @@ def neutral_games(neutral):
     tg = dba.return_data('tourney_geog', modifier='WHERE season < 2010')
 
     # add unique game id from teams and date
-    tg = clean.date_from_daynum(tg)
+    seasons = dba.return_data('seasons')
+    tg = clean.date_from_daynum(tg, seasons)
     tg = clean.order_team_id(tg, ['wteam', 'lteam'])
     tg = clean.make_game_id(tg)
     tg['game_loc'] = zip(tg['latitude'].values, tg['longitude'].values)
