@@ -128,6 +128,8 @@ custom functions to create and store search objects, extract appropriate objects
 iterative updates to refine the search space over time. 
 
 ### Model Selection and Results
+Add description of results here...
+
 ![precision_recall](images/test_precision_recall.jpg)
 
 ![roc](images/test_ROC.jpg)  
@@ -139,3 +141,13 @@ iterative updates to refine the search space over time.
 | Gradient Boosted Trees  | 0.491  | 0.56 | 0.438 |
 | Neural network  | 0.464  | 0.64 | 0.364 |
 | Random Forest  | 0.424  | 0.56 | 0.341 |
+
+
+**Confusion matrix for prediction of 2017 tournament**
+
+![confusion_matrix](images/confusion_matrix.jpg)
+
+**Comparison to all entries in 2017 Kaggle contest**  
+Comparison on upset recall (vertical axis), precision (horizontal axis), and *F1* (size of dot) 
+between my upset detection model and all entries in 2017 Kaggle contest
+![kaggle_f1](images/kaggle_f1.jpg)
