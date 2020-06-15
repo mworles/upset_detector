@@ -70,7 +70,8 @@ that could be useful in predicting upsets. A few examples are shown below.
 **Underdog and Favorite Efficiency Rating**  
 Upsets (in red) shown as function of favorite efficiency rating (vertical axis) and
 underdog efficiency rating (horizontal axis). Upsets are concentrated in matchups 
-that pit favorites with ratings below 25 against underdogs with ratings above 10. 
+that pit favorites with ratings below 25 against underdogs with ratings above 10.  
+
 ![datavis_0](images/datavis_0.jpg)
 
 This plot suggests a simple combination of three team features could be sufficient
@@ -196,3 +197,5 @@ Using historical odds data from [this website](https://www.oddsportal.com/), I
 computed the loss and profit for 42 $100 gambles on the winner of each game according 
 to the upset model predictions. In the plot below I show the cumulative net
 return over the course of the 2017 tournament.  
+
+![test_roi](images/test_roi.jpg)
