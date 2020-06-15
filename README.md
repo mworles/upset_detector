@@ -71,7 +71,6 @@ that could be useful in predicting upsets. A few examples are shown below.
 Upsets (in red) shown as function of favorite efficiency rating (vertical axis) and
 underdog efficiency rating (horizontal axis). Upsets are concentrated in matchups 
 that pit favorites with ratings below 25 against underdogs with ratings above 10.  
-
 ![datavis_0](images/datavis_0.jpg)
 
 This plot suggests a simple combination of three team features could be sufficient
@@ -81,8 +80,7 @@ and their product.
 **Offensive Rebound plus Turnover Margin**  
 This metric represents the extent that a team typically creates an advantage in scoring 
 opportunities by getting more offensive rebounds and having fewer turnovers
-than their opponent.  
-For the plot below I split the data by upset status (upset or not), and 
+than their opponent. I split the data by upset status (upset or not), and 
 computed the average margin for the favorites and underdogs in each game. Upsets tend to occur
 when an underdog has a greater margin than their favored opponent. 
 
@@ -90,7 +88,7 @@ when an underdog has a greater margin than their favored opponent.
 
 **Strength of schedule rating**  
 "Strength of schedule" captures the difficulty of a team's previous opponents over
-the course of their season, as computed on [sports-reference.com](https://www.sports-reference.com/cbb/).  
+the course of their season, as computed on [sports-reference.com](https://www.sports-reference.com/cbb/).
 Upsets tend to involve underdogs who played a more difficult pre-tournament schedule.  
 ![datavis_2](images/datavis_2.jpg)
 
@@ -161,25 +159,28 @@ produced the highest test set *F1* score.
 
 To visualize classifier performance, I produced ROC curves for each algorithm. I
 noticed that the top 3 algorithms each had distinct areas of superior performance on 
-ROC curves. Combining these 3 model into an ensemble might produce even better predictions. 
+ROC curves. Combining these 3 model into an ensemble might produce even better predictions.  
+
 ![roc](images/test_ROC.jpg)
 
 ### Business Use Case
 
-#####Upset model performance in single tournament
+##### Upset model performance in single tournament
 To assess how the model would perform in a typical use case, I used the logistic regression
 classifier to predict upsets in a single season, the 2017 tournament.
-Model predictions produced the results shown in the confusion matrix and metrics below. 
-The model predicted 8 of 10 true upsets, and of the 15 upset predictions, 8 were correct. 
-Overall accuracy was 0.79, with 33 of 42 games predicted correctly. 
+Model predictions produced the results shown in the confusion matrix and metrics below.  
+###### Confusion matrix and classification metrics - 2017 tournament  
 
-**Confusion matrix and classification metrics for 2017 tournament**
 ![confusion_matrix](images/confusion_matrix.jpg)
+
 | *F1* score | Recall | Precision | Accuracy |
 | ---------- | ------ | --------- | -------- |
 | 0.64 | 0.80 | 0.53 | 0.79 |
 
-#####Competitive Benchmark Comparison
+The model predicted 8 of 10 true upsets, and of the 15 upset predictions, 8 were correct. 
+Overall accuracy was 0.79, with 33 of 42 games predicted correctly. 
+
+##### Competitive Benchmark Comparison 
 To compare this performance to predictions from other models, I obtained all participant prediction files from 
 the public release of the [2017 Kaggle contest](https://www.kaggle.com/c/march-machine-learning-mania-2017).
 Although the main goal of this context is not to predict upsets accurately, it would still serve as
@@ -188,11 +189,11 @@ that my model performed in the 1st percentile of this metric, bested by only one
 My model achieved an ideal balance between upset precision and recall as shown in the 
 plot below. 
 
-**Upset recall (vertical axis), precision (horizontal axis), and *F1* (dot size) 
-for my final upset detection model and all entries in 2017 Kaggle contest**
+Upset recall (vertical axis), precision (horizontal axis), and *F1* (dot size)
+for my final upset detection model and all entries in 2017 Kaggle contest
 ![kaggle_f1](images/kaggle_f1.jpg)
 
-#####Return on Investment Analysis
+##### Return on Investment Analysis
 Using historical odds data from [this website](https://www.oddsportal.com/), I
 computed the loss and profit for 42 $100 gambles on the winner of each game according 
 to the upset model predictions. In the plot below I show the cumulative net
