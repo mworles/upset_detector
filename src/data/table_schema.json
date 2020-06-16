@@ -12,5 +12,26 @@
         {"name": "team_id", "type": "INTEGER"},
         {"name": "games", "type": "INTEGER"},
         {"name": "wins", "type": "INTEGER"}
+    ],
+    "team_season_stats":
+    [   {"name": "team_id", "type": "INTEGER"},
+        {"name": "season", "type": "INTEGER"},
+        {"name": "ppg", "type": "FLOAT"},
+        {"name": "ppg_d", "type": "FLOAT"},
+        {"name": "scrmarg", "type": "FLOAT"},
+        {"name": "ftrat", "type": "FLOAT"},
+        {"name": "ftmrat", "type": "FLOAT"},
+        {"name": "ftrat_d", "type": "FLOAT"},
+        {"name": "efgpct", "type": "FLOAT"},
+        {"name": "efgpct_d", "type": "FLOAT"},
+        {"name": "drbpct", "type": "FLOAT"},
+        {"name": "orbpct", "type": "FLOAT"},
+        {"name": "orbtomarg", "type": "FLOAT"},
+        {"name": "topct", "type": "FLOAT"},
+        {"name": "topct_d", "type": "FLOAT"},
+        {"name": "scrmargsd", "type": "FLOAT"},
+        {"name": "wpctlast5", "type": "FLOAT"},
+        {"name": "wpctlast10", "type": "FLOAT"},
+        {"name": "winpct", "type": "FLOAT"}
     ]
 }
