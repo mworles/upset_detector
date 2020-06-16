@@ -63,7 +63,7 @@ production profiles, player experience, player height, and temporal metrics of t
 I used data exploration to gain insights into features or feature combinations
 that could be useful in predicting upsets. A few examples are shown below. 
 
-##### Underdog and Favorite Efficiency Rating
+#### Underdog and Favorite Efficiency Rating
 Upsets (in red) shown as function of favorite efficiency rating (vertical axis) and
 underdog efficiency rating (horizontal axis). Upsets are concentrated in matchups 
 that pit favorites with ratings below 25 against underdogs with ratings above 10.  
@@ -72,7 +72,7 @@ that pit favorites with ratings below 25 against underdogs with ratings above 10
 This plot suggests a reasonable baseline model could be informed by 3 features:
 underdog efficiency, favorite efficiency, and their product.  
 
-##### Offensive Rebound plus Turnover Margin  
+#### Offensive Rebound plus Turnover Margin  
 This metric represents the extent that a team typically creates an advantage in scoring 
 opportunities by getting more offensive rebounds and having fewer turnovers
 than their opponent. I split the data by upset status (upset or not), and 
@@ -81,7 +81,7 @@ when an underdog has a greater margin than their favored opponent.
 
 ![datavis_1](images/datavis_1.jpg)
 
-##### Strength of schedule rating  
+#### Strength of schedule rating  
 "Strength of schedule" captures the difficulty of a team's previous opponents over
 the course of their season, as computed on [sports-reference.com](https://www.sports-reference.com/cbb/).
 Upsets tend to involve underdogs who played a more difficult pre-tournament schedule. 
@@ -140,7 +140,7 @@ were produced to more fully characterize algorithm performance on the test set.
 As shown in the table below, logistic regression and support vector machines 
 produced the highest test set *F1* score.  
 
-##### Test set upset classification metrics for each algorithm
+**Test set upset classification metrics for each algorithm**  
 | Algorithm  | *F1* score | Recall | Precision |
 | ---------- | ------------------- | --------- | ------ |
 | Support Vector Machines  | 0.545  | 0.84| 0.404 |
@@ -161,7 +161,8 @@ combining these 3 models into an ensemble might produce even better predictions.
 To assess model performance in a typical use case, I used the logistic regression
 classifier to predict upsets for a single season, the 2017 tournament.
 Model predictions produced the results shown in the confusion matrix and metrics below.  
-##### Confusion matrix and classification metrics - 2017 tournament  
+
+**Confusion matrix and classification metrics - 2017 tournament**  
 ![confusion_matrix](images/confusion_matrix.jpg)
 
 | *F1* score | Recall | Precision | Accuracy |
@@ -181,9 +182,8 @@ the full distribution of *F1* scores, my model performed in the 1st percentile, 
 achieved an ideal balance between upset precision and recall as shown in the 
 plot below. 
 
-##### Upset recall (vertical axis), precision (horizontal axis), and *F1* (dot size)
-for my final upset detection model and all entries in 2017 Kaggle contest 
-
+**Upset recall (vertical axis), precision (horizontal axis), and *F1* (dot size)
+for my final upset detection model and all entries in 2017 Kaggle contest**   
 ![kaggle_f1](images/kaggle_f1.jpg)
 
 #### Return on Investment Analysis
