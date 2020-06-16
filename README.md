@@ -21,7 +21,7 @@ one's overall accuracy is modest.
 ## Project Summary
 The rest of this page provides a high-level overview of the structure of this project 
 and the results (side note: I continue to update this project privately with the intent
-of releasing a web tool, so this repo contains only some of the features and updates)
+of releasing a web tool, so this repo contains only some of the features and updates).
 
 ### Data Sources
 By accessing public downloadable files and writing web scrapers I collected raw data in several domains
@@ -182,7 +182,8 @@ achieved an ideal balance between upset precision and recall as shown in the
 plot below. 
 
 ##### Upset recall (vertical axis), precision (horizontal axis), and *F1* (dot size)
-for my final upset detection model and all entries in 2017 Kaggle contest
+for my final upset detection model and all entries in 2017 Kaggle contest 
+
 ![kaggle_f1](images/kaggle_f1.jpg)
 
 #### Return on Investment Analysis
