@@ -4,8 +4,53 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LogisticRegression
 from imblearn.over_sampling import RandomOverSampler
 from imblearn.pipeline import make_pipeline
-from sklearn.metrics import f1_score
 from src.data.transfer import DBAssist
+import plotly
+
+
+def plot_roi(data):
+    x_values = data.index.values
+    y_values = data['net_cumulative'].values
+    net_result = data['net_won'].astype(int).values
+    favorites = data['Favorite'].values
+    underdogs = data['Underdog'].values
+    predictions = np.where(data['prediction'] == 1,
+                           underdogs,
+                           favorites)
+    go = plotly.graph_objects
+    fig = go.Figure()
+
+    fig.add_trace(go.Scatter(
+        x=x_values,
+        y=y_values,
+        mode="lines+markers",
+        marker={'size': 12},
+        marker_symbol='diamond',
+        customdata = list(zip(favorites, underdogs, predictions,
+                              net_result)),
+        hovertemplate = """Favorite: %{customdata[0]}
+        <br>Underdog: %{customdata[1]}
+        <br>Prediction :%{customdata[2]}
+        <br>Net Return: %{customdata[3]}""",
+        name=''
+    ))
+
+    fig.update_layout(
+        title="Cumulative net winnings - 2017 Tournament",
+        xaxis_title="Game Number",
+        yaxis_title="Total Winnings",
+        font={'size': 20})
+
+    # create static image for README
+    fig.write_image("../../images/test_roi.jpg")
+
+    # write interative html to file for github pages
+    fig.write_html("../../docs/index.html")
+    
+    fig.show()
+
+# manually launch orca server outside of script
+plotly.io.orca.config.server_url = "http://localhost:9091"
 
 data_path = '../../data/processed/'
 
@@ -114,5 +159,6 @@ def add_team_names(game_data):
 test_odds = add_team_names(test_odds)
 test_odds = test_odds.sort_values(['rnd'])
 test_odds['net_cumulative'] = test_odds['net_won'].cumsum()
+test_odds = test_odds.reset_index(drop=True)
 
-test_odds.to_csv(data_path + '../results/bets_2017.csv', index=False)
+plot_roi(test_odds)
